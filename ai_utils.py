@@ -637,7 +637,7 @@ def feature_point_cloud(P):
     return P, center
 
 
-def graph(P, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0.1, d_se_max=0):
+def graph(P, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0.1, d_se_max=0, max_sp_size=7000):
     # TODO: copy point cloud P before processing?
     print("Compute superpoint graph")
     n_sps, n_edges, sp_idxs, senders, receivers = superpoint_graph(
@@ -651,25 +651,27 @@ def graph(P, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0.1, 
     print("Superpoint graph has {0} nodes and {1} edges".format(n_sps, n_edges))
     print("Compute features for every superpoint")
     P, center = feature_point_cloud(P=P)
-    n_ft = 910
-    if n_ft is None:
-        idxs = np.unique(sp_idxs[0])
-        #print(idxs.shape)
-        sp = P[idxs]
-        #return None
-        features = compute_features(P=sp)
-        n_ft = features.shape[0]
-        print("Use {0} features".format(n_ft))
-    node_features = np.zeros((n_sps, n_ft), dtype=np.float32)
+
     sps_sizes = []
-    for k in range(n_sps):
+    idxs = np.unique(sp_idxs[0])
+    sp_size = idxs.shape[0]
+    if sp_size > max_sp_size:
+        raise Exception("Superpoint {0} too large with {1} points (max: {2}). Try to lower the reg_strength.".format(0, sp_size, max_sp_size))
+    sps_sizes.append(sp_size)
+    sp = P[idxs]
+    features = compute_features(P=sp)
+    n_ft = features.shape[0]
+    print("Use {0} features".format(n_ft))
+    sp_idxs[0] = idxs
+    node_features = np.zeros((n_sps, n_ft), dtype=np.float32)
+    node_features[0] = features
+    for k in range(1, n_sps):
         idxs = np.unique(sp_idxs[k])
         #print(idxs.shape)
-        # TODO: better solution for hugh superpoints
-        if idxs.shape[0] > 7000 :
-            raise Exception("SP too big: {0}".format(idxs.shape[0]))
         sp = P[idxs]
         sp_size = sp.shape[0]
+        if sp_size > max_sp_size:
+            raise Exception("Superpoint {0} too large with {1} points (max: {2}). Try to lower the reg_strength.".format(k, sp_size, max_sp_size))
         sps_sizes.append(sp_size)
         # TODO: remove random features!
         #features = np.random.randn(n_ft, )

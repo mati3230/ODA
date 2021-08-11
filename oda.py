@@ -21,6 +21,8 @@ def main():
     parser.add_argument("--k_nn_adj", default=10, type=int, help="Adjacency structure for the minimal partition.")
     parser.add_argument("--lambda_edge_weight", default=1., type=float, help="Parameter determine the edge weight for minimal part.")
     parser.add_argument("--d_se_max", default=0, type=float, help="Max length of super edges.")
+    parser.add_argument("--initial_db", default=0.5, type=float, help="Initial guess for the decision boundary.")
+    parser.add_argument("--max_sp_size", default=7000, type=int, help="Maximum size of a superpoint.")
     args = parser.parse_args()
 
     if not args.gpu:
@@ -39,17 +41,15 @@ def main():
         k_nn_geof=args.k_nn_geof,
         lambda_edge_weight=args.lambda_edge_weight,
         reg_strength=args.reg_strength,
-        d_se_max=args.d_se_max)
-    unions, probs = predict(graph_dict=graph_dict)
+        d_se_max=args.d_se_max,
+        max_sp_size=args.max_sp_size)
+    unions, probs = predict(graph_dict=graph_dict, dec_b=args.initial_db)
 
     data = np.load("colors.npz")
     colors = data["colors"]
     p_pcd = partition_pcd(graph_dict=graph_dict, unions=unions, P=P, sp_idxs=sp_idxs, colors=colors)
     o3d.visualization.draw_geometries([p_pcd])
-    #vis = visualizer()
-    #vis.add_geometry(p_pcd)
-    #vis.run()
-    #vis.destroy_window()
+
     while True:
         d_b = input("Decision Boundary [0,1] (exit: -1):")
         try:
