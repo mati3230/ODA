@@ -3,12 +3,8 @@ import open3d as o3d
 import igraph as ig
 
 
-def visualizer():
-    vis = o3d.visualization.VisualizerWithEditing()
-    vis.create_window()
-    cs = coordinate_system()
-    vis.add_geometry(cs)
-    return vis
+def render(pcd):
+    o3d.visualization.draw_geometries([pcd])
 
 
 def coordinate_system():
@@ -54,6 +50,21 @@ def partition_vec(ig_graph, n_P, sp_idxs):
             p_vec[P_idxs] = c
         c += 1
     return p_vec
+
+
+def initial_partition_pcd(P, sp_idxs, colors):
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(P[:, :3])
+    n_P = P.shape[0]
+    C = np.zeros((n_P, 3))
+    n_sps = len(sp_idxs)
+    for i in range(n_sps):
+        idxs = sp_idxs[i]
+        color = colors[i, :]
+        #print(len(idx), color)
+        C[idxs, :] = color / 255
+    pcd.colors = o3d.utility.Vector3dVector(C)
+    return pcd
 
 
 def partition_pcd(graph_dict, unions, P, sp_idxs, colors):

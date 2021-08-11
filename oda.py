@@ -3,7 +3,7 @@ import open3d as o3d
 import argparse
 import os
 
-from visu_utils import visualizer, partition_pcd
+from visu_utils import partition_pcd, initial_partition_pcd, render
 from io_utils import load
 from ai_utils import graph, predict
 
@@ -29,6 +29,7 @@ def main():
         os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
     np.random.seed(args.seed)
     P, pcd = load(file=args.file, r=args.r, g=args.g, b=args.b, p=args.p)
+    render(pcd)
     """
     n_P = 10000
     P = 5*np.random.randn(n_P, 3)
@@ -36,19 +37,22 @@ def main():
     P = np.hstack((P, C)).astype(np.float32)
     """
     graph_dict, sp_idxs = graph(
-        P=P,
+        cloud=P,
         k_nn_adj=args.k_nn_adj,
         k_nn_geof=args.k_nn_geof,
         lambda_edge_weight=args.lambda_edge_weight,
         reg_strength=args.reg_strength,
         d_se_max=args.d_se_max,
         max_sp_size=args.max_sp_size)
-    unions, probs = predict(graph_dict=graph_dict, dec_b=args.initial_db)
 
     data = np.load("colors.npz")
     colors = data["colors"]
+    p_pcd = initial_partition_pcd(P=P, sp_idxs=sp_idxs, colors=colors)
+    render(p_pcd)
+
+    unions, probs = predict(graph_dict=graph_dict, dec_b=args.initial_db)
     p_pcd = partition_pcd(graph_dict=graph_dict, unions=unions, P=P, sp_idxs=sp_idxs, colors=colors)
-    o3d.visualization.draw_geometries([p_pcd])
+    render(p_pcd)
 
     while True:
         d_b = input("Decision Boundary [0,1] (exit: -1):")
@@ -61,7 +65,7 @@ def main():
         unions = np.zeros((unions.shape[0], ), dtype=np.bool)
         unions[probs > d_b] = True
         p_pcd = partition_pcd(graph_dict=graph_dict, unions=unions, P=P, sp_idxs=sp_idxs, colors=colors)
-        o3d.visualization.draw_geometries([p_pcd])
+        render(p_pcd)
 
 
 if __name__ == "__main__":

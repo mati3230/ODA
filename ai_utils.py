@@ -637,8 +637,8 @@ def feature_point_cloud(P):
     return P, center
 
 
-def graph(P, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0.1, d_se_max=0, max_sp_size=7000):
-    # TODO: copy point cloud P before processing?
+def graph(cloud, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0.1, d_se_max=0, max_sp_size=7000):
+    P = np.array(cloud, copy=True)
     print("Compute superpoint graph")
     n_sps, n_edges, sp_idxs, senders, receivers = superpoint_graph(
         xyz=P[:, :3],

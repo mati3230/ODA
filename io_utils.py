@@ -60,6 +60,8 @@ def cloud(P, pcd, r=255, g=0, b=0, p=1):
     colors_available = P.shape[1] == 6
     P, pcd = colorize(P=P, pcd=pcd, colors_available=colors_available, r=r, g=g, b=b)
     P, pcd = subsample(P=P, p=p, pcd=pcd)
+    C = np.asarray(pcd.colors) / 255
+    pcd.colors = o3d.utility.Vector3dVector(C)
     return P, pcd
 
 
@@ -82,7 +84,7 @@ def from_pcd(file, r=255, g=0, b=0, p=1):
     pcd = o3d.io.read_point_cloud(file)
     P = np.asarray(pcd.points)
     if pcd.colors is not None:
-        C = pcd.colors
+        C = np.asarray(pcd.colors)
         P = np.hstack((P, C))
     P, pcd = cloud(P=P, pcd=pcd, r=r, g=g, b=b, p=p)
     return P, pcd
