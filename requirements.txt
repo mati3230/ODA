@@ -1,8 +1,7 @@
-tensorflow	
-numpy
-open3d
-sklearn
-scipy
-graph_nets
-sonnet
-python-igraph
+tensorflow>=2.5.0
+numpy>=1.19.5
+open3d>=0.13.0
+sklearn>=0.0
+scipy>=1.5.4
+dm-sonnet>=2.0.0
+python-igraph>=0.9.6
