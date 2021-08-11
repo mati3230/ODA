@@ -1,2 +1,14 @@
+# An array with colors to plot a partition
+colors.npz
+
+# Weights of the neural network
+model.npz
+
 # Python
 __pycache__
+
+# Windows Dependencies
+boost_numpy36-vc142-mt-x64-1_74.dll
+boost_python36-vc142-mt-x64-1_74.dll
+cp_ext.pyd
+ply_c_ext.pyd

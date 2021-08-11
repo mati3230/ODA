@@ -4,6 +4,35 @@ import math
 import os
 
 
+def mkdir(directory):
+    """Method to create a new directory.
+
+    Parameters
+    ----------
+    directory : str
+        Relative or absolute path.
+    """
+    if not os.path.isdir(directory):
+        os.makedirs(directory)
+
+
+def file_exists(filepath):
+    """Check if a file exists.
+
+    Parameters
+    ----------
+    filepath : str
+        Relative or absolute path to a file.
+
+    Returns
+    -------
+    boolean
+        True if the file exists.
+
+    """
+    return os.path.isfile(filepath)
+
+
 def check_color_value(c):
     if c > 255 or c < 0:
         raise Exception("Invalid color value: {0}".format(c))
