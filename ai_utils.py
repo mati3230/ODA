@@ -552,7 +552,13 @@ def estimate_normals_curvature(P, k_neighbours=5):
     
     p = np.matlib.repmat(P, k_neighbours, 1)
     p = np.reshape(p, (n_P, k_neighbours, n))
-    p = p - p_nns
+    try:
+        p = p - p_nns
+    except Exception as e:
+        normals = np.zeros((n_P, 3), dtype=np.float32)
+        normals[:, 0] = 1
+        curvature = np.zeros((n_P, ), dtype=np.float32)
+        return normals, curvature
     
     C = np.zeros((n_P,6))
     C[:,0] = np.sum(np.multiply(p[:,:,0], p[:,:,0]), axis=1)
@@ -631,10 +637,17 @@ def feature_point_cloud(P):
     return P, center
 
 
-def graph(P):
+def graph(P, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0.1, d_se_max=0):
     # TODO: copy point cloud P before processing?
     print("Compute superpoint graph")
-    n_sps, n_edges, sp_idxs, senders, receivers = superpoint_graph(xyz=P[:, :3], rgb=P[:, 3:])
+    n_sps, n_edges, sp_idxs, senders, receivers = superpoint_graph(
+        xyz=P[:, :3],
+        rgb=P[:, 3:],
+        reg_strength=reg_strength,
+        k_nn_geof=k_nn_geof,
+        k_nn_adj=k_nn_adj,
+        lambda_edge_weight=lambda_edge_weight,
+        d_se_max=d_se_max)
     print("Superpoint graph has {0} nodes and {1} edges".format(n_sps, n_edges))
     print("Compute features for every superpoint")
     P, center = feature_point_cloud(P=P)
@@ -652,12 +665,15 @@ def graph(P):
     for k in range(n_sps):
         idxs = np.unique(sp_idxs[k])
         #print(idxs.shape)
+        # TODO: better solution for hugh superpoints
+        if idxs.shape[0] > 7000 :
+            raise Exception("SP too big: {0}".format(idxs.shape[0]))
         sp = P[idxs]
         sp_size = sp.shape[0]
         sps_sizes.append(sp_size)
         # TODO: remove random features!
-        features = np.random.randn(n_ft, )
-        #features = compute_features(P=sp)
+        #features = np.random.randn(n_ft, )
+        features = compute_features(P=sp)
         node_features[k] = features
         sp_idxs[k] = idxs
     print("Average superpoint size: {0:.2f} ({1:.2f})".format(np.mean(sps_sizes), np.std(sps_sizes)))
