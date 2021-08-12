@@ -210,4 +210,4 @@ def save_meshes(meshes, fdir):
     mkdir(fdir)
     for i in range(len(meshes)):
         mesh = meshes[i]
-        o3d.io.write_triangle_mesh(fdir + "/mesh_" + str(i) + ".obj", mesh)
+        o3d.io.write_triangle_mesh(fdir + "/mesh_" + str(i) + ".glb", mesh)

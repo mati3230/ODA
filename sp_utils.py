@@ -157,8 +157,8 @@ def reconstruct_obj(P, alpha):
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(P[:, :3])
     pcd.colors = o3d.utility.Vector3dVector(P[:, 3:] / 255.)
-    pcd.estimate_normals()
 
+    #pcd.estimate_normals()
     #mesh, _ = o3d.geometry.TriangleMesh.create_from_point_cloud_poisson(pcd, depth=9)
     
     #radii = [0.005, 0.01, 0.02, 0.04]
