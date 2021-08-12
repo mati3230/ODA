@@ -34,6 +34,37 @@ def file_exists(filepath):
     return os.path.isfile(filepath)
 
 
+def load_colors():
+    data = np.load("colors.npz")
+    colors = data["colors"]
+    return colors
+
+
+def load_unions(fdir, graph_dict):
+    file = fdir + "/unions.h5"
+    if not file_exists(filepath=file):
+        return None
+    hf = h5py.File(file, "r")
+    unions = np.array(hf["unions"], copy=True)
+    senders = np.array(hf["senders"], copy=True)
+    receivers = np.array(hf["receivers"], copy=True)
+    hf.close()
+    graph_dict["senders"] = senders
+    graph_dict["receivers"] = receivers
+    return unions, graph_dict
+
+
+def save_unions(fdir, unions, graph_dict):
+    mkdir(fdir)
+    hf = h5py.File(fdir + "/unions.h5", "w")
+    hf.create_dataset("unions", data=unions)
+    senders = graph_dict["senders"]
+    receivers = graph_dict["receivers"]
+    hf.create_dataset("senders", data=senders)
+    hf.create_dataset("receivers", data=receivers)
+    hf.close()
+
+
 def save_probs(fdir, P, graph_dict, sp_idxs, probs, initial_db, save_init=False):
     if save_init:
         save_init_graph(fdir=fdir, P=P, graph_dict=graph_dict, sp_idxs=sp_idxs)
@@ -173,3 +204,10 @@ def subsample(P, p):
     idxs = np.random.choice(a=idxs, size=size, replace=False)
     P = P[idxs]
     return P
+
+
+def save_meshes(meshes, fdir):
+    mkdir(fdir)
+    for i in range(len(meshes)):
+        mesh = meshes[i]
+        o3d.io.write_triangle_mesh(fdir + "/mesh_" + str(i) + ".obj", mesh)

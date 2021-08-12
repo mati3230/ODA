@@ -4,6 +4,9 @@ colors.npz
 # Folder where inbetween results are stored
 tmp
 
+# Folder where the meshes are stored 
+out
+
 # Weights of the neural network
 model.npz
 

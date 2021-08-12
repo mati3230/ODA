@@ -2,9 +2,10 @@ import numpy as np
 import argparse
 import os
 
-from visu_utils import partition_pcd, initial_partition_pcd, render
-from io_utils import load_cloud, save_init_graph, load_init_graph, save_probs, load_probs
+from visu_utils import partition_pcd, initial_partition_pcd, render, pick_sp_points
+from io_utils import load_cloud, save_init_graph, load_init_graph, save_probs, load_probs, save_unions, load_unions, load_colors
 from ai_utils import graph, predict
+from sp_utils import unify
 
 def main():
     parser = argparse.ArgumentParser()
@@ -27,10 +28,12 @@ def main():
     parser.add_argument("--save_probs", default=False, type=bool, help="Save the processed superpoint graph in g_dir.")
     parser.add_argument("--load_probs", default=False, type=bool, help="Load the processed superpoint graph from g_dir.")
     parser.add_argument("--g_dir", default="./tmp", type=str, help="Directory where the graphs will be stored.")
+    parser.add_argument("--col_c", default=0.8, type=float, help="Strength of the contrast of the superpoints.")
+    parser.add_argument("--load_unions", default=False, type=bool, help="Load the unions from g_dir.")
     args = parser.parse_args()
-    
-    data = np.load("colors.npz")
-    colors = data["colors"]
+    col_c = 1 - args.col_c
+
+    colors = load_colors()
     
     if not args.gpu:
         os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
@@ -44,12 +47,6 @@ def main():
         P, graph_dict, sp_idxs = load_init_graph(fdir=args.g_dir)
     if P is None:
         P = load_cloud(file=args.file, r=args.r, g=args.g, b=args.b, p=args.p)
-        """
-        n_P = 10000
-        P = 5*np.random.randn(n_P, 3)
-        C = np.random.randint(low=0, high=255, size=(n_P, 3))
-        P = np.hstack((P, C)).astype(np.float32)
-        """
         graph_dict, sp_idxs = graph(
             cloud=P,
             k_nn_adj=args.k_nn_adj,
@@ -67,25 +64,38 @@ def main():
         unions, probs = predict(graph_dict=graph_dict, dec_b=args.initial_db)
         if args.save_probs:
             save_probs(fdir=args.g_dir, P=P, graph_dict=graph_dict, sp_idxs=sp_idxs, probs=probs, save_init=not args.save_init_g, initial_db=args.initial_db)
+    if args.load_unions:
+        unions, graph_dict = load_unions(fdir=args.g_dir, graph_dict=graph_dict)
 
+    #"""
     render(P)
     p_pcd = initial_partition_pcd(P=P, sp_idxs=sp_idxs, colors=colors)
     render(p_pcd)
-    p_pcd = partition_pcd(graph_dict=graph_dict, unions=unions, P=P, sp_idxs=sp_idxs, colors=colors)
+    #"""
+    p_pcd = partition_pcd(graph_dict=graph_dict, unions=unions, P=P, sp_idxs=sp_idxs, colors=colors, col_d=col_c)
     render(p_pcd)
-
+    #"""
+    if not args.load_unions:
+        while True:
+            d_b = input("Decision Boundary [0,1] (exit: -1):")
+            try:
+                d_b = float(d_b)
+            except:
+                continue
+            if d_b == -1:
+                break
+            unions = np.zeros((unions.shape[0], ), dtype=np.bool)
+            unions[probs > d_b] = True
+            p_pcd = partition_pcd(graph_dict=graph_dict, unions=unions, P=P, sp_idxs=sp_idxs, colors=colors, col_d=col_c)
+            render(p_pcd)
+        save_unions(fdir=args.g_dir, unions=unions, graph_dict=graph_dict)
+    #"""
     while True:
-        d_b = input("Decision Boundary [0,1] (exit: -1):")
-        try:
-            d_b = float(d_b)
-        except:
-            continue
-        if d_b == -1:
-            return
-        unions = np.zeros((unions.shape[0], ), dtype=np.bool)
-        unions[probs > d_b] = True
-        p_pcd = partition_pcd(graph_dict=graph_dict, unions=unions, P=P, sp_idxs=sp_idxs, colors=colors)
-        render(p_pcd)
+        picked_points_idxs = pick_sp_points(p_pcd)
+        #picked_points_idxs = [8659, 54049]
+        graph_dict, unions = unify(picked_points_idxs=picked_points_idxs, sp_idxs=sp_idxs, graph_dict=graph_dict, unions=unions)
+        p_pcd = partition_pcd(graph_dict=graph_dict, unions=unions, P=P, sp_idxs=sp_idxs, colors=colors, col_d=col_c)
+        save_unions(fdir=args.g_dir, unions=unions, graph_dict=graph_dict)
 
 
 if __name__ == "__main__":

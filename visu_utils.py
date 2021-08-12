@@ -1,6 +1,21 @@
 import numpy as np
 import open3d as o3d
-import igraph as ig
+
+from sp_utils import comp_list
+
+
+def pick_sp_points(pcd):
+    print("")
+    print("1) Pick superpoints that should by unified by using [shift + left click]")
+    print("Press [shift + right click] to undo a selection")
+    print("2) After picking the superpoints, press 'Q' to close the window")
+    vis = o3d.visualization.VisualizerWithEditing()
+    vis.create_window()
+    vis.add_geometry(pcd)
+    vis.run()  # user picks points
+    vis.destroy_window()
+    print("")
+    return vis.get_picked_points()
 
 
 def render(x):
@@ -11,6 +26,9 @@ def render(x):
         pcd = o3d.geometry.PointCloud()
         pcd.points = o3d.utility.Vector3dVector(x[:, :3])
         pcd.colors = o3d.utility.Vector3dVector(x[:, 3:] / 255.)
+    elif type(x) == list:
+        o3d.visualization.draw_geometries(x)
+        return        
     o3d.visualization.draw_geometries([pcd])
 
 
@@ -23,40 +41,6 @@ def coordinate_system():
     line_set.colors = o3d.utility.Vector3dVector(colors)
     line_set.lines = o3d.utility.Vector2iVector(lines)
     return line_set
-
-
-def to_igraph(graph_dict, unions):
-    senders = graph_dict["senders"]
-    receivers = graph_dict["receivers"]
-    n_edges = senders.shape[0]
-    edge_list = n_edges*[None]
-    for i in range(n_edges):
-        vi = int(senders[i])
-        vj = int(receivers[i])
-        edge_list[i] = (vi, vj)
-    g = ig.Graph(edges=edge_list)
-    g.es["union"] = unions.tolist()
-    return g
-
-
-def partition_vec(ig_graph, n_P, sp_idxs):
-    p_vec = np.zeros((n_P, ), dtype=np.uint32)
-    unions = ig_graph.es["union"]
-    unions = np.array(unions, dtype=np.bool)
-    idxs = np.where(unions == False)[0]
-    idxs = idxs.astype(np.uint32)
-    idxs = idxs.tolist()
-    ig_graph.delete_edges(idxs)
-    clusters = ig_graph.clusters()
-    c = 1
-    for i in range(len(clusters)):
-        cluster = clusters[i]
-        for j in range(len(cluster)):
-            sp_i = cluster[j]
-            P_idxs = sp_idxs[sp_i]
-            p_vec[P_idxs] = c
-        c += 1
-    return p_vec
 
 
 def initial_partition_pcd(P, sp_idxs, colors):
@@ -74,24 +58,27 @@ def initial_partition_pcd(P, sp_idxs, colors):
     return pcd
 
 
-def partition_pcd(graph_dict, unions, P, sp_idxs, colors):
+def partition_pcd(graph_dict, unions, P, sp_idxs, colors, col_d=0.25):
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(P[:, :3])
     n_P = P.shape[0]
     C = np.zeros((n_P, 3))
-    #"""
-    g = to_igraph(graph_dict=graph_dict, unions=unions)
-    p_vec = partition_vec(ig_graph=g, n_P=n_P, sp_idxs=sp_idxs)
-    
-    superpoints = np.unique(p_vec)
-    n_superpoints = superpoints.shape[0]
-    #print(n_superpoints)
-    for i in range(n_superpoints):
-        superpoint_value = superpoints[i]
-        idx = np.where(p_vec == superpoint_value)[0]
+
+    c_list = comp_list(graph_dict=graph_dict, unions=unions, n_P=n_P, sp_idxs=sp_idxs)
+
+    for i in range(len(c_list)):
+        comp = c_list[i]
         color = colors[i, :]
-        #print(len(idx), color)
-        C[idx, :] = color / 255
-    #"""
+        n_sp_comp = len(comp)
+        if col_d > 0:
+            c_factors = (np.arange(n_sp_comp) + 1) / n_sp_comp
+            c_factors *= col_d
+            c_factors += (1-col_d)
+        else:
+            c_factors = np.ones((n_sp_comp, ))
+        for j in range(n_sp_comp):
+            P_idxs = comp[j][1]
+            C[P_idxs, :] = c_factors[j] * color / 255.
+
     pcd.colors = o3d.utility.Vector3dVector(C)
     return pcd
