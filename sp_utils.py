@@ -153,22 +153,30 @@ def get_remaining(P, objects):
     return remaining
 
 
-def reconstruct_obj(P, depth=7):
+def reconstruct_obj(P, alpha):
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(P[:, :3])
     pcd.colors = o3d.utility.Vector3dVector(P[:, 3:] / 255.)
     pcd.estimate_normals()
-    mesh, _ = o3d.geometry.TriangleMesh.create_from_point_cloud_poisson(pcd, depth=depth)
+
+    #mesh, _ = o3d.geometry.TriangleMesh.create_from_point_cloud_poisson(pcd, depth=9)
+    
+    #radii = [0.005, 0.01, 0.02, 0.04]
+    #mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_ball_pivoting(pcd, o3d.utility.DoubleVector(radii))
+
+    mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_alpha_shape(pcd, alpha=alpha)
+
     return mesh
 
-def reconstruct(P, objects, remaining):
+
+def reconstruct(P, objects, remaining, alpha):
     meshes = (len(objects) + 1) * [None]
     for i in range(len(objects)):
         o_idxs = objects[i]
         P_obj = P[o_idxs]
-        mesh_obj = reconstruct_obj(P=P_obj)
+        mesh_obj = reconstruct_obj(P=P_obj, alpha=alpha)
         meshes[i] = mesh_obj
     P_r = P[remaining]
-    mesh_r = reconstruct_obj(P=P_r)
+    mesh_r = reconstruct_obj(P=P_r, alpha=alpha)
     meshes[-1] = mesh_r
     return meshes
