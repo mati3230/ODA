@@ -5,3 +5,4 @@ sklearn>=0.0
 scipy>=1.5.4
 dm-sonnet>=2.0.0
 python-igraph>=0.9.6
+h5py>=3.1.0

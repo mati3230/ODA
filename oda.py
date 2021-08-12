@@ -1,10 +1,9 @@
 import numpy as np
-import open3d as o3d
 import argparse
 import os
 
 from visu_utils import partition_pcd, initial_partition_pcd, render
-from io_utils import load
+from io_utils import load_cloud, save_init_graph, load_init_graph, save_probs, load_probs
 from ai_utils import graph, predict
 
 def main():
@@ -23,34 +22,55 @@ def main():
     parser.add_argument("--d_se_max", default=0, type=float, help="Max length of super edges.")
     parser.add_argument("--initial_db", default=0.5, type=float, help="Initial guess for the decision boundary.")
     parser.add_argument("--max_sp_size", default=7000, type=int, help="Maximum size of a superpoint.")
+    parser.add_argument("--save_init_g", default=False, type=bool, help="Save the initial superpoint graph in g_dir.")
+    parser.add_argument("--load_init_g", default=False, type=bool, help="Load the initial superpoint graph from g_dir.")
+    parser.add_argument("--save_probs", default=False, type=bool, help="Save the processed superpoint graph in g_dir.")
+    parser.add_argument("--load_probs", default=False, type=bool, help="Load the processed superpoint graph from g_dir.")
+    parser.add_argument("--g_dir", default="./tmp", type=str, help="Directory where the graphs will be stored.")
     args = parser.parse_args()
-
+    
+    data = np.load("colors.npz")
+    colors = data["colors"]
+    
     if not args.gpu:
         os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
     np.random.seed(args.seed)
-    P, pcd = load(file=args.file, r=args.r, g=args.g, b=args.b, p=args.p)
-    render(pcd)
-    """
-    n_P = 10000
-    P = 5*np.random.randn(n_P, 3)
-    C = np.random.randint(low=0, high=255, size=(n_P, 3))
-    P = np.hstack((P, C)).astype(np.float32)
-    """
-    graph_dict, sp_idxs = graph(
-        cloud=P,
-        k_nn_adj=args.k_nn_adj,
-        k_nn_geof=args.k_nn_geof,
-        lambda_edge_weight=args.lambda_edge_weight,
-        reg_strength=args.reg_strength,
-        d_se_max=args.d_se_max,
-        max_sp_size=args.max_sp_size)
+    P = None
+    load_init_g = args.load_init_g and not args.load_probs
+    if args.load_probs:
+        P = -1
 
-    data = np.load("colors.npz")
-    colors = data["colors"]
+    if load_init_g:
+        P, graph_dict, sp_idxs = load_init_graph(fdir=args.g_dir)
+    if P is None:
+        P = load_cloud(file=args.file, r=args.r, g=args.g, b=args.b, p=args.p)
+        """
+        n_P = 10000
+        P = 5*np.random.randn(n_P, 3)
+        C = np.random.randint(low=0, high=255, size=(n_P, 3))
+        P = np.hstack((P, C)).astype(np.float32)
+        """
+        graph_dict, sp_idxs = graph(
+            cloud=P,
+            k_nn_adj=args.k_nn_adj,
+            k_nn_geof=args.k_nn_geof,
+            lambda_edge_weight=args.lambda_edge_weight,
+            reg_strength=args.reg_strength,
+            d_se_max=args.d_se_max,
+            max_sp_size=args.max_sp_size)
+        if args.save_init_g:
+            save_init_graph(fdir=args.g_dir, P=P, graph_dict=graph_dict, sp_idxs=sp_idxs)
+
+    if args.load_probs:
+        P, graph_dict, sp_idxs, probs, unions = load_probs(fdir=args.g_dir)
+    else:
+        unions, probs = predict(graph_dict=graph_dict, dec_b=args.initial_db)
+        if args.save_probs:
+            save_probs(fdir=args.g_dir, P=P, graph_dict=graph_dict, sp_idxs=sp_idxs, probs=probs, save_init=not args.save_init_g, initial_db=args.initial_db)
+
+    render(P)
     p_pcd = initial_partition_pcd(P=P, sp_idxs=sp_idxs, colors=colors)
     render(p_pcd)
-
-    unions, probs = predict(graph_dict=graph_dict, dec_b=args.initial_db)
     p_pcd = partition_pcd(graph_dict=graph_dict, unions=unions, P=P, sp_idxs=sp_idxs, colors=colors)
     render(p_pcd)
 

@@ -3,7 +3,14 @@ import open3d as o3d
 import igraph as ig
 
 
-def render(pcd):
+def render(x):
+    if x is None:
+        return
+    pcd = x
+    if type(x) == np.ndarray:
+        pcd = o3d.geometry.PointCloud()
+        pcd.points = o3d.utility.Vector3dVector(x[:, :3])
+        pcd.colors = o3d.utility.Vector3dVector(x[:, 3:] / 255.)
     o3d.visualization.draw_geometries([pcd])
 
 
