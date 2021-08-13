@@ -3,10 +3,18 @@ import igraph as ig
 import open3d as o3d
 
 
+def extend(arr, n_arr, dtype):
+    n_arr = np.array(n_arr, dtype=dtype)
+    arr = np.vstack((arr[:, None], n_arr[:, None]))
+    arr = arr.reshape(arr.shape[0], )
+    return arr
+
+
 def unify(picked_points_idxs, sp_idxs, graph_dict, unions):
     if len(picked_points_idxs) == 0:
         return graph_dict, unions
     sp_to_unify = superpoint_idxs(picked_points_idxs=picked_points_idxs, sp_idxs=sp_idxs)
+    print("Superpoints to unify: {0}".format(sp_to_unify))
     senders = graph_dict["senders"]
     receivers = graph_dict["receivers"]
     n_sp_to_unify = len(sp_to_unify)
@@ -20,8 +28,9 @@ def unify(picked_points_idxs, sp_idxs, graph_dict, unions):
         idxs_to_del = np.vstack((idxs_to_del, idxs[:, None]))
     idxs_to_del = idxs_to_del.reshape(idxs_to_del.shape[0], )
     idxs_to_del = np.unique(idxs_to_del)
+    print("Remove {0} edges".format(idxs_to_del.shape[0]))
     unions[idxs_to_del] = False
-    
+
     n_senders = []
     n_receivers = []
     n_edges = 0
@@ -45,14 +54,11 @@ def unify(picked_points_idxs, sp_idxs, graph_dict, unions):
                 continue
             n_senders.append(sp_i)
             n_receivers.append(sp_j)
+            print("Add new edge from node {0} to {1}".format(sp_i, sp_j))
             n_edges += 1
     if n_edges > 0:
-        n_senders = np.array(n_senders, dtype=np.uint32)
-        senders = np.vstack((senders[:, None], n_senders[:, None]))
-        senders = senders.reshape(senders.shape[0], )
-        n_receivers = np.array(n_receivers, dtype=np.uint32)
-        receivers = np.vstack((receivers[:, None], n_receivers[:, None]))
-        receivers = senders.reshape(receivers.shape[0], )
+        senders = extend(arr=senders, n_arr=n_senders, dtype=np.uint32)
+        receivers = extend(arr=receivers, n_arr=n_receivers, dtype=np.uint32)
         n_unions = np.ones((n_edges, 1), dtype=np.bool)
         unions = np.vstack((unions[:, None], n_unions))
         unions = unions.reshape(unions.shape[0], )
@@ -70,6 +76,7 @@ def superpoint_idxs(picked_points_idxs, sp_idxs):
             idxs = sp_idxs[j]
             if p_idx in idxs:
                 result.append(j)
+                print("Point idx {0} refers to superpoint {1}".format(p_idx, j))
                 break
     result = np.unique(result)
     return result

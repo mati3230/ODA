@@ -35,13 +35,16 @@ def file_exists(filepath):
 
 
 def load_colors():
+    print("Load colors...")
     data = np.load("colors.npz")
     colors = data["colors"]
+    print("Done")
     return colors
 
 
-def load_unions(fdir, graph_dict):
-    file = fdir + "/unions.h5"
+def load_unions(fdir, graph_dict, filename=""):
+    print("Load unions...")
+    file = "{0}/unions_{1}.h5".format(fdir, filename)
     if not file_exists(filepath=file):
         return None
     hf = h5py.File(file, "r")
@@ -51,33 +54,40 @@ def load_unions(fdir, graph_dict):
     hf.close()
     graph_dict["senders"] = senders
     graph_dict["receivers"] = receivers
+    print("Done")
     return unions, graph_dict
 
 
-def save_unions(fdir, unions, graph_dict):
+def save_unions(fdir, unions, graph_dict, filename=""):
+    print("Save unions")
     mkdir(fdir)
-    hf = h5py.File(fdir + "/unions.h5", "w")
+    hf = h5py.File("{0}/unions_{1}.h5".format(fdir, filename), "w")
     hf.create_dataset("unions", data=unions)
     senders = graph_dict["senders"]
     receivers = graph_dict["receivers"]
     hf.create_dataset("senders", data=senders)
     hf.create_dataset("receivers", data=receivers)
     hf.close()
+    print("Done")
 
 
-def save_probs(fdir, P, graph_dict, sp_idxs, probs, initial_db, save_init=False):
+def save_probs(fdir, P, graph_dict, sp_idxs, probs, initial_db, save_init=False, filename=""):
+    print("Save probs")
     if save_init:
         save_init_graph(fdir=fdir, P=P, graph_dict=graph_dict, sp_idxs=sp_idxs)
     mkdir(fdir)
-    hf = h5py.File(fdir + "/probs.h5", "w")
+    hf = h5py.File("{0}/probs_{1}.h5".format(fdir, filename), "w")
     hf.create_dataset("probs", data=probs)
     hf.create_dataset("initial_db", data=(initial_db, ))
     hf.close()
+    print("Done")
 
-def load_probs(fdir):
-    P, graph_dict, sp_idxs = load_init_graph(fdir=fdir)
 
-    file = fdir + "/probs.h5"
+def load_probs(fdir, filename=""):
+    print("Load probs...")
+    P, graph_dict, sp_idxs = load_init_graph(fdir=fdir, filename=filename)
+
+    file = "{0}/probs_{1}.h5".format(fdir, filename)
     if not file_exists(filepath=file):
         return None, None, None, None, None, None
     hf = h5py.File(file, "r")
@@ -86,12 +96,13 @@ def load_probs(fdir):
     unions = np.zeros((probs.shape[0], ), dtype=np.bool)
     unions[probs > initial_db] = True
     hf.close()
-    
+    print("Done")
     return P, graph_dict, sp_idxs, probs, unions
 
-def save_init_graph(fdir, P, graph_dict, sp_idxs):
+def save_init_graph(fdir, P, graph_dict, sp_idxs, filename=""):
+    print("Save initial graph")
     mkdir(fdir)
-    hf = h5py.File(fdir + "/init_graph.h5", "w")
+    hf = h5py.File("{0}/init_graph_{1}.h5".format(fdir, filename), "w")
     hf.create_dataset("P", data=P)
     n_sps = len(sp_idxs)
     hf.create_dataset("n_sps", data=(n_sps, ))
@@ -104,10 +115,12 @@ def save_init_graph(fdir, P, graph_dict, sp_idxs):
     hf.create_dataset("senders", data=senders)
     hf.create_dataset("receivers", data=receivers)
     hf.close()
+    print("Done")
 
 
-def load_init_graph(fdir):
-    file = fdir + "/init_graph.h5"
+def load_init_graph(fdir, filename=""):
+    print("Load initial graph...")
+    file = "{0}/init_graph_{1}.h5".format(fdir, filename)
     if not file_exists(filepath=file):
         return None, None, None
     hf = h5py.File(file, "r")
@@ -129,6 +142,7 @@ def load_init_graph(fdir):
         sp_idxs[i] = idxs
     sp_idxs = np.array(sp_idxs, dtype = "object")
     hf.close()
+    print("Done")
     return P, graph_dict, sp_idxs
 
 
@@ -138,6 +152,7 @@ def check_color_value(c):
 
 
 def load_cloud(file, r=255, g=0, b=0, p=1):
+    print("Load point cloud...")
     if not os.path.exists(file):
         raise Exception("File not found: {0}".format(file))
     check_color_value(r)
@@ -151,6 +166,7 @@ def load_cloud(file, r=255, g=0, b=0, p=1):
         P = from_txt(file=file, r=r, g=g, b=b, p=p)
     else:
         raise Exception("Unknwon file type: {0}".format(file))
+    print("Done")
     return P
 
 
@@ -206,8 +222,8 @@ def subsample(P, p):
     return P
 
 
-def save_meshes(meshes, fdir):
+def save_meshes(meshes, fdir, filename=""):
     mkdir(fdir)
     for i in range(len(meshes)):
         mesh = meshes[i]
-        o3d.io.write_triangle_mesh(fdir + "/mesh_" + str(i) + ".glb", mesh)
+        o3d.io.write_triangle_mesh("{0}/mesh_{1}_{2}.glb".format(fdir, filename, i), mesh)

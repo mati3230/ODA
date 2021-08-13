@@ -9,4 +9,4 @@
 
 # Quickstart
 
-python oda.py --file ../conferenceRoom_1.txt --p 0.05 --reg_strength 0.03 --initial_db 0.9 --load_probs True
+python oda.py --file ../conferenceRoom_1.txt --p 0.05 --reg_strength 0.03 --initial_db 0.9 --load_probs True --g_filename a1cr1
