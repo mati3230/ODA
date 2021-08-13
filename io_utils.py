@@ -185,7 +185,12 @@ def from_txt(file, r=255, g=0, b=0, p=1, delimiter=" "):
 
 def from_npz(file, r=255, g=0, b=0, p=1):
     data = np.load(file, allow_pickle=True)
-    P = data["P"]
+    try:
+        P = data["P"]
+    except KeyError as  ke:
+        xyz = data["xyz"]
+        rgb = data["rgb"]
+        P = np.hstack((xyz, rgb))
     P = cloud(P=P, r=r, g=g, b=b, p=p)
     return P
 

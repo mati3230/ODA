@@ -60,6 +60,8 @@ def main():
         P, graph_dict, sp_idxs = load_init_graph(fdir=args.g_dir, filename=args.g_filename)
     if P is None:
         P = load_cloud(file=args.file, r=args.r, g=args.g, b=args.b, p=args.p)
+        #render(P)
+        #return
         graph_dict, sp_idxs = graph(
             cloud=P,
             k_nn_adj=args.k_nn_adj,

@@ -27,9 +27,10 @@ def render(x):
         pcd.points = o3d.utility.Vector3dVector(x[:, :3])
         pcd.colors = o3d.utility.Vector3dVector(x[:, 3:] / 255.)
     elif type(x) == list:
+        x.extend(coordinate_system())
         o3d.visualization.draw_geometries(x)
         return        
-    o3d.visualization.draw_geometries([pcd])
+    o3d.visualization.draw_geometries([pcd, coordinate_system()])
 
 
 def coordinate_system():
