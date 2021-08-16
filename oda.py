@@ -187,6 +187,7 @@ def main():
         elif mode == "r":
             points_idxs_r = pick_sp_points_pptk(P=P, initial_partition=init_p, partition=part, point_size=point_size)
             graph_dict, sp_idxs = reduce_superpoint(picked_points_idxs=picked_points_idxs, points_idxs_r=points_idxs_r, graph_dict=graph_dict, sp_idxs=sp_idxs)
+            init_p = initial_partition(P=P, sp_idxs=sp_idxs)
         part = partition(
             graph_dict=graph_dict,
             unions=unions,

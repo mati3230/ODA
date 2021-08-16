@@ -64,12 +64,13 @@ def reduce_superpoint(picked_points_idxs, points_idxs_r, graph_dict, sp_idxs):
     P_idxs_to_del = point_idxs[start_i:stop_i]
     # remove target_point_idxs from target_sp
     del_idxs = find_idxs_by_val(a=P_idxs, idxs=P_idxs_to_del)
+    #print(P_idxs.shape, P_idxs[del_idxs], P_idxs_to_del)
     P_idxs = np.delete(P_idxs, del_idxs)
+    #print(P_idxs.shape)
     sp_idxs[source_sp] = P_idxs
 
     # add a new superpoint for this points
     sp_idxs = sp_idxs.tolist()
-    print(type(sp_idxs[0]))
     sp_idxs.append(P_idxs_to_del)
     sp_idxs = np.array(sp_idxs, dtype="object")
     nodes = graph_dict["nodes"]
@@ -367,6 +368,7 @@ def initial_partition(P, sp_idxs):
     n_P = P.shape[0]
     par_v = np.zeros((n_P, ), dtype=np.uint32)
     n_sps = len(sp_idxs)
+    print("Number of superpoints: {0}".format(n_sps))
     for i in range(n_sps):
         idxs = sp_idxs[i]
         par_v[idxs] = i+1
