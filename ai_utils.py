@@ -545,7 +545,15 @@ def estimate_normals_curvature(P, k_neighbours=5):
         k_neighbours = 5
     n = P.shape[1]
 
-    _, nns = get_knn(D=P[:, :3]) 
+    try:
+        nbrs = NearestNeighbors(n_neighbors=k_neighbours, algorithm="auto", metric="euclidean").fit(P[:, :3])
+        _, nns = nbrs.kneighbors(D)
+    except Exception as e:
+        normals = np.zeros((n_P, 3), dtype=np.float32)
+        normals[:, 0] = 1
+        curvature = np.zeros((n_P, ), dtype=np.float32)
+        return normals, curvature
+
 
     k_nns = nns[:, 1:k_neighbours+1]
     p_nns = P[k_nns[:]]
@@ -600,30 +608,6 @@ def get_general_bb(P):
         bb[j] = np.max(P[:, i])
         j += 1
     return bb
-
-
-def get_knn(D):
-    size = D.shape[0]
-    dim = D.shape[1]
-    # compute a distance matrix
-    d_mat = np.zeros((size, size))
-    for i in range(dim):
-        # extract column
-        col = D[:, i] 
-        # convert vector to matrix
-        col = col[:, None]
-        # repeat column along rows
-        A = np.tile(col, reps=[1, size])
-        # copy and transpose
-        A_T = np.array(A, copy=True).transpose()
-        # calc intermediate distance matrix for column
-        d_mat_tmp = A - A_T
-        d_mat_tmp = np.square(d_mat_tmp)
-        # add to final distance matrix
-        d_mat += d_mat_tmp
-        d_mat = np.sqrt(d_mat)
-    n_idxs = np.argsort(d_mat, axis=1)
-    return d_mat, n_idxs
 
 
 def feature_point_cloud(P):
