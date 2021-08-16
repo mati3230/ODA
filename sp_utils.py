@@ -118,13 +118,15 @@ def extend_superpoint_points(picked_points_idxs, points_idxs_e, sp_idxs):
     return sp_idxs
 
 
-def extend_superpoint(picked_points_idxs, sp_idxs, graph_dict, unions):
-    if len(picked_points_idxs) != 2:
-        print("Please choose only two points for extending a superpoint. {0} chosen.".format(len(picked_points_idxs)))
+def extend_superpoint(picked_points_idxs, points_idxs_e, sp_idxs, graph_dict, unions):
+    if len(picked_points_idxs) != 1:
+        print("Please choose one points for extending.")
         return graph_dict, unions
-    sp_to_unify = points_to_superpoints(picked_points_idxs=picked_points_idxs, sp_idxs=sp_idxs)
-    source_sp = sp_to_unify[0]
-    target_sp = sp_to_unify[1]
+    if len(points_idxs_e) != 1:
+        print("Please choose one points for extending.")
+        return graph_dict, unions
+    source_sp = points_to_superpoints(picked_points_idxs=picked_points_idxs, sp_idxs=sp_idxs)[0]
+    target_sp = points_to_superpoints(picked_points_idxs=points_idxs_e, sp_idxs=sp_idxs)[0]
     if source_sp == target_sp:
         print("2 points in the same superpoint.")
         return graph_dict, unions

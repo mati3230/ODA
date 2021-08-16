@@ -170,8 +170,10 @@ def main():
                 graph_dict=graph_dict,
                 unions=unions)
         elif mode == "e":
+            points_idxs_e = pick_sp_points_pptk(P=P, initial_partition=init_p, partition=part, point_size=point_size)
             graph_dict, unions = extend_superpoint(
                 picked_points_idxs=picked_points_idxs,
+                points_idxs_e=points_idxs_e,
                 sp_idxs=sp_idxs,
                 graph_dict=graph_dict,
                 unions=unions)
