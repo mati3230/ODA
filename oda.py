@@ -21,7 +21,9 @@ from sp_utils import\
     separate_superpoint,\
     partition,\
     initial_partition,\
-    delete
+    delete,\
+    extend_superpoint_points,\
+    reduce_superpoint
 
 def main():
     parser = argparse.ArgumentParser()
@@ -118,7 +120,7 @@ def main():
     #"""
     if not args.load_unions:
         while True:
-            d_b = input("Decision Boundary [0,1] (continue: -1):")
+            d_b = input("Decision Boundary [0,1] (continue: -1): ")
             try:
                 d_b = float(d_b)
             except:
@@ -146,7 +148,7 @@ def main():
             unions=unions,
             graph_dict=graph_dict,
             filename=args.g_filename)
-        mode = input("Superpoint Editing Mode: Extend [e] | Create [c] | Separate [s] | Point Cloud [p] | Point_Size [ps] | Exit [-1]: ")
+        mode = input("Superpoint Editing Mode: Extend [e] | Create [c] | Separate [s] | Point Cloud [p] | Point_Size [ps] | Extend points [ep] | Reduce points [r] | Exit [-1]: ")
         if mode == "p":
             render_pptk(P=P, initial_partition=init_p, partition=part, point_size=point_size)
             continue
@@ -179,6 +181,12 @@ def main():
                 sp_idxs=sp_idxs,
                 graph_dict=graph_dict,
                 unions=unions)
+        elif mode == "ep":
+            points_idxs_e = pick_sp_points_pptk(P=P, initial_partition=init_p, partition=part, point_size=point_size)
+            sp_idxs = extend_superpoint_points(picked_points_idxs=picked_points_idxs, points_idxs_e=points_idxs_e, sp_idxs=sp_idxs)
+        elif mode == "r":
+            points_idxs_r = pick_sp_points_pptk(P=P, initial_partition=init_p, partition=part, point_size=point_size)
+            graph_dict, sp_idxs = reduce_superpoint(picked_points_idxs=picked_points_idxs, points_idxs_r=points_idxs_r, graph_dict=graph_dict, sp_idxs=sp_idxs)
         part = partition(
             graph_dict=graph_dict,
             unions=unions,

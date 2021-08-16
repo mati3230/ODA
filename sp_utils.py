@@ -21,6 +21,102 @@ def separate_superpoint(picked_points_idxs, sp_idxs, graph_dict, unions):
     return graph_dict, unions
 
 
+def find_idxs_by_val(a, idxs):
+    idxs_to_del = np.zeros((0, 1), dtype=np.uint32)
+    for i in range(idxs.shape[0]):
+        idx = idxs[i]
+        a_idxs = np.where(a == idx)[0]
+        if a_idxs.shape[0] == 0:
+            continue
+        idxs_to_del = np.vstack((idxs_to_del, a_idxs[:, None]))
+    idxs_to_del = idxs_to_del.reshape(idxs_to_del.shape[0], )
+    idxs_to_del = np.unique(idxs_to_del)
+    return idxs_to_del
+
+
+def reduce_superpoint(picked_points_idxs, points_idxs_r, graph_dict, sp_idxs):
+    if len(picked_points_idxs) != 1:
+        print("Please choose one points for extending.")
+        return graph_dict, sp_idxs
+    if len(points_idxs_r) == 0:
+        return graph_dict, sp_idxs
+    source_sp = points_to_superpoints(picked_points_idxs=picked_points_idxs, sp_idxs=sp_idxs)[0]
+    sps = points_to_superpoints(picked_points_idxs=points_idxs_r, sp_idxs=sp_idxs)
+    sps = np.array(sps, dtype=np.uint32)
+    point_idxs = np.array(points_idxs_r, dtype=np.uint32)
+    sortation = np.argsort(sps)
+    sps = sps[sortation]
+    point_idxs = point_idxs[sortation]
+    uni_sps, uni_idxs, uni_counts = np.unique(sps, return_index=True, return_counts=True)
+
+    s_idx = np.where(uni_sps == source_sp)[0]
+    if s_idx.shape[0] == 0:
+        return graph_dict, sp_idxs
+    s_idx = s_idx[0]
+
+    uni_idx = uni_idxs[s_idx]
+    uni_count = uni_counts[s_idx]
+    start_i = uni_idx
+    stop_i = start_i + uni_count
+    
+    P_idxs = sp_idxs[source_sp]
+
+    P_idxs_to_del = point_idxs[start_i:stop_i]
+    # remove target_point_idxs from target_sp
+    del_idxs = find_idxs_by_val(a=P_idxs, idxs=P_idxs_to_del)
+    P_idxs = np.delete(P_idxs, del_idxs)
+    sp_idxs[source_sp] = P_idxs
+
+    # add a new superpoint for this points
+    sp_idxs = sp_idxs.tolist()
+    print(type(sp_idxs[0]))
+    sp_idxs.append(P_idxs_to_del)
+    sp_idxs = np.array(sp_idxs, dtype="object")
+    nodes = graph_dict["nodes"]
+    new_node = np.zeros((1, nodes.shape[-1]), dtype=nodes.dtype)
+    nodes = np.vstack((nodes, new_node))
+    graph_dict["nodes"] = nodes
+    return graph_dict, sp_idxs
+
+
+def extend_superpoint_points(picked_points_idxs, points_idxs_e, sp_idxs):
+    if len(picked_points_idxs) != 1:
+        print("Please choose one points for extending.")
+        return sp_idxs
+    if len(points_idxs_e) == 0:
+        return sp_idxs
+    source_sp = points_to_superpoints(picked_points_idxs=picked_points_idxs, sp_idxs=sp_idxs)[0]
+    sps = points_to_superpoints(picked_points_idxs=points_idxs_e, sp_idxs=sp_idxs)
+    sps = np.array(sps, dtype=np.uint32)
+    point_idxs = np.array(points_idxs_e, dtype=np.uint32)
+    sortation = np.argsort(sps)
+    sps = sps[sortation]
+    point_idxs = point_idxs[sortation]
+    uni_sps, uni_idxs, uni_counts = np.unique(sps, return_index=True, return_counts=True)
+
+    for i in range(uni_counts.shape[0]):
+        target_sp = uni_sps[i]
+        if target_sp == source_sp:
+            continue
+        uni_idx = uni_idxs[i]
+        uni_count = uni_counts[i]
+        start_i = uni_idx
+        stop_i = start_i + uni_count
+        
+        target_point_idxs = point_idxs[start_i:stop_i]
+        
+        t_P_idxs = sp_idxs[target_sp]
+        change_idxs = find_idxs_by_val(a=target_point_idxs, idxs=t_P_idxs)
+        t_P_idxs = np.delete(t_P_idxs, change_idxs)
+        sp_idxs[target_sp] = t_P_idxs
+
+        s_P_idxs = sp_idxs[source_sp]
+        s_P_idxs = np.vstack((s_P_idxs[:, None], target_point_idxs[:, None]))
+        s_P_idxs = s_P_idxs.reshape(s_P_idxs.shape[0], )
+        sp_idxs[source_sp] = s_P_idxs
+    return sp_idxs
+
+
 def extend_superpoint(picked_points_idxs, sp_idxs, graph_dict, unions):
     if len(picked_points_idxs) != 2:
         print("Please choose only two points for extending a superpoint. {0} chosen.".format(len(picked_points_idxs)))
@@ -148,7 +244,7 @@ def points_to_superpoints(picked_points_idxs, sp_idxs):
             idxs = sp_idxs[j]
             if p_idx in idxs:
                 result.append(j)
-                print("Point idx {0} refers to superpoint {1}".format(p_idx, j))
+                #print("Point idx {0} refers to superpoint {1}".format(p_idx, j))
                 break
     return result
 
