@@ -151,7 +151,7 @@ def extend_superpoint(picked_points_idxs, points_idxs_e, sp_idxs, graph_dict, un
     n_senders.append(source_sp)
     n_receivers.append(target_sp)
     n_edges = 1
-    print("Add new edge from node {0} to {1}".format(source_sp, target_sp))
+    #print("Add new edge from node {0} to {1}".format(source_sp, target_sp))
     senders, receivers, unions = extend_edges(
         senders=senders,
         n_senders=n_senders,
