@@ -342,7 +342,7 @@ def reconstruct_obj(P, depth):
     pcd.colors = o3d.utility.Vector3dVector(P[:, 3:] / 255.)
 
     pcd.estimate_normals()
-    print("Normals estimated.")
+    #print("Normals estimated.")
     mesh, _ = o3d.geometry.TriangleMesh.create_from_point_cloud_poisson(pcd, depth=depth)
     
     #radii = 3 * [0.1]
