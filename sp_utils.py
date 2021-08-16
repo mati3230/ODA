@@ -223,7 +223,7 @@ def unify(picked_points_idxs, sp_idxs, graph_dict, unions):
                 continue
             n_senders.append(sp_i)
             n_receivers.append(sp_j)
-            print("Add new edge from node {0} to {1}".format(sp_i, sp_j))
+            #print("Add new edge from node {0} to {1}".format(sp_i, sp_j))
             n_edges += 1
     if n_edges > 0:
         senders, receivers, unions = extend_edges(

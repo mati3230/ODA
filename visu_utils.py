@@ -17,16 +17,29 @@ def pick_sp_points_o3d(pcd):
     return vis.get_picked_points()
 
 
-def pick_sp_points_pptk(P, partition=None, initial_partition=None, point_size=-1):
-    v = render_pptk_(P=P, partition=partition, initial_partition=initial_partition, point_size=point_size)
+def pick_sp_points_pptk(P, partition=None, initial_partition=None, point_size=-1, v=None):
+    v = render_pptk_(P=P, partition=partition, initial_partition=initial_partition, point_size=point_size, v=v)
     idxs = v.get("selected")
     idxs = np.array(idxs, dtype=np.uint32)
     idxs = np.unique(idxs)
-    v.close()
-    return idxs
+    return idxs, v
 
 
-def render_pptk_(P, partition=None, initial_partition=None, point_size=-1):
+def get_perspective(viewer):
+    x, y, z = viewer.get('eye')
+    phi = viewer.get('phi')
+    theta = viewer.get('theta')
+    r = viewer.get('r')
+    return [x, y, z, phi, theta, r]
+
+
+def set_perspective(viewer, p):
+    if p is None:
+        return
+    viewer.set(lookat=p[:3], phi=p[3], theta=p[4], r=p[5])
+
+
+def render_pptk_(P, partition=None, initial_partition=None, point_size=-1, v=None):
     if P is None:
         return None
     xyz = P[:, :3]
@@ -36,7 +49,13 @@ def render_pptk_(P, partition=None, initial_partition=None, point_size=-1):
     if max_c.shape[0] > 0:
         #print("Normalize colors.")
         rgb /= 255.
-    v = pptk.viewer(xyz)
+    persp = None
+    if v is None:
+        v = pptk.viewer(xyz)
+    else:
+        persp = get_perspective(viewer=v)
+        v.clear()
+        v.load(xyz)
     if point_size > 0:
         v.set(point_size=point_size)
     colors = P[:, 3:]
@@ -49,15 +68,14 @@ def render_pptk_(P, partition=None, initial_partition=None, point_size=-1):
     else:
         v.attributes(rgb, initial_partition, partition)
     print("Press Return to continue.")
+    set_perspective(viewer=v, p=persp)
     v.wait()
     return v
 
 
-def render_pptk(P, partition=None, initial_partition=None, point_size=-1):
-    v = render_pptk_(P=P, partition=partition, initial_partition=initial_partition, point_size=point_size)
-    if v is None:
-        return
-    v.close()
+def render_pptk(P, partition=None, initial_partition=None, point_size=-1, v=None):
+    v = render_pptk_(P=P, partition=partition, initial_partition=initial_partition, point_size=point_size, v=v)
+    return v
 
 
 def render_o3d(x):

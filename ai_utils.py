@@ -424,48 +424,73 @@ def compute_features(P, n_curv=30, k_curv=14, k_far=30, n_normal=30, bins=10, mi
     q_25_color = np.quantile(P[:, 3:], 0.25, axis=0)
     q_75_color = np.quantile(P[:, 3:], 0.75, axis=0)
     
-    normals, curv = estimate_normals_curvature(P=P[:, :3], k_neighbours=k_curv)
+    normals, curv, ok = estimate_normals_curvature(P=P[:, :3], k_neighbours=k_curv)
     
     ########normals########
     # mean, std
-    mean_normal = np.mean(normals, axis=0)
-    std_normal = np.std(normals, axis=0)
-    median_normal = np.median(normals, axis=0)
-    q_25_normal = np.quantile(normals, 0.25, axis=0)
-    q_75_normal = np.quantile(normals, 0.75, axis=0)
+    if ok:
+        mean_normal = np.mean(normals, axis=0)
+        std_normal = np.std(normals, axis=0)
+        median_normal = np.median(normals, axis=0)
+        q_25_normal = np.quantile(normals, 0.25, axis=0)
+        q_75_normal = np.quantile(normals, 0.75, axis=0)
 
-    # min, max
-    ref_normal = np.zeros((normals.shape[0], 3))
-    ref_normal[:, 0] = 1
-    normal_dot, _, _ = np_fast_dot(a=ref_normal, b=normals)
-    min_normal, max_normal, min_n_idxs, max_n_idxs = get_min_max(feature=normal_dot, target=n_normal)
-    min_P_n, max_P_n = extract_min_max_points(P=P, min_idxs=min_n_idxs, max_idxs=max_n_idxs, target=n_normal, center=center, center_max=3)
+        # min, max
+        ref_normal = np.zeros((normals.shape[0], 3))
+        ref_normal[:, 0] = 1
+        normal_dot, _, _ = np_fast_dot(a=ref_normal, b=normals)
+        min_normal, max_normal, min_n_idxs, max_n_idxs = get_min_max(feature=normal_dot, target=n_normal)
+        min_P_n, max_P_n = extract_min_max_points(P=P, min_idxs=min_n_idxs, max_idxs=max_n_idxs, target=int(n_normal/2), center=center, center_max=3)
 
-    ########curvature########
-    # mean, std
-    curv = curv.reshape(curv.shape[0], )
-    mean_curv = 2 * (np.mean(curv) - 0.5)
-    mean_curv = np.array([mean_curv], dtype=np.float32)
-    std_curv = np.std(curv)
-    std_curv = np.array([std_curv], dtype=np.float32)
-    median_curv = np.median(curv)
-    median_curv = 2 * (median_curv - 0.5)
-    median_curv = np.array([median_curv], dtype=np.float32)
-    q_25_curv = np.quantile(curv, 0.25)
-    q_25_curv = 2 * (q_25_curv - 0.5)
-    q_25_curv = np.array([q_25_curv], dtype=np.float32)
-    q_75_curv = np.quantile(curv, 0.75)
-    q_75_curv = 2 * (q_75_curv - 0.5)
-    q_75_curv = np.array([q_75_curv], dtype=np.float32)
-    
-    # min, max
-    min_curv, max_curv, min_c_idxs, max_c_idxs = get_min_max(feature=curv, target=n_curv, pad=False)
-    min_curv = 2 * (min_curv - 0.5)
-    max_curv = 2 * (max_curv - 0.5) 
-    target_c = int(n_curv / 2)
-    min_curv = zero_padding(x=min_curv, target_size=target_c)
-    max_curv = zero_padding(x=max_curv, target_size=target_c)
-    min_P_c, max_P_c = extract_min_max_points(P=P, min_idxs=min_c_idxs, max_idxs=max_c_idxs, target=target_c, center=center, center_max=3)
+        ########curvature########
+        # mean, std
+        curv = curv.reshape(curv.shape[0], )
+        mean_curv = 2 * (np.mean(curv) - 0.5)
+        mean_curv = np.array([mean_curv], dtype=np.float32)
+        std_curv = np.std(curv)
+        std_curv = np.array([std_curv], dtype=np.float32)
+        median_curv = np.median(curv)
+        median_curv = 2 * (median_curv - 0.5)
+        median_curv = np.array([median_curv], dtype=np.float32)
+        q_25_curv = np.quantile(curv, 0.25)
+        q_25_curv = 2 * (q_25_curv - 0.5)
+        q_25_curv = np.array([q_25_curv], dtype=np.float32)
+        q_75_curv = np.quantile(curv, 0.75)
+        q_75_curv = 2 * (q_75_curv - 0.5)
+        q_75_curv = np.array([q_75_curv], dtype=np.float32)
+        
+        # min, max
+        min_curv, max_curv, min_c_idxs, max_c_idxs = get_min_max(feature=curv, target=n_curv, pad=False)
+        min_curv = 2 * (min_curv - 0.5)
+        max_curv = 2 * (max_curv - 0.5) 
+        target_c = int(n_curv / 2)
+        min_curv = zero_padding(x=min_curv, target_size=target_c)
+        max_curv = zero_padding(x=max_curv, target_size=target_c)
+        min_P_c, max_P_c = extract_min_max_points(P=P, min_idxs=min_c_idxs, max_idxs=max_c_idxs, target=target_c, center=center, center_max=3)
+    else:
+        mean_normal = np.zeros((3, ))
+        std_normal = np.zeros((3, ))
+        median_normal = np.zeros((3, ))
+        q_25_normal = np.zeros((3, ))
+        q_75_normal = np.zeros((3, ))
+        n_normal_ = int(n_normal/2)
+
+        min_normal = np.zeros((3*n_normal_, ))
+        max_normal = np.zeros((3*n_normal_, ))
+        
+        min_P_n = np.zeros((6*n_normal_, ))
+        max_P_n = np.zeros((6*n_normal_, ))
+
+        mean_curv = np.zeros((1, ))
+        std_curv = np.zeros((1, ))
+        median_curv = np.zeros((1, ))
+        q_25_curv = np.zeros((1, ))
+        q_75_curv = np.zeros((1, ))
+        n_curv_ = int(n_curv/2)
+        min_curv = np.zeros((n_curv_, ))
+        max_curv = np.zeros((n_curv_, ))
+        min_P_c = np.zeros((6*n_curv_, ))
+        max_P_c = np.zeros((6*n_curv_, ))
 
     ########farthest points########
     idxs, dists = get_characteristic_points(P=P, center=center, k=k_far, far_points=True)
@@ -494,15 +519,19 @@ def compute_features(P, n_curv=30, k_curv=14, k_far=30, n_normal=30, bins=10, mi
         q_25_color[:, None],#3,abs
         q_75_color[:, None],#3,abs
         std[:, None],#6
+        
         mean_normal[:, None],#3
         std_normal[:, None],#3
         median_normal[:, None],#3,abs
         q_25_normal[:, None],
         q_75_normal[:, None],
+        
         min_normal[:, None],#n_normal*3
         max_normal[:, None],#n_normal*3
+        
         min_P_n[:, None],#n_normal*6,local
         max_P_n[:, None],#n_normal*6,local
+        
         mean_curv[:, None],#1
         std_curv[:, None],#1
         median_curv[:, None],#3,abs
@@ -512,6 +541,7 @@ def compute_features(P, n_curv=30, k_curv=14, k_far=30, n_normal=30, bins=10, mi
         max_curv[:, None],#n_curv/2
         min_P_c[:, None],#6*n_curv/2,local
         max_P_c[:,None],#6*n_curv/2,local
+        
         far_points[:, None],#k_far*6,local
         dists[:, None],#k_far
         volumes[:, None],#2
@@ -546,13 +576,13 @@ def estimate_normals_curvature(P, k_neighbours=5):
     n = P.shape[1]
 
     try:
-        nbrs = NearestNeighbors(n_neighbors=k_neighbours, algorithm="auto", metric="euclidean").fit(P[:, :3])
+        nbrs = NearestNeighbors(n_neighbors=k_neighbours, algorithm="brute", metric="euclidean").fit(P[:, :3])
         _, nns = nbrs.kneighbors(D)
     except Exception as e:
         normals = np.zeros((n_P, 3), dtype=np.float32)
         normals[:, 0] = 1
         curvature = np.zeros((n_P, ), dtype=np.float32)
-        return normals, curvature
+        return normals, curvature, False
 
 
     k_nns = nns[:, 1:k_neighbours+1]
@@ -566,7 +596,7 @@ def estimate_normals_curvature(P, k_neighbours=5):
         normals = np.zeros((n_P, 3), dtype=np.float32)
         normals[:, 0] = 1
         curvature = np.zeros((n_P, ), dtype=np.float32)
-        return normals, curvature
+        return normals, curvature, False
     
     C = np.zeros((n_P,6))
     C[:,0] = np.sum(np.multiply(p[:,:,0], p[:,:,0]), axis=1)
@@ -596,7 +626,7 @@ def estimate_normals_curvature(P, k_neighbours=5):
             sum_v = 1e-12
         curvature[i] = lamda / sum_v
 
-    return normals, curvature
+    return normals, curvature, True
 
 
 def get_general_bb(P):
