@@ -3,10 +3,8 @@ import argparse
 import os
 
 from visu_utils import\
-    partition_pcd,\
-    initial_partition_pcd,\
-    render,\
-    pick_sp_points
+    render_pptk,\
+    pick_sp_points_pptk
 from io_utils import\
     load_cloud,\
     save_init_graph,\
@@ -15,9 +13,15 @@ from io_utils import\
     load_probs,\
     save_unions,\
     load_unions,\
-    load_colors
+    save_cloud
 from ai_utils import graph, predict
-from sp_utils import unify
+from sp_utils import\
+    unify,\
+    extend_superpoint,\
+    separate_superpoint,\
+    partition,\
+    initial_partition,\
+    delete
 
 def main():
     parser = argparse.ArgumentParser()
@@ -41,12 +45,10 @@ def main():
     parser.add_argument("--load_probs", default=False, type=bool, help="Load the processed superpoint graph from g_dir.")
     parser.add_argument("--g_dir", default="./tmp", type=str, help="Directory where the graphs will be stored.")
     parser.add_argument("--g_filename", default="", type=str, help="Filename will be used as a postfix.")
-    parser.add_argument("--col_c", default=0.8, type=float, help="Strength of the contrast of the superpoints.")
     parser.add_argument("--load_unions", default=False, type=bool, help="Load the unions from g_dir.")
+    parser.add_argument("--load_proc_cloud", default=False, type=bool, help="Load the preprocessed point cloud from g_dir.")
+    parser.add_argument("--point_size", default=0.03, type=float, help="Rendering point size.")
     args = parser.parse_args()
-    col_c = 1 - args.col_c
-
-    colors = load_colors()
     
     if not args.gpu:
         os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
@@ -59,8 +61,19 @@ def main():
     if load_init_g:
         P, graph_dict, sp_idxs = load_init_graph(fdir=args.g_dir, filename=args.g_filename)
     if P is None:
-        P = load_cloud(file=args.file, r=args.r, g=args.g, b=args.b, p=args.p)
-        #render(P)
+        if args.load_proc_cloud:
+            P = load_proc_cloud(fdir=args.g_dir, fname=args.g_filename)
+        else:
+            P = load_cloud(file=args.file, r=args.r, g=args.g, b=args.b, p=args.p)
+            while True:
+                picked_points_idxs = pick_sp_points_pptk(P=P, point_size=args.point_size)
+                P = delete(P=P, idxs=picked_points_idxs)
+                save_cloud(P=P, fdir=args.g_dir, fname=args.g_filename)
+                i = input("Delete more points [Return] | Continue [-1] | Exit [e]: ")
+                if i == "-1":
+                    break
+                elif i == "e":
+                    return
         #return
         graph_dict, sp_idxs = graph(
             cloud=P,
@@ -95,24 +108,17 @@ def main():
     if args.load_unions:
         unions, graph_dict = load_unions(
             fdir=args.g_dir, graph_dict=graph_dict, filename=args.g_filename)
-
-    #"""
-    render(P)
-    p_pcd = initial_partition_pcd(P=P, sp_idxs=sp_idxs, colors=colors)
-    render(p_pcd)
-    #"""
-    p_pcd = partition_pcd(
+    init_p = initial_partition(P=P, sp_idxs=sp_idxs)
+    part = partition(
         graph_dict=graph_dict,
         unions=unions,
         P=P,
-        sp_idxs=sp_idxs,
-        colors=colors,
-        col_d=col_c)
-    render(p_pcd)
+        sp_idxs=sp_idxs)
+    render_pptk(P=P, initial_partition=init_p, partition=part, point_size=args.point_size)
     #"""
     if not args.load_unions:
         while True:
-            d_b = input("Decision Boundary [0,1] (exit: -1):")
+            d_b = input("Decision Boundary [0,1] (continue: -1):")
             try:
                 d_b = float(d_b)
             except:
@@ -121,39 +127,63 @@ def main():
                 break
             unions = np.zeros((unions.shape[0], ), dtype=np.bool)
             unions[probs > d_b] = True
-            p_pcd = partition_pcd(
+            part = partition(
                 graph_dict=graph_dict,
                 unions=unions,
                 P=P,
-                sp_idxs=sp_idxs,
-                colors=colors,
-                col_d=col_c)
-            render(p_pcd)
+                sp_idxs=sp_idxs)
+            render_pptk(P=P, initial_partition=init_p, partition=part, point_size=args.point_size)
         save_unions(
             fdir=args.g_dir,
             unions=unions,
             graph_dict=graph_dict,
             filename=args.g_filename)
     #"""
+    point_size = args.point_size
     while True:
-        picked_points_idxs = pick_sp_points(p_pcd)
-        graph_dict, unions = unify(
-            picked_points_idxs=picked_points_idxs,
-            sp_idxs=sp_idxs,
-            graph_dict=graph_dict,
-            unions=unions)
-        p_pcd = partition_pcd(
-            graph_dict=graph_dict,
-            unions=unions,
-            P=P,
-            sp_idxs=sp_idxs,
-            colors=colors,
-            col_d=col_c)
         save_unions(
             fdir=args.g_dir,
             unions=unions,
             graph_dict=graph_dict,
             filename=args.g_filename)
+        mode = input("Superpoint Editing Mode: Extend [e] | Create [c] | Separate [s] | Point Cloud [p] | Point_Size [ps] | Exit [-1]: ")
+        if mode == "p":
+            render_pptk(P=P, initial_partition=init_p, partition=part, point_size=point_size)
+            continue
+        elif mode == "ps":
+            ps = input("Point size: ")
+            try:
+                ps = float(ps)
+            except:
+                continue
+            point_size = ps
+            continue
+        elif mode == "-1":
+            return
+        picked_points_idxs = pick_sp_points_pptk(P=P, initial_partition=init_p, partition=part, point_size=point_size)
+        if mode == "c":
+            graph_dict, unions = unify(
+                picked_points_idxs=picked_points_idxs,
+                sp_idxs=sp_idxs,
+                graph_dict=graph_dict,
+                unions=unions)
+        elif mode == "e":
+            graph_dict, unions = extend_superpoint(
+                picked_points_idxs=picked_points_idxs,
+                sp_idxs=sp_idxs,
+                graph_dict=graph_dict,
+                unions=unions)
+        elif mode == "s":
+            graph_dict, unions = separate_superpoint(
+                picked_points_idxs=picked_points_idxs,
+                sp_idxs=sp_idxs,
+                graph_dict=graph_dict,
+                unions=unions)
+        part = partition(
+            graph_dict=graph_dict,
+            unions=unions,
+            P=P,
+            sp_idxs=sp_idxs)
 
 
 if __name__ == "__main__":

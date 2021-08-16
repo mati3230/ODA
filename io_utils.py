@@ -99,6 +99,7 @@ def load_probs(fdir, filename=""):
     print("Done")
     return P, graph_dict, sp_idxs, probs, unions
 
+
 def save_init_graph(fdir, P, graph_dict, sp_idxs, filename=""):
     print("Save initial graph")
     mkdir(fdir)
@@ -168,6 +169,21 @@ def load_cloud(file, r=255, g=0, b=0, p=1):
         raise Exception("Unknwon file type: {0}".format(file))
     print("Done")
     return P
+
+
+def load_proc_cloud(fdir, fname):
+    hf = h5py.File("{0}/P_{1}.h5".format(fdir, fname), "r")
+    P = np.array(hf["P"], copy=True)
+    hf.close()
+    return P
+
+
+def save_cloud(P, fdir, fname):
+    print("Save cloud")
+    hf = h5py.File("{0}/P_{1}.h5".format(fdir, fname), "w")
+    hf.create_dataset("P", data=P)
+    hf.close()
+    print("Done")
 
 
 def cloud(P, r=255, g=0, b=0, p=1):

@@ -1,10 +1,9 @@
 import numpy as np
 import open3d as o3d
+import pptk
 
-from sp_utils import comp_list
 
-
-def pick_sp_points(pcd):
+def pick_sp_points_o3d(pcd):
     print("")
     print("1) Pick superpoints that should by unified by using [shift + left click]")
     print("Press [shift + right click] to undo a selection")
@@ -18,19 +17,55 @@ def pick_sp_points(pcd):
     return vis.get_picked_points()
 
 
-def render(x):
-    if x is None:
+def pick_sp_points_pptk(P, partition=None, initial_partition=None, point_size=-1):
+    v = render_pptk_(P=P, partition=partition, initial_partition=initial_partition, point_size=point_size)
+    idxs = v.get("selected")
+    idxs = np.array(idxs, dtype=np.uint32)
+    idxs = np.unique(idxs)
+    v.close()
+    return idxs
+
+
+def render_pptk_(P, partition=None, initial_partition=None, point_size=-1):
+    if P is None:
+        return None
+    xyz = P[:, :3]
+    rgb = np.array(P[:, 3:], copy=True)
+    max_c = np.max(rgb, axis=0)
+    max_c = max_c[max_c > 1]
+    if max_c.shape[0] > 0:
+        #print("Normalize colors.")
+        rgb /= 255.
+    v = pptk.viewer(xyz)
+    if point_size > 0:
+        v.set(point_size=point_size)
+    colors = P[:, 3:]
+    if partition is None and initial_partition is None:
+        v.attributes(rgb)
+    elif initial_partition is not None and partition is None:
+        v.attributes(rgb, initial_partition)
+    elif initial_partition is None and partition is not None:
+        v.attributes(rgb, partition)
+    else:
+        v.attributes(rgb, initial_partition, partition)
+    print("Press Return to continue.")
+    v.wait()
+    return v
+
+
+def render_pptk(P, partition=None, initial_partition=None, point_size=-1):
+    v = render_pptk_(P=P, partition=partition, initial_partition=initial_partition, point_size=point_size)
+    if v is None:
         return
-    pcd = x
-    if type(x) == np.ndarray:
-        pcd = o3d.geometry.PointCloud()
-        pcd.points = o3d.utility.Vector3dVector(x[:, :3])
-        pcd.colors = o3d.utility.Vector3dVector(x[:, 3:] / 255.)
-    elif type(x) == list:
-        x.extend(coordinate_system())
+    v.close()
+
+
+def render_o3d(x):
+    if type(x) == list:
+        x.append(coordinate_system())
         o3d.visualization.draw_geometries(x)
-        return        
-    o3d.visualization.draw_geometries([pcd, coordinate_system()])
+    else:
+        o3d.visualization.draw_geometries([x, coordinate_system()])
 
 
 def coordinate_system():
@@ -42,44 +77,3 @@ def coordinate_system():
     line_set.colors = o3d.utility.Vector3dVector(colors)
     line_set.lines = o3d.utility.Vector2iVector(lines)
     return line_set
-
-
-def initial_partition_pcd(P, sp_idxs, colors):
-    pcd = o3d.geometry.PointCloud()
-    pcd.points = o3d.utility.Vector3dVector(P[:, :3])
-    n_P = P.shape[0]
-    C = np.zeros((n_P, 3))
-    n_sps = len(sp_idxs)
-    for i in range(n_sps):
-        idxs = sp_idxs[i]
-        color = colors[i, :]
-        #print(len(idx), color)
-        C[idxs, :] = color / 255
-    pcd.colors = o3d.utility.Vector3dVector(C)
-    return pcd
-
-
-def partition_pcd(graph_dict, unions, P, sp_idxs, colors, col_d=0.25):
-    pcd = o3d.geometry.PointCloud()
-    pcd.points = o3d.utility.Vector3dVector(P[:, :3])
-    n_P = P.shape[0]
-    C = np.zeros((n_P, 3))
-
-    c_list = comp_list(graph_dict=graph_dict, unions=unions, n_P=n_P, sp_idxs=sp_idxs)
-
-    for i in range(len(c_list)):
-        comp = c_list[i]
-        color = colors[i, :]
-        n_sp_comp = len(comp)
-        if col_d > 0:
-            c_factors = (np.arange(n_sp_comp) + 1) / n_sp_comp
-            c_factors *= col_d
-            c_factors += (1-col_d)
-        else:
-            c_factors = np.ones((n_sp_comp, ))
-        for j in range(n_sp_comp):
-            P_idxs = comp[j][1]
-            C[P_idxs, :] = c_factors[j] * color / 255.
-
-    pcd.colors = o3d.utility.Vector3dVector(C)
-    return pcd
