@@ -29,6 +29,32 @@ def graph_convolution(model_fn, input_graphs, training, node_factor=0.7):
     return output_graphs
 
 
+def graph_convolution2(model_fn_node, model_fn_neigh, activation, input_graphs, training):
+    # Send the node features to the edges that are being sent by that node. 
+    nodes_at_sender_edges = gn.blocks.broadcast_sender_nodes_to_edges(input_graphs)
+    temporary_graph_sent = input_graphs.replace(edges=nodes_at_sender_edges)
+
+    nodes_at_receiver_edges = gn.blocks.broadcast_receiver_nodes_to_edges(input_graphs)
+    temporary_graph_recv = input_graphs.replace(edges=nodes_at_receiver_edges)
+
+    # Average the all of the edges received by every node.
+    nodes_with_aggregated_edges_s = gn.blocks.ReceivedEdgesToNodesAggregator(tf.math.unsorted_segment_mean)(temporary_graph_sent)
+    # Average the all of the edges sent by every node.
+    nodes_with_aggregated_edges_r = gn.blocks.SentEdgesToNodesAggregator(tf.math.unsorted_segment_mean)(temporary_graph_recv)
+    nodes_with_aggregated_edges = nodes_with_aggregated_edges_s + nodes_with_aggregated_edges_r
+
+    z_neigh = model_fn_neigh(nodes_with_aggregated_edges, is_training=training)
+    z_node = model_fn_node(input_graphs.nodes, is_training=training)
+    updated_nodes = z_node + z_neigh
+    if activation is not None:
+        updated_nodes = activation(updated_nodes)
+
+
+    output_graphs = input_graphs.replace(nodes=updated_nodes)
+
+    return output_graphs
+
+
 def fast_dot(a, b):
     dot = a*b
     dot = tf.reduce_sum(dot, axis=-1)
@@ -68,12 +94,12 @@ class FFGraphNet(BaseNetwork):
             observation_size=observation_size)
 
     def action(self, obs, training=False, decision_boundary=0.5):
-        out_g = graph_convolution(model_fn=self.model_fn, input_graphs=obs, training=training, node_factor=0.7)
+        out_g = graph_convolution2(model_fn_node=self.model_fn_node, model_fn_neigh=self.model_fn_neigh, activation=self.activation, input_graphs=obs, training=training)
         s = out_g.senders
         r = out_g.receivers
 
         fi = tf.gather(out_g.nodes, indices=s)
-        fj= tf.gather(out_g.nodes, indices=r)
+        fj = tf.gather(out_g.nodes, indices=r)
         dot, fin, fjn = fast_dot(fi, fj)
         
         d = (dot + 1) / 2
@@ -94,14 +120,23 @@ class FFGraphNet(BaseNetwork):
             seed=None,
             initializer="glorot_uniform",
             mode="full"):
-        self.model_fn = snt.nets.MLP(
+        self.model_fn_node = snt.nets.MLP(
             output_sizes=[512, 256, 128, 64, 16],
             activation=tf.nn.relu,
             w_init=snt.initializers.TruncatedNormal(mean=0, stddev=0.2, seed=seed),
             dropout_rate=0.2,
             activate_final=False,
-            name="mlp1"
+            name="mlp_node"
             )
+        self.model_fn_neigh = snt.nets.MLP(
+            output_sizes=[512, 256, 128, 64, 16],
+            activation=tf.nn.relu,
+            w_init=snt.initializers.TruncatedNormal(mean=0, stddev=0.2, seed=seed),
+            dropout_rate=0.2,
+            activate_final=False,
+            name="mlp_neigh"
+            )
+        self.activation = None
 
     def init_net(
             self,
@@ -116,7 +151,8 @@ class FFGraphNet(BaseNetwork):
 
     def get_vars(self, with_non_trainable=True):
         vars_ = []
-        vars_.extend(self.model_fn.variables)
+        vars_.extend(self.model_fn_node.variables)
+        vars_.extend(self.model_fn_neigh.variables)
         return vars_
 
     def reset(self):
