@@ -95,7 +95,7 @@ class FFGraphNet(BaseNetwork):
             initializer="glorot_uniform",
             mode="full"):
         self.model_fn = snt.nets.MLP(
-            output_sizes=[800, 400, 200, 64, 16],
+            output_sizes=[512, 256, 128, 64, 16],
             activation=tf.nn.relu,
             w_init=snt.initializers.TruncatedNormal(mean=0, stddev=0.2, seed=seed),
             dropout_rate=0.2,

@@ -17,8 +17,8 @@ def pick_sp_points_o3d(pcd):
     return vis.get_picked_points()
 
 
-def pick_sp_points_pptk(P, partition=None, initial_partition=None, point_size=-1, v=None):
-    v = render_pptk_(P=P, partition=partition, initial_partition=initial_partition, point_size=point_size, v=v)
+def pick_sp_points_pptk(P, partition=None, initial_partition=None, point_size=-1, v=None, colors=None):
+    v = render_pptk_(P=P, partition=partition, initial_partition=initial_partition, point_size=point_size, v=v, colors=colors)
     idxs = v.get("selected")
     idxs = np.array(idxs, dtype=np.uint32)
     idxs = np.unique(idxs)
@@ -39,7 +39,7 @@ def set_perspective(viewer, p):
     viewer.set(lookat=p[:3], phi=p[3], theta=p[4], r=p[5])
 
 
-def render_pptk_(P, partition=None, initial_partition=None, point_size=-1, v=None):
+def render_pptk_(P, partition=None, initial_partition=None, point_size=-1, v=None, colors=None):
     if P is None:
         return None
     xyz = P[:, :3]
@@ -56,6 +56,8 @@ def render_pptk_(P, partition=None, initial_partition=None, point_size=-1, v=Non
         persp = get_perspective(viewer=v)
         v.clear()
         v.load(xyz)
+    if colors is not None:
+        v.color_map(c=colors)
     if point_size > 0:
         v.set(point_size=point_size)
     colors = P[:, 3:]
@@ -73,8 +75,8 @@ def render_pptk_(P, partition=None, initial_partition=None, point_size=-1, v=Non
     return v
 
 
-def render_pptk(P, partition=None, initial_partition=None, point_size=-1, v=None):
-    v = render_pptk_(P=P, partition=partition, initial_partition=initial_partition, point_size=point_size, v=v)
+def render_pptk(P, partition=None, initial_partition=None, point_size=-1, v=None, colors=None):
+    v = render_pptk_(P=P, partition=partition, initial_partition=initial_partition, point_size=point_size, v=v, colors=colors)
     return v
 
 

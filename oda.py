@@ -13,7 +13,9 @@ from io_utils import\
     load_probs,\
     save_unions,\
     load_unions,\
-    save_cloud
+    save_cloud,\
+    load_proc_cloud,\
+    load_colors
 from ai_utils import graph, predict
 from sp_utils import\
     unify,\
@@ -51,6 +53,8 @@ def main():
     parser.add_argument("--load_proc_cloud", default=False, type=bool, help="Load the preprocessed point cloud from g_dir.")
     parser.add_argument("--point_size", default=0.03, type=float, help="Rendering point size.")
     args = parser.parse_args()
+    colors = load_colors()
+    colors = colors/255.
     viewer = None
     if not args.gpu:
         os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
@@ -68,7 +72,7 @@ def main():
         else:
             P = load_cloud(file=args.file, r=args.r, g=args.g, b=args.b, p=args.p)
             while True:
-                picked_points_idxs, viewer = pick_sp_points_pptk(P=P, point_size=args.point_size, v=viewer)
+                picked_points_idxs, viewer = pick_sp_points_pptk(P=P, point_size=args.point_size, v=viewer, colors=colors)
                 P = delete(P=P, idxs=picked_points_idxs)
                 save_cloud(P=P, fdir=args.g_dir, fname=args.g_filename)
                 i = input("Delete more points [Return] | Continue [-1] | Exit [e]: ")
@@ -116,7 +120,7 @@ def main():
         unions=unions,
         P=P,
         sp_idxs=sp_idxs)
-    viewer = render_pptk(P=P, initial_partition=init_p, partition=part, point_size=args.point_size, v=viewer)
+    viewer = render_pptk(P=P, initial_partition=init_p, partition=part, point_size=args.point_size, v=viewer, colors=colors)
     #"""
     if not args.load_unions:
         while True:
@@ -134,7 +138,7 @@ def main():
                 unions=unions,
                 P=P,
                 sp_idxs=sp_idxs)
-            viewer = render_pptk(P=P, initial_partition=init_p, partition=part, point_size=args.point_size, v=viewer)
+            viewer = render_pptk(P=P, initial_partition=init_p, partition=part, point_size=args.point_size, v=viewer, colors=colors)
         save_unions(
             fdir=args.g_dir,
             unions=unions,
@@ -150,7 +154,7 @@ def main():
             filename=args.g_filename)
         mode = input("Superpoint Editing Mode: Extend [e] | Create [c] | Separate [s] | Point Cloud [p] | Point_Size [ps] | Extend points [ep] | Reduce points [r] | Exit [-1]: ")
         if mode == "p":
-            viewer = render_pptk(P=P, initial_partition=init_p, partition=part, point_size=point_size, v=viewer)
+            viewer = render_pptk(P=P, initial_partition=init_p, partition=part, point_size=point_size, v=viewer, colors=colors)
             continue
         elif mode == "ps":
             ps = input("Point size: ")
@@ -164,7 +168,7 @@ def main():
             if viewer is not None:
                 viewer.close()
             return
-        picked_points_idxs, viewer = pick_sp_points_pptk(P=P, initial_partition=init_p, partition=part, point_size=point_size, v=viewer)
+        picked_points_idxs, viewer = pick_sp_points_pptk(P=P, initial_partition=init_p, partition=part, point_size=point_size, v=viewer, colors=colors)
         if mode == "c":
             graph_dict, unions = unify(
                 picked_points_idxs=picked_points_idxs,
@@ -172,7 +176,7 @@ def main():
                 graph_dict=graph_dict,
                 unions=unions)
         elif mode == "e":
-            points_idxs_e, viewer = pick_sp_points_pptk(P=P, initial_partition=init_p, partition=part, point_size=point_size, v=viewer)
+            points_idxs_e, viewer = pick_sp_points_pptk(P=P, initial_partition=init_p, partition=part, point_size=point_size, v=viewer, colors=colors)
             graph_dict, unions = extend_superpoint(
                 picked_points_idxs=picked_points_idxs,
                 points_idxs_e=points_idxs_e,
@@ -186,10 +190,10 @@ def main():
                 graph_dict=graph_dict,
                 unions=unions)
         elif mode == "ep":
-            points_idxs_e, viewer = pick_sp_points_pptk(P=P, initial_partition=init_p, partition=part, point_size=point_size, v=viewer)
+            points_idxs_e, viewer = pick_sp_points_pptk(P=P, initial_partition=init_p, partition=part, point_size=point_size, v=viewer, colors=colors)
             sp_idxs = extend_superpoint_points(picked_points_idxs=picked_points_idxs, points_idxs_e=points_idxs_e, sp_idxs=sp_idxs)
         elif mode == "r":
-            points_idxs_r, viewer = pick_sp_points_pptk(P=P, initial_partition=init_p, partition=part, point_size=point_size, v=viewer)
+            points_idxs_r, viewer = pick_sp_points_pptk(P=P, initial_partition=init_p, partition=part, point_size=point_size, v=viewer, colors=colors)
             graph_dict, sp_idxs = reduce_superpoint(picked_points_idxs=picked_points_idxs, points_idxs_r=points_idxs_r, graph_dict=graph_dict, sp_idxs=sp_idxs)
             init_p = initial_partition(P=P, sp_idxs=sp_idxs)
             if args.save_init_g:
