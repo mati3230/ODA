@@ -5,11 +5,13 @@ import numpy.matlib
 from sklearn.neighbors import NearestNeighbors
 from scipy.spatial import Delaunay
 from graph_nets import utils_tf
+from tqdm import tqdm
 
 from network import FFGraphNet
 
 
 def compute_graph_nn_2(xyz, k_nn1, k_nn2, voronoi = 0.0):
+    print("Compute Graph NN")
     """compute simulteneoulsy 2 knn structures
     only saves target for knn2
     assumption : knn1 <= knn2"""
@@ -56,6 +58,7 @@ def compute_graph_nn_2(xyz, k_nn1, k_nn2, voronoi = 0.0):
         graph["target"] = np.transpose(neighbors.flatten(order='C')).astype('uint32')
         graph["distances"] = distances.flatten().astype('float32')
     #save the graph
+    print("Done")
     return graph, target2
 
 
@@ -65,17 +68,20 @@ def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, 
     #---compute 10 nn graph-------
     graph_nn, target_fea = compute_graph_nn_2(xyz, k_nn_adj, k_nn_geof)
     #---compute geometric features-------
+    print("Compute geof")
     geof = libply_c.compute_geof(xyz, target_fea, k_nn_geof).astype('float32')
     del target_fea
-    
+
     #choose here which features to use for the partition
     features = np.hstack((geof, rgb/255.)).astype("float32")#add rgb as a feature for partitioning
     features[:,3] = 2. * features[:,3] #increase importance of verticality (heuristic)
                 
     graph_nn["edge_weight"] = np.array(1. / ( lambda_edge_weight + graph_nn["distances"] / np.mean(graph_nn["distances"])), dtype = "float32")
     #print("        minimal partition...")
+    print("Minimal Partition")
     components, in_component = libcp.cutpursuit(features, graph_nn["source"], graph_nn["target"]
                                  , graph_nn["edge_weight"], reg_strength)
+    print("Done")
     #print(components)
     #print(in_component)
     components = np.array(components, dtype = "object")
@@ -135,12 +141,12 @@ def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, 
     for i_sedg in range(0, n_sedg):
         i_edg_begin = jump_edg[i_sedg]
         i_edg_end = jump_edg[i_sedg + 1]
-        ver_source = edges[0, range(i_edg_begin, i_edg_end)]
-        ver_target = edges[1, range(i_edg_begin, i_edg_end)]
+        #ver_source = edges[0, range(i_edg_begin, i_edg_end)]
+        #ver_target = edges[1, range(i_edg_begin, i_edg_end)]
         com_source = edge_comp[0, i_edg_begin]
         com_target = edge_comp[1, i_edg_begin]
-        xyz_source = xyz[ver_source, :]
-        xyz_target = xyz[ver_target, :]
+        #xyz_source = xyz[ver_source, :]
+        #xyz_target = xyz[ver_target, :]
         senders[i_sedg] = com_source
         receivers[i_sedg] = com_target
 
@@ -690,7 +696,7 @@ def graph(cloud, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0
 
     node_features = np.zeros((n_sps, n_ft), dtype=np.float32)
     node_features[0] = features
-    for k in range(1, n_sps):
+    for k in tqdm(range(1, n_sps), desc="Node features"):
         idxs = sp_idxs[k]
         sp = P[idxs]
         features = compute_features(P=sp)
