@@ -4,6 +4,7 @@ import igraph as ig
 import open3d as o3d
 from sklearn.neighbors import NearestNeighbors
 from vtk.util.numpy_support import vtk_to_numpy
+from scipy.spatial.transform import Rotation
 
 
 def extend(arr, n_arr, dtype):
@@ -425,4 +426,27 @@ def delete(P, idxs):
     if idxs.shape[0] == 0:
         return P
     P = np.delete(P, idxs, axis=0)
+    return P
+
+
+def rotate(P):
+    axis = input("Axis [x, y, z]: ")
+    if axis != "x" and axis != "y" and axis != "z":
+        return P
+    degree = input("Degree [-180, 180]: ")
+    try:
+        degree = float(degree)
+    except:
+        return P
+    if degree < -180 or degree > 180:
+        return P
+    r = Rotation.from_euler(axis, degree, degrees=True)
+    P[:, :3] = r.apply(P[:, :3])
+    return P
+
+
+def recenter(P):
+    center = np.mean(P[:, :3], axis=0)
+    #print(center)
+    P[:, :3] -= center
     return P

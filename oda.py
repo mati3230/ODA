@@ -15,7 +15,8 @@ from io_utils import\
     load_unions,\
     save_cloud,\
     load_proc_cloud,\
-    load_colors
+    load_colors,\
+    subsample
 from ai_utils import graph, predict
 from sp_utils import\
     unify,\
@@ -25,7 +26,9 @@ from sp_utils import\
     initial_partition,\
     delete,\
     extend_superpoint_points,\
-    reduce_superpoint
+    reduce_superpoint,\
+    rotate,\
+    recenter
 
 def main():
     parser = argparse.ArgumentParser()
@@ -71,15 +74,37 @@ def main():
             P = load_proc_cloud(fdir=args.g_dir, fname=args.g_filename)
         else:
             P = load_cloud(file=args.file, r=args.r, g=args.g, b=args.b, p=args.p)
+        editing = input("Continue Editing? [y|n]: ")
+        editing = editing == "y"
+        if editing:
             while True:
-                picked_points_idxs, viewer = pick_sp_points_pptk(P=P, point_size=args.point_size, v=viewer, colors=colors)
-                P = delete(P=P, idxs=picked_points_idxs)
-                save_cloud(P=P, fdir=args.g_dir, fname=args.g_filename)
-                i = input("Delete more points [Return] | Continue [-1] | Exit [e]: ")
+                viewer = render_pptk(P=P, v=viewer)
+                i = input("Delete points [d] | Rotate [r] | recenter [re] | downsample [s] | Continue [-1] | Exit [e]: ")
                 if i == "-1":
                     break
                 elif i == "e":
+                    if viewer is not None:
+                        viewer.close()
                     return
+                elif i == "d":
+                    picked_points_idxs, viewer = pick_sp_points_pptk(
+                        P=P, point_size=args.point_size, v=viewer, colors=colors)
+                    P = delete(P=P, idxs=picked_points_idxs)
+                elif i == "r":
+                    P = rotate(P=P)
+                elif i == "re":
+                    P = recenter(P=P)
+                elif i == "s":
+                    s = input("Percent [0,1]: ")
+                    try:
+                        s = float(s)
+                        P = subsample(P=P, p=s)
+                    except Exception as e:
+                        print(e)
+                        continue
+                else:
+                    continue
+                save_cloud(P=P, fdir=args.g_dir, fname=args.g_filename)
         #return
         graph_dict, sp_idxs = graph(
             cloud=P,

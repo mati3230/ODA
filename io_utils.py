@@ -86,6 +86,7 @@ def save_probs(fdir, P, graph_dict, sp_idxs, probs, initial_db, save_init=False,
 def load_probs(fdir, filename=""):
     print("Load probs...")
     P, graph_dict, sp_idxs = load_init_graph(fdir=fdir, filename=filename)
+    print("Point cloud size: {0} points".format(P.shape[0]))
 
     file = "{0}/probs_{1}.h5".format(fdir, filename)
     if not file_exists(filepath=file):
@@ -136,6 +137,7 @@ def load_init_graph(fdir, filename=""):
         "globals": None
     }
     P = np.array(hf["P"], copy=True)
+    print("Point cloud size: {0} points".format(P.shape[0]))
     n_sps = int(hf["n_sps"][0])
     sp_idxs = n_sps * [None]
     for i in range(n_sps):
@@ -167,6 +169,7 @@ def load_cloud(file, r=255, g=0, b=0, p=1):
         P = from_txt(file=file, r=r, g=g, b=b, p=p)
     else:
         raise Exception("Unknwon file type: {0}".format(file))
+    print("Point cloud size: {0} points".format(P.shape[0]))
     print("Done")
     return P
 
@@ -174,6 +177,7 @@ def load_cloud(file, r=255, g=0, b=0, p=1):
 def load_proc_cloud(fdir, fname):
     hf = h5py.File("{0}/P_{1}.h5".format(fdir, fname), "r")
     P = np.array(hf["P"], copy=True)
+    print("Point cloud size: {0} points".format(P.shape[0]))
     hf.close()
     return P
 
@@ -189,6 +193,7 @@ def save_cloud(P, fdir, fname):
 def cloud(P, r=255, g=0, b=0, p=1):
     colors_available = P.shape[1] == 6
     P = colorize(P=P, colors_available=colors_available, r=r, g=g, b=b)
+    print("Original Point Cloud Size: {0}".format(P.shape[0]))
     P = subsample(P=P, p=p)
     return P
 
