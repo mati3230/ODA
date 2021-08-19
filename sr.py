@@ -31,7 +31,9 @@ def main():
     objects = get_objects(picked_points_idxs=picked_points_idxs, P=P, sp_idxs=sp_idxs, graph_dict=graph_dict, unions=unions)
     remaining = get_remaining(P=P, objects=objects)
     objects.append(remaining)
+    meshes = []
     for i in range(len(objects)):
+        print("Object: {0}/{1}".format(i, len(objects)))
         o_idxs = objects[i]
         while True:
             #"""
@@ -49,6 +51,8 @@ def main():
             mesh = reco(P=P, o_idxs=o_idxs, dims=dims, radius=radius, sample_size=sample_size)
             render_o3d(mesh)
             save_mesh(mesh=mesh, fdir=args.o_dir, filename=args.g_filename, o_id=i)
+        meshes.append(mesh)
+    render_o3d(meshes)
 
 if __name__ == "__main__":
     main()
