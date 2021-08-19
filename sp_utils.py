@@ -1,4 +1,5 @@
 import numpy as np
+from vedo import *
 import igraph as ig
 import open3d as o3d
 
@@ -342,13 +343,13 @@ def reconstruct_obj(P, depth):
     pcd.colors = o3d.utility.Vector3dVector(P[:, 3:] / 255.)
 
     pcd.estimate_normals()
-    #print("Normals estimated.")
-    mesh, _ = o3d.geometry.TriangleMesh.create_from_point_cloud_poisson(pcd, depth=depth)
+    print("Normals estimated.")
+    mesh, _ = o3d.geometry.TriangleMesh.create_from_point_cloud_poisson(pcd=pcd, depth=depth, scale=1.05, linear_fit=False)
     
-    #radii = 3 * [0.1]
+    #radii = [depth, 2*depth]
     #mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_ball_pivoting(pcd, o3d.utility.DoubleVector(radii))
 
-    #mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_alpha_shape(pcd, alpha=alpha)
+    mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_alpha_shape(pcd, alpha=depth)
 
     return mesh
 
@@ -364,6 +365,38 @@ def reconstruct(P, objects, remaining, depth):
     mesh_r = reconstruct_obj(P=P_r, depth=depth)
     meshes[-1] = mesh_r
     return meshes
+
+
+def to_reco_params(inp):
+    inps = inp.split(",")
+    if len(inps) != 3:
+        return False, 150, 0.1, 15
+    try:
+        dims = int(inps[0])
+        radius = float(inps[1])
+        sample_size = int(inps[2])
+    except Exception as e:
+        print(e)
+        return False, 150, 0.1, 15
+    return True, dims, radius, sample_size
+
+
+def reco(P, o_idxs, file, apply_colors=False, dims=150, radius=0.1, sample_size=15):
+    plt = Plotter(N=2, axes=0)
+    c_list = (255, 0, 0)
+    if apply_colors:
+        c_list = P.shape[0] * [None]
+        for i in range(P.shape[0]):
+            c = P[i, 3:]
+            c_list[i] = (c[0], c[1], c[2], 255)
+    pts0 = Points(P[:, :3], c=c_list).legend("cloud")
+    #pts0 = pts0.clone().smoothMLS2D(f=0.8)  # smooth cloud
+    plt.show(pts0, "original point cloud", at=0)
+    print("Reconstruct")
+    reco = recoSurface(pts0, dims=dims, radius=radius, sampleSize=sample_size).legend("surf. reco")
+    print("Plot")
+    plt.show(reco, at=1, axes=7, zoom=1.2, interactive=1).close()
+    write(objct=reco, fileoutput=file)
 
 
 def initial_partition(P, sp_idxs):
