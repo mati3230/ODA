@@ -1,7 +1,7 @@
 import argparse
 
 from io_utils import load_probs, load_unions, save_mesh, load_cloud
-from sp_utils import get_objects, get_remaining, reconstruct, partition, initial_partition, reco, to_reco_params
+from sp_utils import get_objects, get_remaining, partition, initial_partition, reco, to_reco_params
 from visu_utils import pick_sp_points_pptk, render_pptk, render_o3d
 
 
