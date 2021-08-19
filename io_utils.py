@@ -243,8 +243,12 @@ def subsample(P, p):
     return P
 
 
+def save_mesh(mesh, fdir, filename, o_id):
+    o3d.io.write_triangle_mesh("{0}/mesh_{1}_{2}.glb".format(fdir, filename, o_id), mesh)
+
+
 def save_meshes(meshes, fdir, filename=""):
     mkdir(fdir)
     for i in range(len(meshes)):
         mesh = meshes[i]
-        o3d.io.write_triangle_mesh("{0}/mesh_{1}_{2}.glb".format(fdir, filename, i), mesh)
+        save_mesh(mesh=mesh, fdir=fdir, filename=filename, o_id=i)

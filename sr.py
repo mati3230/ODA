@@ -1,6 +1,6 @@
 import argparse
 
-from io_utils import load_probs, load_unions, save_meshes, load_cloud
+from io_utils import load_probs, load_unions, save_mesh, load_cloud
 from sp_utils import get_objects, get_remaining, reconstruct, partition, initial_partition, reco, to_reco_params
 from visu_utils import pick_sp_points_pptk, render_pptk, render_o3d
 
@@ -30,24 +30,25 @@ def main():
     # list of point idxs
     objects = get_objects(picked_points_idxs=picked_points_idxs, P=P, sp_idxs=sp_idxs, graph_dict=graph_dict, unions=unions)
     remaining = get_remaining(P=P, objects=objects)
-    #"""
-    # TODO del
-    #P = load_cloud(file="../conferenceRoom_1.txt", r=255, g=0, b=0, p=0.025)
-    #objects = []
     objects.append(remaining)
     for i in range(len(objects)):
         o_idxs = objects[i]
         while True:
+            #"""
             inp = input("Continue [c] | Parameter [dims(int),radius(float),sample_size(int)]: ")
             if inp == "c":
                 break
             ok, dims, radius, sample_size = to_reco_params(inp=inp)
             if not ok:
                 continue
-            file = "{0}/mesh_{1}_{2}.obj".format(args.o_dir, args.g_filename, i)
-            reco(P=P, o_idxs=o_idxs, file=file, dims=dims, radius=radius, sample_size=sample_size)
-
-
+            """            
+            dims=100 
+            radius=0.1
+            sample_size=10
+            """
+            mesh = reco(P=P, o_idxs=o_idxs, dims=dims, radius=radius, sample_size=sample_size)
+            render_o3d(mesh)
+            save_mesh(mesh=mesh, fdir=args.o_dir, filename=args.g_filename, o_id=i)
 
 if __name__ == "__main__":
     main()

@@ -1,7 +1,9 @@
 import numpy as np
-from vedo import *
+from vedo import Plotter, Points, recoSurface, write, Mesh
 import igraph as ig
 import open3d as o3d
+from sklearn.neighbors import NearestNeighbors
+from vtk.util.numpy_support import vtk_to_numpy
 
 
 def extend(arr, n_arr, dtype):
@@ -381,22 +383,47 @@ def to_reco_params(inp):
     return True, dims, radius, sample_size
 
 
-def reco(P, o_idxs, file, apply_colors=False, dims=150, radius=0.1, sample_size=15):
-    plt = Plotter(N=2, axes=0)
-    c_list = (255, 0, 0)
-    if apply_colors:
-        c_list = P.shape[0] * [None]
-        for i in range(P.shape[0]):
-            c = P[i, 3:]
-            c_list[i] = (c[0], c[1], c[2], 255)
-    pts0 = Points(P[:, :3], c=c_list).legend("cloud")
+def reco(P, o_idxs, dims=150, radius=0.1, sample_size=15):
+    #plt = Plotter(N=2, axes=0)
+    pts0 = Points(P[o_idxs, :3], c=(255, 0, 0)).legend("cloud")
     #pts0 = pts0.clone().smoothMLS2D(f=0.8)  # smooth cloud
-    plt.show(pts0, "original point cloud", at=0)
+    #plt.show(pts0, "original point cloud", at=0)
     print("Reconstruct")
     reco = recoSurface(pts0, dims=dims, radius=radius, sampleSize=sample_size).legend("surf. reco")
-    print("Plot")
-    plt.show(reco, at=1, axes=7, zoom=1.2, interactive=1).close()
-    write(objct=reco, fileoutput=file)
+    """
+    reco.computeNormals()
+    cldata = reco._data.GetCellData()
+    tri_normals = None
+    if cldata.GetNumberOfArrays():
+        for i in range(cldata.GetNumberOfArrays()):
+            iarr = cldata.GetArray(i)
+            if iarr:
+                icname = iarr.GetName()
+                if icname == "Normals":
+                    tri_normals = vtk_to_numpy(iarr)
+    """
+    # access
+    # points: reco.points()
+    # tris: reco.faces()
+    # overview of the mesh: reco._data 
+    print("Apply vertex colors")
+    verts = np.array(reco.points())
+    nn = NearestNeighbors(n_neighbors=1).fit(P[:, :3])
+    distances, neighbors = nn.kneighbors(verts)
+    P_n = P[neighbors[:, 0]]
+    #print(neighbors[:, 0])
+    #print(P_n)
+    v_colors = P_n[:, 3:]
+    tris = np.array(reco.faces())
+    #mesh = Mesh([verts, tris])
+    #mesh.color(c=v_colors)
+    print("Set up o3d mesh")
+    mesh = o3d.geometry.TriangleMesh(o3d.utility.Vector3dVector(verts), o3d.utility.Vector3iVector(tris))
+    mesh.vertex_colors = o3d.utility.Vector3dVector(v_colors/255.)
+    mesh.compute_vertex_normals()
+    mesh.compute_triangle_normals()
+    print("Done")
+    return mesh
 
 
 def initial_partition(P, sp_idxs):

@@ -80,13 +80,17 @@ def render_pptk(P, partition=None, initial_partition=None, point_size=-1, v=None
     return v
 
 
-def render_o3d(x):
+def render_o3d(x, w_co=False):
     if type(x) == list:
-        #x.append(coordinate_system())
+        if w_co:
+            x.append(coordinate_system())
         o3d.visualization.draw_geometries(x)
-        #x.pop(-1)
+        if w_co:
+            x.pop(-1)
     else:
-        o3d.visualization.draw_geometries([x, coordinate_system()])
+        if w_co:
+            o3d.visualization.draw_geometries([x, coordinate_system()])
+        o3d.visualization.draw_geometries([x])
 
 
 def coordinate_system():
