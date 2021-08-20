@@ -1,6 +1,6 @@
 import argparse
 
-from io_utils import load_probs, load_unions, save_mesh, load_cloud
+from io_utils import load_probs, load_unions, save_mesh, load_cloud, load_colors
 from sp_utils import get_objects, get_remaining, partition, initial_partition, reco, to_reco_params
 from visu_utils import pick_sp_points_pptk, render_pptk, render_o3d
 
@@ -15,6 +15,8 @@ def main():
     args = parser.parse_args()
     #"""
     point_size=args.point_size
+    colors = load_colors()
+    colors = colors/255.
 
     P, graph_dict, sp_idxs, probs, unions = load_probs(fdir=args.g_dir, filename=args.g_filename)
     unions, graph_dict = load_unions(fdir=args.g_dir, graph_dict=graph_dict, filename=args.g_filename)
@@ -25,7 +27,8 @@ def main():
         unions=unions,
         P=P,
         sp_idxs=sp_idxs)
-    picked_points_idxs, viewer = pick_sp_points_pptk(P=P, initial_partition=init_p, partition=part, point_size=point_size)
+    picked_points_idxs, viewer = pick_sp_points_pptk(
+        P=P, initial_partition=init_p, partition=part, point_size=point_size, colors=colors)
     viewer.close()
     # list of point idxs
     objects = get_objects(picked_points_idxs=picked_points_idxs, P=P, sp_idxs=sp_idxs, graph_dict=graph_dict, unions=unions)

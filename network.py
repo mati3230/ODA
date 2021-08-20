@@ -6,52 +6,35 @@ import numpy as np
 from base_network import BaseNetwork
 
 
-def graph_convolution(model_fn, input_graphs, training, node_factor=0.7):
+def attention2(input_graphs, model_fn, training):
+    nodes_at_sender_edges = gn.blocks.broadcast_sender_nodes_to_edges(input_graphs)
+    nodes_at_receiver_edges = gn.blocks.broadcast_receiver_nodes_to_edges(input_graphs)
+    
+    V = model_fn(nodes_at_sender_edges, is_training=training)
+    U = model_fn(nodes_at_receiver_edges, is_training=training)
+    U_a, _, _ = fast_dot(U, V)
+    nominator = U_a
+
+    temporary_graph_sent = input_graphs.replace(edges=nominator)
+    denominator = gn.blocks.ReceivedEdgesToNodesAggregator(tf.math.unsorted_segment_sum)(temporary_graph_sent)
+    denominator = 1 / (denominator + 1e-6)
+    deno_graphs = input_graphs.replace(nodes=denominator)
+    deno_edges = gn.blocks.broadcast_receiver_nodes_to_edges(deno_graphs)
+    att = nominator * deno_edges
+    return att
+
+
+def graph_convolution2(model_fn_node, model_fn_neigh, activation, input_graphs, training, att_model_fn=None):
     # Send the node features to the edges that are being sent by that node. 
     nodes_at_sender_edges = gn.blocks.broadcast_sender_nodes_to_edges(input_graphs)
+    if att_model_fn is not None:
+        att = attention2(input_graphs=input_graphs, model_fn=att_model_fn, training=training)
+        nodes_at_sender_edges *= att[:, None]
+
     temporary_graph_sent = input_graphs.replace(edges=nodes_at_sender_edges)
 
-    nodes_at_receiver_edges = gn.blocks.broadcast_receiver_nodes_to_edges(input_graphs)
-    temporary_graph_recv = input_graphs.replace(edges=nodes_at_receiver_edges)
-
     # Average the all of the edges received by every node.
-    nodes_with_aggregated_edges_s = gn.blocks.ReceivedEdgesToNodesAggregator(tf.math.unsorted_segment_mean)(temporary_graph_sent)
-    # Average the all of the edges sent by every node.
-    nodes_with_aggregated_edges_r = gn.blocks.SentEdgesToNodesAggregator(tf.math.unsorted_segment_mean)(temporary_graph_recv)
-    nodes_with_aggregated_edges = nodes_with_aggregated_edges_s + nodes_with_aggregated_edges_r
-
-    # Interpolation between input and neighbour features
-    aggregated_nodes = node_factor * input_graphs.nodes + (1 - node_factor) * nodes_with_aggregated_edges
-    updated_nodes = model_fn(aggregated_nodes, is_training=training)
-
-    output_graphs = input_graphs.replace(nodes=updated_nodes)
-
-    return output_graphs
-
-
-def graph_convolution2(model_fn_node, model_fn_neigh, activation, input_graphs, training):
-    # Send the node features to the edges that are being sent by that node. 
-    nodes_at_sender_edges = gn.blocks.broadcast_sender_nodes_to_edges(input_graphs)
-    temporary_graph_sent = input_graphs.replace(edges=nodes_at_sender_edges)
-
-    nodes_at_receiver_edges = gn.blocks.broadcast_receiver_nodes_to_edges(input_graphs)
-    temporary_graph_recv = input_graphs.replace(edges=nodes_at_receiver_edges)
-
-    # Average the all of the edges received by every node.
-    nodes_with_aggregated_edges_s = gn.blocks.ReceivedEdgesToNodesAggregator(tf.math.unsorted_segment_mean)(temporary_graph_sent)
-    # Average the all of the edges sent by every node.
-    nodes_with_aggregated_edges_r = gn.blocks.SentEdgesToNodesAggregator(tf.math.unsorted_segment_mean)(temporary_graph_recv)
-    nodes_with_aggregated_edges = nodes_with_aggregated_edges_s + nodes_with_aggregated_edges_r
-
-    """
-    # Average the all of the edges received by every node.
-    nodes_with_aggregated_edges_s = gn.blocks.ReceivedEdgesToNodesAggregator(tf.math.unsorted_segment_sum)(temporary_graph_sent)
-    # Average the all of the edges sent by every node.
-    nodes_with_aggregated_edges_r = gn.blocks.SentEdgesToNodesAggregator(tf.math.unsorted_segment_sum)(temporary_graph_recv)
-    nodes_with_aggregated_edges = nodes_with_aggregated_edges_s + nodes_with_aggregated_edges_r
-    # TODO divide by nr of nodes
-    nodes_with_aggregated_edges /= x
-    """
+    nodes_with_aggregated_edges = gn.blocks.ReceivedEdgesToNodesAggregator(tf.math.unsorted_segment_sum)(temporary_graph_sent)
 
     z_neigh = model_fn_neigh(nodes_with_aggregated_edges, is_training=training)
     z_node = model_fn_node(input_graphs.nodes, is_training=training)
@@ -104,12 +87,34 @@ class FFGraphNet(BaseNetwork):
             observation_size=observation_size)
 
     def action(self, obs, training=False, decision_boundary=0.5):
-        out_g = graph_convolution2(model_fn_node=self.model_fn_node, model_fn_neigh=self.model_fn_neigh, activation=self.activation, input_graphs=obs, training=training)
-        s = out_g.senders
-        r = out_g.receivers
+        if training:
+            noise = tf.random.normal(shape=obs.nodes.shape, stddev=0.1)
+            in_nodes = obs.nodes + noise
+            obs.replace(nodes=in_nodes)
+        out_g1 = graph_convolution2(
+            model_fn_node=self.model_fn_node_1,
+            model_fn_neigh=self.model_fn_neigh_1,
+            activation=tf.nn.relu,
+            input_graphs=obs,
+            training=training,
+            att_model_fn=self.model_fn_att_1)
+        out_g2 = graph_convolution2(
+            model_fn_node=self.model_fn_node_2,
+            model_fn_neigh=self.model_fn_neigh_2,
+            activation=None,
+            input_graphs=out_g1,
+            training=training,
+            att_model_fn=self.model_fn_att_2)
+        out_g2_n = tf.concat([out_g2.nodes, out_g1.nodes], axis=-1)
 
-        fi = tf.gather(out_g.nodes, indices=s)
-        fj = tf.gather(out_g.nodes, indices=r)
+        out_g2.replace(nodes=out_g2_n)
+
+        half_e = int(obs.n_edge[0] / 2)
+        s = obs.senders[:half_e]
+        r = obs.receivers[:half_e]
+
+        fi = tf.gather(out_g2.nodes, indices=s)
+        fj = tf.gather(out_g2.nodes, indices=r)
         dot, fin, fjn = fast_dot(fi, fj)
         
         d = (dot + 1) / 2
@@ -130,23 +135,57 @@ class FFGraphNet(BaseNetwork):
             seed=None,
             initializer="glorot_uniform",
             mode="full"):
-        self.model_fn_node = snt.nets.MLP(
-            output_sizes=[512, 256, 128, 64, 16],
+        drop = 0.1
+        self.model_fn_node_1 = snt.nets.MLP(
+            output_sizes=[512, 256, 128],
             activation=tf.nn.relu,
-            w_init=snt.initializers.TruncatedNormal(mean=0, stddev=0.2, seed=seed),
-            dropout_rate=0.2,
-            activate_final=False,
-            name="mlp_node"
+            w_init=snt.initializers.TruncatedNormal(mean=0, stddev=1, seed=seed),
+            dropout_rate=drop,
+            activate_final=True,
+            name="mlp_node_1"
             )
-        self.model_fn_neigh = snt.nets.MLP(
-            output_sizes=[512, 256, 128, 64, 16],
+        self.model_fn_node_2 = snt.nets.MLP(
+            output_sizes=[64, 16],
             activation=tf.nn.relu,
-            w_init=snt.initializers.TruncatedNormal(mean=0, stddev=0.2, seed=seed),
-            dropout_rate=0.2,
+            w_init=snt.initializers.TruncatedNormal(mean=0, stddev=1, seed=seed),
+            dropout_rate=drop,
             activate_final=False,
-            name="mlp_neigh"
+            name="mlp_node_2"
             )
-        self.activation = None
+        self.model_fn_neigh_1 = snt.nets.MLP(
+            output_sizes=[512, 256, 128],
+            activation=tf.nn.relu,
+            w_init=snt.initializers.TruncatedNormal(mean=0, stddev=1, seed=seed),
+            dropout_rate=drop,
+            activate_final=True,
+            name="mlp_neigh_1"
+            )
+        self.model_fn_neigh_2 = snt.nets.MLP(
+            output_sizes=[64, 16],
+            activation=tf.nn.relu,
+            w_init=snt.initializers.TruncatedNormal(mean=0, stddev=1, seed=seed),
+            dropout_rate=drop,
+            activate_final=False,
+            name="mlp_neigh_2"
+            )
+        self.model_fn_att_1 = snt.nets.MLP(
+            output_sizes=[128],
+            activation=tf.nn.relu,
+            #w_init=snt.initializers.TruncatedNormal(mean=0, stddev=0.2, seed=seed),
+            dropout_rate=drop,
+            activate_final=False,
+            name="mlp_att_1",
+            with_bias=False
+            )
+        self.model_fn_att_2 = snt.nets.MLP(
+            output_sizes=[64],
+            activation=tf.nn.relu,
+            #w_init=snt.initializers.TruncatedNormal(mean=0, stddev=0.2, seed=seed),
+            dropout_rate=drop,
+            activate_final=False,
+            name="mlp_att_2",
+            with_bias=False
+            )
 
     def init_net(
             self,
@@ -161,8 +200,12 @@ class FFGraphNet(BaseNetwork):
 
     def get_vars(self, with_non_trainable=True):
         vars_ = []
-        vars_.extend(self.model_fn_node.variables)
-        vars_.extend(self.model_fn_neigh.variables)
+        vars_.extend(self.model_fn_node_1.variables)
+        vars_.extend(self.model_fn_neigh_1.variables)
+        vars_.extend(self.model_fn_node_2.variables)
+        vars_.extend(self.model_fn_neigh_2.variables)
+        vars_.extend(self.model_fn_att_1.variables)
+        vars_.extend(self.model_fn_att_2.variables)
         return vars_
 
     def reset(self):

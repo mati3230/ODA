@@ -134,8 +134,8 @@ def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, 
     jump_edg = np.vstack((0, np.argwhere(np.diff(edge_comp_index)) + 1, n_edg)).flatten()
     n_sedg = len(jump_edg) - 1
 
-    senders = np.zeros((n_sedg, ), dtype='uint32')
-    receivers = np.zeros((n_sedg, ), dtype='uint32')
+    senders = np.zeros((2*n_sedg, ), dtype='uint32')
+    receivers = np.zeros((2*n_sedg, ), dtype='uint32')
 
     #---compute the superedges features---
     for i_sedg in range(0, n_sedg):
@@ -149,7 +149,10 @@ def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, 
         #xyz_target = xyz[ver_target, :]
         senders[i_sedg] = com_source
         receivers[i_sedg] = com_target
-
+        # bidirectional
+        k = n_sedg + i_sedg
+        senders[k] = com_target
+        receivers[k] = com_source
     return n_com, n_sedg, components, senders, receivers
 
 
