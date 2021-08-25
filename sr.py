@@ -12,7 +12,8 @@ def main():
     parser.add_argument("--save_meshes", default=False, type=bool, help="Should the meshes be stored in the o_dir?")
     parser.add_argument("--g_filename", default="", type=str, help="Filename will be used as a postfix.")
     parser.add_argument("--point_size", default=0.03, type=float, help="Rendering point size.")
-    parser.add_argument("--ending", default="glb", type=str, help="File format of the meshes (glb, obj, ...)")
+    parser.add_argument("--ending", default=".glb", type=str, help="File format of the meshes (glb, obj, ...)")
+    parser.add_argument("--co", default=False, type=bool, help="Visualize an o3d coordinate system")
     args = parser.parse_args()
     #"""
     point_size=args.point_size
@@ -37,7 +38,8 @@ def main():
     objects.append(remaining)
     meshes = []
     for i in range(len(objects)):
-        print("Object: {0}/{1}".format(i, len(objects)))
+        print("Object: {0}/{1}".format(i+1, len(objects)))
+        last_one = i == len(objects) - 1
         o_idxs = objects[i]
         while True:
             #"""
@@ -53,10 +55,14 @@ def main():
             sample_size=10
             """
             mesh = reco(P=P, o_idxs=o_idxs, dims=dims, radius=radius, sample_size=sample_size)
-            render_o3d(mesh)
-            save_mesh(mesh=mesh, fdir=args.o_dir, filename=args.g_filename, o_id=i, ending=args.ending)
+            if args.save_meshes:
+                ending = args.ending
+                if last_one:
+                    ending = "_room{0}".format(ending)
+                save_mesh(mesh=mesh, fdir=args.o_dir, filename=args.g_filename, o_id=i, ending=ending)
+            render_o3d(mesh, w_co=args.co)
         meshes.append(mesh)
-    render_o3d(meshes)
+    render_o3d(meshes, w_co=args.co)
 
 if __name__ == "__main__":
     main()

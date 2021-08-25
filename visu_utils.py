@@ -90,7 +90,8 @@ def render_o3d(x, w_co=False):
     else:
         if w_co:
             o3d.visualization.draw_geometries([x, coordinate_system()])
-        o3d.visualization.draw_geometries([x])
+        else:
+            o3d.visualization.draw_geometries([x])
 
 
 def coordinate_system():

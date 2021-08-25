@@ -149,7 +149,7 @@ def main():
     #"""
     if not args.load_unions:
         while True:
-            d_b = input("Decision Boundary [0,1] (continue: -1): ")
+            d_b = input("Decision Boundary [0,1] | Continue: [-1]: ")
             try:
                 d_b = float(d_b)
             except:
@@ -177,7 +177,7 @@ def main():
             unions=unions,
             graph_dict=graph_dict,
             filename=args.g_filename)
-        mode = input("Superpoint Editing Mode: Extend [e] | Create [c] | Separate [s] | Point Cloud [p] | Point_Size [ps] | Extend points [ep] | Reduce points [r] | Exit [-1]: ")
+        mode = input("Superpoint Editing Mode: Extend [ex] | Create [c] | Separate [s] | Point Cloud [p] | Point_Size [ps] | Extend points [ep] | Reduce points [r] | Exit [e]: ")
         if mode == "p":
             viewer = render_pptk(P=P, initial_partition=init_p, partition=part, point_size=point_size, v=viewer, colors=colors)
             continue

@@ -86,6 +86,8 @@ def save_probs(fdir, P, graph_dict, sp_idxs, probs, initial_db, save_init=False,
 def load_probs(fdir, filename=""):
     print("Load probs...")
     P, graph_dict, sp_idxs = load_init_graph(fdir=fdir, filename=filename)
+    if P is None:
+        return None, None, None, None, None, None
     print("Point cloud size: {0} points".format(P.shape[0]))
 
     file = "{0}/probs_{1}.h5".format(fdir, filename)
@@ -249,8 +251,11 @@ def subsample(P, p):
 
 
 def save_mesh(mesh, fdir, filename, o_id, ending="glb"):
-    o3d.io.write_triangle_mesh("{0}/mesh_{1}_{2}.{3}".format(fdir, filename, o_id, ending), mesh)
-
+    mkdir(fdir)
+    file = "{0}/mesh_{1}_{2}{3}".format(fdir, filename, o_id, ending)
+    print("Save mesh: {0}".format(file))
+    o3d.io.write_triangle_mesh(file, mesh)
+    print("Done")
 
 def save_meshes(meshes, fdir, filename=""):
     mkdir(fdir)

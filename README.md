@@ -5,7 +5,6 @@
 # Install
 
 * pip install -r requirements.txt
-* pip install git+git://github.com/deepmind/graph_nets.git
 
 # Quickstart
 

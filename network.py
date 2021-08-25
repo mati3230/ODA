@@ -13,7 +13,7 @@ def attention2(input_graphs, model_fn, training):
     V = model_fn(nodes_at_sender_edges, is_training=training)
     U = model_fn(nodes_at_receiver_edges, is_training=training)
     U_a, _, _ = fast_dot(U, V)
-    nominator = U_a
+    nominator = tf.math.exp(U_a)
 
     temporary_graph_sent = input_graphs.replace(edges=nominator)
     denominator = gn.blocks.ReceivedEdgesToNodesAggregator(tf.math.unsorted_segment_sum)(temporary_graph_sent)
@@ -137,7 +137,7 @@ class FFGraphNet(BaseNetwork):
             mode="full"):
         drop = 0.1
         self.model_fn_node_1 = snt.nets.MLP(
-            output_sizes=[512, 256, 128],
+            output_sizes=[256, 128],
             activation=tf.nn.relu,
             w_init=snt.initializers.TruncatedNormal(mean=0, stddev=1, seed=seed),
             dropout_rate=drop,
@@ -153,7 +153,7 @@ class FFGraphNet(BaseNetwork):
             name="mlp_node_2"
             )
         self.model_fn_neigh_1 = snt.nets.MLP(
-            output_sizes=[512, 256, 128],
+            output_sizes=[256, 128],
             activation=tf.nn.relu,
             w_init=snt.initializers.TruncatedNormal(mean=0, stddev=1, seed=seed),
             dropout_rate=drop,
@@ -173,7 +173,7 @@ class FFGraphNet(BaseNetwork):
             activation=tf.nn.relu,
             #w_init=snt.initializers.TruncatedNormal(mean=0, stddev=0.2, seed=seed),
             dropout_rate=drop,
-            activate_final=False,
+            activate_final=True,
             name="mlp_att_1",
             with_bias=False
             )
@@ -182,7 +182,7 @@ class FFGraphNet(BaseNetwork):
             activation=tf.nn.relu,
             #w_init=snt.initializers.TruncatedNormal(mean=0, stddev=0.2, seed=seed),
             dropout_rate=drop,
-            activate_final=False,
+            activate_final=True,
             name="mlp_att_2",
             with_bias=False
             )

@@ -520,6 +520,12 @@ def compute_features(P, n_curv=30, k_curv=14, k_far=30, n_normal=30, bins=10, mi
     far_points = zero_padding(x=far_points, target_size=k_far)
     far_points = far_points.flatten()
     dists = zero_padding(x=dists, target_size=k_far)
+    far_normals = normals[idxs]
+    far_normals = zero_padding(x=far_normals, target_size=k_far)
+    far_normals = far_normals.flatten()
+    far_curv = curv[idxs]
+    far_curv = zero_padding(x=far_curv, target_size=k_far)
+
 
     ########volumes########
     bb = get_general_bb(P=P)
@@ -547,11 +553,11 @@ def compute_features(P, n_curv=30, k_curv=14, k_far=30, n_normal=30, bins=10, mi
         q_25_normal[:, None],
         q_75_normal[:, None],
         
-        min_normal[:, None],#n_normal*3
-        max_normal[:, None],#n_normal*3
+        #min_normal[:, None],#n_normal*3
+        #max_normal[:, None],#n_normal*3
         
-        min_P_n[:, None],#n_normal*6,local
-        max_P_n[:, None],#n_normal*6,local
+        #min_P_n[:, None],#n_normal*6,local
+        #max_P_n[:, None],#n_normal*6,local
         
         mean_curv[:, None],#1
         std_curv[:, None],#1
@@ -560,10 +566,12 @@ def compute_features(P, n_curv=30, k_curv=14, k_far=30, n_normal=30, bins=10, mi
         q_75_curv[:, None],
         min_curv[:, None],#n_curv/2
         max_curv[:, None],#n_curv/2
-        min_P_c[:, None],#6*n_curv/2,local
-        max_P_c[:,None],#6*n_curv/2,local
+        #min_P_c[:, None],#6*n_curv/2,local
+        #max_P_c[:,None],#6*n_curv/2,local
         
         far_points[:, None],#k_far*6,local
+        far_curv[:, None],
+        far_normals[:, None],
         dists[:, None],#k_far
         volumes[:, None],#2
         hists[:, None]#6*bins
