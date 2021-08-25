@@ -12,6 +12,7 @@ def main():
     parser.add_argument("--save_meshes", default=False, type=bool, help="Should the meshes be stored in the o_dir?")
     parser.add_argument("--g_filename", default="", type=str, help="Filename will be used as a postfix.")
     parser.add_argument("--point_size", default=0.03, type=float, help="Rendering point size.")
+    parser.add_argument("--ending", default="glb", type=str, help="File format of the meshes (glb, obj, ...)")
     args = parser.parse_args()
     #"""
     point_size=args.point_size
@@ -53,7 +54,7 @@ def main():
             """
             mesh = reco(P=P, o_idxs=o_idxs, dims=dims, radius=radius, sample_size=sample_size)
             render_o3d(mesh)
-            save_mesh(mesh=mesh, fdir=args.o_dir, filename=args.g_filename, o_id=i)
+            save_mesh(mesh=mesh, fdir=args.o_dir, filename=args.g_filename, o_id=i, ending=args.ending)
         meshes.append(mesh)
     render_o3d(meshes)
 
