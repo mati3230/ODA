@@ -265,7 +265,7 @@ def uni_superpoint_idxs(picked_points_idxs, sp_idxs):
 def to_igraph(graph_dict, unions):
     senders = graph_dict["senders"]
     receivers = graph_dict["receivers"]
-    n_edges = senders.shape[0]
+    n_edges = int(senders.shape[0] / 2)
     edge_list = n_edges*[None]
     for i in range(n_edges):
         vi = int(senders[i])
@@ -273,6 +273,7 @@ def to_igraph(graph_dict, unions):
         edge_list[i] = (vi, vj)
     g = ig.Graph(edges=edge_list)
     g.es["union"] = unions.tolist()
+    #print("iGraph, n edges: {0}, n unions: {1}".format(len(edge_list), len(unions)))
     return g
 
 
@@ -450,3 +451,54 @@ def recenter(P):
     #print(center)
     P[:, :3] -= center
     return P
+
+
+def merge_small_singles(graph_dict, sp_idxs, unions, P, thres):
+    senders = graph_dict["senders"]
+    receivers = graph_dict["receivers"]
+    n_edges = int(senders.shape[0] / 2)
+    c_list = comp_list(graph_dict=graph_dict, unions=unions, n_P=P.shape[0], sp_idxs=sp_idxs)
+    single_sps = []
+    for i in range(len(c_list)):
+        comp = c_list[i]
+        n_sp_comp = len(comp)
+        if n_sp_comp != 1:
+            continue
+        sp = comp[0]
+        sp_idx = sp[0]
+        single_sps.append(sp_idx)
+    print("{0} single superpoints".format(len(single_sps)))
+    n_unified = 0
+    for i in range(n_edges):
+        vi = int(senders[i])
+        vj = int(receivers[i])
+        sp_i = sp_idxs[vi]    
+        sp_j = sp_idxs[vj]
+        if sp_i.shape[0] < thres and sp_j.shape[0] < thres and vi in single_sps and vj in single_sps:
+            unions[i] = True
+            n_unified += 1
+    print("Unified {0} edges".format(n_unified))
+    return unions
+
+
+def superpoint_info(picked_points_idxs, sp_idxs, P, graph_dict):
+    if len(picked_points_idxs) != 1:
+        return
+    sp_info = uni_superpoint_idxs(picked_points_idxs=picked_points_idxs, sp_idxs=sp_idxs)
+    sp_info = sp_info[0]
+    P_idxs = sp_idxs[sp_info]
+    print("Superpoint: {0}".format(sp_info))
+    print("Size: {0}".format(P_idxs.shape[0]))
+    senders = graph_dict["senders"]
+    receivers = graph_dict["receivers"]
+    n_edges = int(senders.shape[0] / 2)
+    print("Total number of edges: {0}".format(n_edges))
+    s_idxs = np.where(senders[:n_edges] == sp_info)[0]
+    r_idxs = np.where(receivers[:n_edges] == sp_info)[0]
+    print("Num senders: {0}, num receivers: {1}".format(s_idxs.shape[0], r_idxs.shape[0]))
+    sp_senders = np.hstack((s_idxs[:, None], senders[s_idxs][:, None], receivers[s_idxs][:, None]))
+    print("Sender edges (Idxs, Sender, Receivers):\n{0}".format(sp_senders))
+    sp_receivers = np.hstack((r_idxs[:, None], senders[r_idxs][:, None], receivers[r_idxs][:, None]))
+    print("Receiver edges (Idxs, Sender, Receivers):\n{0}".format(sp_receivers))
+
+    return P[P_idxs]

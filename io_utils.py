@@ -243,10 +243,12 @@ def subsample(P, p):
         raise Exception("Cannot sample {0}% of the data.".format(p))
     if p == 1:
         return P
+    print("Point cloud size before sampling: {0}".format(P.shape[0]))
     size = math.floor(p * P.shape[0])
     idxs = np.arange(P.shape[0])
     idxs = np.random.choice(a=idxs, size=size, replace=False)
     P = P[idxs]
+    print("Point cloud size after sampling: {0}".format(P.shape[0]))
     return P
 
 

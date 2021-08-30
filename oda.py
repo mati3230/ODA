@@ -28,7 +28,10 @@ from sp_utils import\
     extend_superpoint_points,\
     reduce_superpoint,\
     rotate,\
-    recenter
+    recenter,\
+    merge_small_singles,\
+    superpoint_info
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -98,6 +101,7 @@ def main():
                 elif i == "re":
                     P = recenter(P=P)
                 elif i == "s":
+                    print("Point cloud size: {0}".format(P.shape[0]))
                     s = input("Percent [0,1]: ")
                     try:
                         s = float(s)
@@ -175,17 +179,18 @@ def main():
             filename=args.g_filename)
     #"""
     point_size = args.point_size
+    visualize = True
     while True:
         save_unions(
             fdir=args.g_dir,
             unions=unions,
             graph_dict=graph_dict,
             filename=args.g_filename)
-        mode = input("Superpoint Editing Mode: Extend [ex] | Create [c] | Separate [s] | Point Cloud [p] | Point_Size [ps] | Extend points [ep] | Reduce points [r] | Exit [e]: ")
-        if mode == "p":
+        if visualize:
             viewer = render_pptk(P=P, initial_partition=init_p, partition=part, point_size=point_size, v=viewer, colors=colors)
-            continue
-        elif mode == "ps":
+        mode = input("Superpoint Editing Mode: Extend [ex] | Create [c] | Separate [s] | Point_Size [ps] | Extend points [ep] | Reduce points [r] | Merge small ones [m] | Superpoint info [i] | Exit [e]: ")
+        visualize = True
+        if mode == "ps":
             ps = input("Point size: ")
             try:
                 ps = float(ps)
@@ -197,9 +202,22 @@ def main():
             if viewer is not None:
                 viewer.close()
             return
-        if mode != "c" and mode != "ex" and mode != "s" and mode != "ep" and mode != "r":
+        elif mode == "m":
+            thres = input("Minimum superpoint size: ")
+            try:
+                thres = int(thres)
+            except:
+                continue
+            if thres <= 0:
+                continue
+            unions = merge_small_singles(graph_dict=graph_dict, sp_idxs=sp_idxs, unions=unions, thres=thres, P=P)
+        if mode != "c" and mode != "ex" and mode != "s" and mode != "ep" and mode != "r" and mode != "i" and mode != "m":
             continue
-        picked_points_idxs, viewer = pick_sp_points_pptk(P=P, initial_partition=init_p, partition=part, point_size=point_size, v=viewer, colors=colors)
+        pick_points = True
+        if mode == "m":
+            pick_points = False
+        if pick_points:
+            picked_points_idxs, viewer = pick_sp_points_pptk(P=P, initial_partition=init_p, partition=part, point_size=point_size, v=viewer, colors=colors)
         if mode == "c":
             graph_dict, unions = unify(
                 picked_points_idxs=picked_points_idxs,
@@ -220,6 +238,9 @@ def main():
                 sp_idxs=sp_idxs,
                 graph_dict=graph_dict,
                 unions=unions)
+        elif mode == "i":
+            P_sp = superpoint_info(picked_points_idxs=picked_points_idxs, sp_idxs=sp_idxs, P=P, graph_dict=graph_dict)
+            viewer = render_pptk(P=P_sp, v=viewer)
         elif mode == "ep":
             points_idxs_e, viewer = pick_sp_points_pptk(P=P, initial_partition=init_p, partition=part, point_size=point_size, v=viewer, colors=colors)
             sp_idxs = extend_superpoint_points(picked_points_idxs=picked_points_idxs, points_idxs_e=points_idxs_e, sp_idxs=sp_idxs)

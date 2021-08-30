@@ -134,9 +134,11 @@ def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, 
     jump_edg = np.vstack((0, np.argwhere(np.diff(edge_comp_index)) + 1, n_edg)).flatten()
     n_sedg = len(jump_edg) - 1
 
-    senders = np.zeros((2*n_sedg, ), dtype='uint32')
-    receivers = np.zeros((2*n_sedg, ), dtype='uint32')
-
+    senders = []
+    receivers = []
+    uni_edges = []
+    print("Total number of edges: {0}".format(n_sedg))
+    n_filtered = 0
     #---compute the superedges features---
     for i_sedg in range(0, n_sedg):
         i_edg_begin = jump_edg[i_sedg]
@@ -147,13 +149,22 @@ def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, 
         com_target = edge_comp[1, i_edg_begin]
         #xyz_source = xyz[ver_source, :]
         #xyz_target = xyz[ver_target, :]
-        senders[i_sedg] = com_source
-        receivers[i_sedg] = com_target
-        # bidirectional
-        k = n_sedg + i_sedg
-        senders[k] = com_target
-        receivers[k] = com_source
-    return n_com, n_sedg, components, senders, receivers
+        edge = (com_source, com_target)
+        if edge in uni_edges:
+            n_filtered += 1
+            continue
+        senders.append(com_source)
+        receivers.append(com_target)
+        inv_edge = (com_target, com_source)
+        uni_edges.append(inv_edge)
+    # bidirectional
+    tmp_senders = senders.copy()
+    senders.extend(receivers)
+    receivers.extend(tmp_senders)
+    senders = np.array(senders, dtype=np.uint32)
+    receivers = np.array(receivers, dtype=np.uint32)
+    print("{0} edges filtered, {1} unique edges".format(n_filtered, len(uni_edges)))
+    return n_com, n_sedg, components, senders, receivers, len(uni_edges)
 
 
 def get_characteristic_points(P, center, k, far_points=True):
@@ -439,8 +450,8 @@ def compute_features(cloud, n_curv=30, k_curv=14, k_far=30, n_normal=30, bins=10
     normals, curv, ok = estimate_normals_curvature(P=P[:, :3], k_neighbours=k_curv)
     
     P[:, :3] -= center[:3]
-    max_P = np.max(np.abs(P[:, :3]))
-    P[:, :3] /= (max_P + 1e-6)
+    #max_P = np.max(np.abs(P[:, :3]))
+    #P[:, :3] /= (max_P + 1e-6)
     ########normals########
     # mean, std
     if ok:
@@ -522,7 +533,7 @@ def compute_features(cloud, n_curv=30, k_curv=14, k_far=30, n_normal=30, bins=10
     ########farthest points########
     idxs, dists = get_characteristic_points(P=P, center=center, k=k_far, far_points=True)
     far_points = P[idxs]
-    far_points[:, :3] -= center[:3]
+    #far_points[:, :3] -= center[:3]
     far_points = zero_padding(x=far_points, target_size=k_far)
     far_points = far_points.flatten()
     dists = zero_padding(x=dists, target_size=k_far)
@@ -538,6 +549,9 @@ def compute_features(cloud, n_curv=30, k_curv=14, k_far=30, n_normal=30, bins=10
     spatial_volume = get_volume(bb=bb, off=0)
     color_volume = get_volume(bb=bb, off=6)
     volumes = np.array([spatial_volume, color_volume])
+    volumes -= 0.5
+    volumes *= 2
+    
 
     ########hists########
     hists = hists_feature(P=P, center=center, bins=bins, min_r=min_r, max_r=max_r)
@@ -683,7 +697,7 @@ def feature_point_cloud(P):
 def graph(cloud, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0.1, d_se_max=0, max_sp_size=7000):
     P = np.array(cloud, copy=True)
     print("Compute superpoint graph")
-    n_sps, n_edges, sp_idxs, senders, receivers = superpoint_graph(
+    n_sps, n_edges, sp_idxs, senders, receivers, _ = superpoint_graph(
         xyz=P[:, :3],
         rgb=P[:, 3:],
         reg_strength=reg_strength,
