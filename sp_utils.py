@@ -502,3 +502,74 @@ def superpoint_info(picked_points_idxs, sp_idxs, P, graph_dict):
     print("Receiver edges (Idxs, Sender, Receivers):\n{0}".format(sp_receivers))
 
     return P[P_idxs]
+
+
+def set_recursion(n_set_i, components, member, done):
+    if member in done:
+        return
+    else:
+        done.append(member)
+    set_j = components[member]
+    #print(member, set_j)
+    n_set_i.update(set_j)
+    for member_j in set_j:
+        set_recursion(n_set_i=n_set_i, components=components, member=member_j, done=done)
+
+
+def unions_to_partition(graph_dict, unions, sp_idxs, P):
+    senders = graph_dict["senders"]
+    receivers = graph_dict["receivers"]
+    n_edges = int(senders.shape[0] / 2)
+    components = len(sp_idxs) * [None]
+    #print(len(sp_idxs))
+    #return
+    for i in range(len(sp_idxs)):
+        components[i] = set()
+        components[i].update([i])
+    #
+    for i in range(unions.shape[0]):
+        union = unions[i]
+        S_i = senders[i]
+        S_j = receivers[i]
+        if union:
+            #print(S_i, S_j)
+            components[S_i].update([int(S_j)])
+            components[S_j].update([int(S_i)])
+    #
+    done = []
+    c_components = []
+    for i in range(len(components)):
+        if i in done:
+            #print("skip {0}".format(i))
+            continue
+        set_i = components[i]
+        n_set_i = set_i.copy()
+        set_done = [i]
+        #print("---- SP: {0}, {1}".format(i, set_i))
+        for member in set_i:
+            set_recursion(n_set_i=n_set_i, components=components, member=member, done=set_done)
+        #print(n_set_i)
+        c_components.append(n_set_i)
+        done.extend(list(n_set_i))
+        #print(set_done)
+    print("Found {0} connected components".format(len(c_components)))
+    for i in range(0, len(c_components)):
+        cc_i = c_components[i]
+        for j in range(i, len(c_components)):
+            if i == j:
+                continue
+            cc_j = c_components[j]
+            cc_k = cc_i.intersection(cc_j)
+            if len(cc_k) > 0:
+                print(i, j, cc_k, len(cc_i), len(cc_j), len(cc_k))
+                raise Exception("Error")
+                #pass
+    partition_vec = np.zeros((P.shape[0], ), dtype=np.uint32)
+    p_n = 0
+    for cc in c_components:
+        #print(cc)
+        for member in cc:
+            P_idxs = sp_idxs[member]
+            partition_vec[P_idxs] = p_n
+        p_n += 1
+    return partition_vec
