@@ -77,9 +77,12 @@ def main():
         editing = input("Continue Editing? [y|n]: ")
         editing = editing == "y"
         if editing:
+            visualize = True
             while True:
-                viewer = render_pptk(P=P, v=viewer)
+                if visualize:
+                    viewer = render_pptk(P=P, v=viewer)
                 i = input("Delete points [d] | Rotate [r] | recenter [re] | downsample [s] | Continue [-1] | Exit [e]: ")
+                visualize = True
                 if i == "-1":
                     break
                 elif i == "e":
@@ -103,6 +106,7 @@ def main():
                         print(e)
                         continue
                 else:
+                    visualize = False
                     continue
                 save_cloud(P=P, fdir=args.g_dir, fname=args.g_filename)
         #return
@@ -193,6 +197,8 @@ def main():
             if viewer is not None:
                 viewer.close()
             return
+        if mode != "c" and mode != "ex" and mode != "s" and mode != "ep" and mode != "r":
+            continue
         picked_points_idxs, viewer = pick_sp_points_pptk(P=P, initial_partition=init_p, partition=part, point_size=point_size, v=viewer, colors=colors)
         if mode == "c":
             graph_dict, unions = unify(
