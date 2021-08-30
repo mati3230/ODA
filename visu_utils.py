@@ -53,7 +53,7 @@ def render_pptk_(P, partition=None, initial_partition=None, point_size=-1, v=Non
     if v is None:
         v = pptk.viewer(xyz)
     else:
-        persp = get_perspective(viewer=v)
+        #persp = get_perspective(viewer=v)
         v.clear()
         v.load(xyz)
     if colors is not None:
@@ -70,7 +70,7 @@ def render_pptk_(P, partition=None, initial_partition=None, point_size=-1, v=Non
     else:
         v.attributes(rgb, initial_partition, partition)
     print("Press Return to continue.")
-    set_perspective(viewer=v, p=persp)
+    #set_perspective(viewer=v, p=persp)
     v.wait()
     return v
 

@@ -189,7 +189,7 @@ def main():
                 continue
             point_size = ps
             continue
-        elif mode == "-1":
+        elif mode == "e":
             if viewer is not None:
                 viewer.close()
             return
@@ -200,7 +200,7 @@ def main():
                 sp_idxs=sp_idxs,
                 graph_dict=graph_dict,
                 unions=unions)
-        elif mode == "e":
+        elif mode == "ex":
             points_idxs_e, viewer = pick_sp_points_pptk(P=P, initial_partition=init_p, partition=part, point_size=point_size, v=viewer, colors=colors)
             graph_dict, unions = extend_superpoint(
                 picked_points_idxs=picked_points_idxs,

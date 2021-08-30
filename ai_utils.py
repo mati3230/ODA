@@ -371,7 +371,7 @@ def hists_feature(P, center, bins=10, min_r=-0.5, max_r=0.5):
     return hists
 
 
-def compute_features(P, n_curv=30, k_curv=14, k_far=30, n_normal=30, bins=10, min_r=-0.5, max_r=0.5):
+def compute_features(cloud, n_curv=30, k_curv=14, k_far=30, n_normal=30, bins=10, min_r=-0.5, max_r=0.5):
     """Compute features from a point cloud P. The features of a point cloud are:
     - Mean color 
     - Median color
@@ -427,14 +427,20 @@ def compute_features(P, n_curv=30, k_curv=14, k_far=30, n_normal=30, bins=10, mi
     np.ndarray
         The calculated features.
     """
+    P = np.array(cloud, copy=True)
     center = np.mean(P, axis=0)
+
     std = np.std(P, axis=0)
     median_color = np.median(P[:, 3:], axis=0)
     q_25_color = np.quantile(P[:, 3:], 0.25, axis=0)
     q_75_color = np.quantile(P[:, 3:], 0.75, axis=0)
     
+    
     normals, curv, ok = estimate_normals_curvature(P=P[:, :3], k_neighbours=k_curv)
     
+    P[:, :3] -= center[:3]
+    max_P = np.max(np.abs(P[:, :3]))
+    P[:, :3] /= (max_P + 1e-6)
     ########normals########
     # mean, std
     if ok:
@@ -528,7 +534,7 @@ def compute_features(P, n_curv=30, k_curv=14, k_far=30, n_normal=30, bins=10, mi
 
 
     ########volumes########
-    bb = get_general_bb(P=P)
+    bb = get_general_bb(P=cloud)
     spatial_volume = get_volume(bb=bb, off=0)
     color_volume = get_volume(bb=bb, off=6)
     volumes = np.array([spatial_volume, color_volume])
@@ -537,6 +543,7 @@ def compute_features(P, n_curv=30, k_curv=14, k_far=30, n_normal=30, bins=10, mi
     hists = hists_feature(P=P, center=center, bins=bins, min_r=min_r, max_r=max_r)
     hists -= 0.5
     hists *= 2
+    #print(hists)
 
     ########concatenation########
     features = np.vstack(
@@ -553,11 +560,11 @@ def compute_features(P, n_curv=30, k_curv=14, k_far=30, n_normal=30, bins=10, mi
         q_25_normal[:, None],
         q_75_normal[:, None],
         
-        #min_normal[:, None],#n_normal*3
-        #max_normal[:, None],#n_normal*3
+        min_normal[:, None],#n_normal*3
+        max_normal[:, None],#n_normal*3
         
-        #min_P_n[:, None],#n_normal*6,local
-        #max_P_n[:, None],#n_normal*6,local
+        min_P_n[:, None],#n_normal*6,local
+        max_P_n[:, None],#n_normal*6,local
         
         mean_curv[:, None],#1
         std_curv[:, None],#1
@@ -566,8 +573,8 @@ def compute_features(P, n_curv=30, k_curv=14, k_far=30, n_normal=30, bins=10, mi
         q_75_curv[:, None],
         min_curv[:, None],#n_curv/2
         max_curv[:, None],#n_curv/2
-        #min_P_c[:, None],#6*n_curv/2,local
-        #max_P_c[:,None],#6*n_curv/2,local
+        min_P_c[:, None],#6*n_curv/2,local
+        max_P_c[:,None],#6*n_curv/2,local
         
         far_points[:, None],#k_far*6,local
         far_curv[:, None],
@@ -664,9 +671,9 @@ def get_general_bb(P):
 
 def feature_point_cloud(P):
     center = np.mean(P[:, :3], axis=0)
-    max_P = np.max(np.abs(P[:, :3]))
     P[:, :3] -= center
-    P[:, :3] /= max_P
+    max_P = np.max(np.abs(P[:, :3]))
+    P[:, :3] /= (max_P + 1e-6)
     P[:, 3:] /= 255
     P[:, 3:] -= 0.5
     P[:, 3:] *= 2
@@ -701,7 +708,7 @@ def graph(cloud, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0
 
     idxs = sp_idxs[0]
     sp = P[idxs]
-    features = compute_features(P=sp)
+    features = compute_features(cloud=sp)
     n_ft = features.shape[0]
     print("Use {0} features".format(n_ft))
 
@@ -710,7 +717,7 @@ def graph(cloud, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0
     for k in tqdm(range(1, n_sps), desc="Node features"):
         idxs = sp_idxs[k]
         sp = P[idxs]
-        features = compute_features(P=sp)
+        features = compute_features(cloud=sp)
         node_features[k] = features
 
     graph_dict = {
@@ -741,7 +748,7 @@ def init_model(n_ft):
     node_features = np.zeros((n_nodes, n_ft), dtype=np.float32)
     for i in range(n_nodes):
         sp = np.random.randn(100, 6)
-        features = compute_features(P=sp)
+        features = compute_features(cloud=sp)
         node_features[i] = features
     senders = np.array(list(range(0, n_nodes-1)), dtype=np.uint32)
     receivers = np.array(list(range(1, n_nodes)), dtype=np.uint32)
