@@ -4,7 +4,8 @@ import os
 
 from visu_utils import\
     render_pptk,\
-    pick_sp_points_pptk
+    pick_sp_points_pptk,\
+    visu_dec_bs
 from io_utils import\
     load_cloud,\
     save_init_graph,\
@@ -30,7 +31,8 @@ from sp_utils import\
     rotate,\
     recenter,\
     merge_small_singles,\
-    superpoint_info
+    superpoint_info,\
+    unify_superpoints
 
 
 def main():
@@ -145,19 +147,33 @@ def main():
                 initial_db=args.initial_db,
                 filename=args.g_filename)
     if args.load_unions:
+        P, graph_dict, sp_idxs = load_init_graph(fdir=args.g_dir, filename=args.g_filename, half="_half")
         unions, graph_dict = load_unions(
             fdir=args.g_dir, graph_dict=graph_dict, filename=args.g_filename)
+    senders = graph_dict["senders"]
+    if 2*unions.shape[0] == senders.shape[0]:
+        half = int(senders.shape[0] / 2)
+        senders = senders[:half]
+        receivers = graph_dict["receivers"]
+        receivers = receivers[:half]
+        graph_dict["senders"] = senders
+        graph_dict["receivers"] = receivers
+
     init_p = initial_partition(P=P, sp_idxs=sp_idxs)
     part = partition(
         graph_dict=graph_dict,
         unions=unions,
         P=P,
-        sp_idxs=sp_idxs)
-    viewer = render_pptk(P=P, initial_partition=init_p, partition=part, point_size=args.point_size, v=viewer, colors=colors)
-    #"""
+        sp_idxs=sp_idxs,
+        half=False)
+
     if not args.load_unions:
+        viewer = render_pptk(P=P, initial_partition=init_p, partition=part, point_size=args.point_size, v=viewer, colors=colors)
         while True:
-            d_b = input("Decision Boundary [0,1] | Continue: [-1]: ")
+            d_b = input("Decision Boundary [0,1] | Decision boundary check [d] | Continue: [-1]: ")
+            if d_b == "d":
+                visu_dec_bs(graph_dict=graph_dict, P=P, sp_idxs=sp_idxs, probs=probs, partition_func=partition)
+                continue
             try:
                 d_b = float(d_b)
             except:
@@ -170,14 +186,15 @@ def main():
                 graph_dict=graph_dict,
                 unions=unions,
                 P=P,
-                sp_idxs=sp_idxs)
+                sp_idxs=sp_idxs,
+                half=False)
             viewer = render_pptk(P=P, initial_partition=init_p, partition=part, point_size=args.point_size, v=viewer, colors=colors)
         save_unions(
             fdir=args.g_dir,
             unions=unions,
             graph_dict=graph_dict,
             filename=args.g_filename)
-    #"""
+
     point_size = args.point_size
     visualize = True
     while True:
@@ -188,7 +205,7 @@ def main():
             filename=args.g_filename)
         if visualize:
             viewer = render_pptk(P=P, initial_partition=init_p, partition=part, point_size=point_size, v=viewer, colors=colors)
-        mode = input("Superpoint Editing Mode: Extend [ex] | Create [c] | Separate [s] | Point_Size [ps] | Extend points [ep] | Reduce points [r] | Merge small ones [m] | Superpoint info [i] | Exit [e]: ")
+        mode = input("Superpoint Editing Mode: Extend Superpoint [ex] | Create [c] | Separate [s] | Point_Size [ps] | Extend points [ep] | Reduce points [r] | Merge small ones [m] | Unify [u] | Superpoint info [i] | Exit [e]: ")
         visualize = True
         if mode == "ps":
             ps = input("Point size: ")
@@ -211,7 +228,7 @@ def main():
             if thres <= 0:
                 continue
             unions = merge_small_singles(graph_dict=graph_dict, sp_idxs=sp_idxs, unions=unions, thres=thres, P=P)
-        if mode != "c" and mode != "ex" and mode != "s" and mode != "ep" and mode != "r" and mode != "i" and mode != "m":
+        if mode != "c" and mode != "ex" and mode != "s" and mode != "ep" and mode != "r" and mode != "i" and mode != "m" and mode != "u":
             continue
         pick_points = True
         if mode == "m":
@@ -229,6 +246,13 @@ def main():
             graph_dict, unions = extend_superpoint(
                 picked_points_idxs=picked_points_idxs,
                 points_idxs_e=points_idxs_e,
+                sp_idxs=sp_idxs,
+                graph_dict=graph_dict,
+                unions=unions)
+        elif mode == "u":
+            # picked_points_idxs, sp_idxs, graph_dict, unions
+            unions = unify_superpoints(
+                picked_points_idxs=picked_points_idxs,
                 sp_idxs=sp_idxs,
                 graph_dict=graph_dict,
                 unions=unions)
@@ -253,12 +277,14 @@ def main():
                     fdir=args.g_dir,
                     P=P, graph_dict=graph_dict,
                     sp_idxs=sp_idxs,
-                    filename=args.g_filename)
+                    filename=args.g_filename,
+                    half="_half")
         part = partition(
             graph_dict=graph_dict,
             unions=unions,
             P=P,
-            sp_idxs=sp_idxs)
+            sp_idxs=sp_idxs,
+            half=False)
 
 
 if __name__ == "__main__":

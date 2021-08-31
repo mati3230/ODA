@@ -71,10 +71,10 @@ def save_unions(fdir, unions, graph_dict, filename=""):
     print("Done")
 
 
-def save_probs(fdir, P, graph_dict, sp_idxs, probs, initial_db, save_init=False, filename=""):
+def save_probs(fdir, P, graph_dict, sp_idxs, probs, initial_db, save_init=False, filename="", half=""):
     print("Save probs")
     if save_init:
-        save_init_graph(fdir=fdir, P=P, graph_dict=graph_dict, sp_idxs=sp_idxs)
+        save_init_graph(fdir=fdir, P=P, graph_dict=graph_dict, sp_idxs=sp_idxs, half=half)
     mkdir(fdir)
     hf = h5py.File("{0}/probs_{1}.h5".format(fdir, filename), "w")
     hf.create_dataset("probs", data=probs)
@@ -103,10 +103,10 @@ def load_probs(fdir, filename=""):
     return P, graph_dict, sp_idxs, probs, unions
 
 
-def save_init_graph(fdir, P, graph_dict, sp_idxs, filename=""):
+def save_init_graph(fdir, P, graph_dict, sp_idxs, filename="", half=""):
     print("Save initial graph")
     mkdir(fdir)
-    hf = h5py.File("{0}/init_graph_{1}.h5".format(fdir, filename), "w")
+    hf = h5py.File("{0}/init_graph{1}_{2}.h5".format(fdir, half, filename), "w")
     hf.create_dataset("P", data=P)
     n_sps = len(sp_idxs)
     hf.create_dataset("n_sps", data=(n_sps, ))
@@ -122,10 +122,11 @@ def save_init_graph(fdir, P, graph_dict, sp_idxs, filename=""):
     print("Done")
 
 
-def load_init_graph(fdir, filename=""):
+def load_init_graph(fdir, filename="", half=""):
     print("Load initial graph...")
-    file = "{0}/init_graph_{1}.h5".format(fdir, filename)
+    file = "{0}/init_graph{1}_{2}.h5".format(fdir, half, filename)
     if not file_exists(filepath=file):
+        #print(file)
         return None, None, None
     hf = h5py.File(file, "r")
     nodes = np.array(hf["nodes"], copy=True)

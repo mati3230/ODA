@@ -122,6 +122,30 @@ def extend_superpoint_points(picked_points_idxs, points_idxs_e, sp_idxs):
     return sp_idxs
 
 
+def unify_superpoints(picked_points_idxs, sp_idxs, graph_dict, unions):
+    if len(picked_points_idxs) != 2:
+        print("Please choose only two points for union.")
+    sps = points_to_superpoints(picked_points_idxs=picked_points_idxs, sp_idxs=sp_idxs)
+    sp_i = sps[0]
+    sp_j = sps[1]
+    if sp_i == sp_j:
+        print("Choose different superpoints - nothing happened.")
+        return unions
+    senders = graph_dict["senders"]
+    receivers = graph_dict["receivers"]
+
+    idxs = np.where((senders == sp_i) & (receivers == sp_j))[0]
+    if idxs.shape[0] == 0:
+        idxs = np.where((senders == sp_j) & (receivers == sp_i))[0]
+    if idxs.shape[0] == 0:
+        print("No edge available - nothing happened.")
+        return unions
+    if idxs.shape[0] != 1:
+        raise Exception("Multi edge")
+    unions[idxs] = True
+    return unions
+
+
 def extend_superpoint(picked_points_idxs, points_idxs_e, sp_idxs, graph_dict, unions):
     if len(picked_points_idxs) != 1:
         print("Please choose one points for extending.")
@@ -262,10 +286,13 @@ def uni_superpoint_idxs(picked_points_idxs, sp_idxs):
     return result
 
 
-def to_igraph(graph_dict, unions):
+def to_igraph(graph_dict, unions, half=False):
     senders = graph_dict["senders"]
     receivers = graph_dict["receivers"]
-    n_edges = int(senders.shape[0] / 2)
+    if half:
+        n_edges = int(senders.shape[0] / 2)
+    else:
+        n_edges = int(senders.shape[0])
     edge_list = n_edges*[None]
     for i in range(n_edges):
         vi = int(senders[i])
@@ -277,8 +304,8 @@ def to_igraph(graph_dict, unions):
     return g
 
 
-def comp_list(graph_dict, unions, n_P, sp_idxs):
-    ig_graph = to_igraph(graph_dict=graph_dict, unions=unions)
+def comp_list(graph_dict, unions, n_P, sp_idxs, half):
+    ig_graph = to_igraph(graph_dict=graph_dict, unions=unions, half=half)
     unions = ig_graph.es["union"]
     unions = np.array(unions, dtype=np.bool)
     idxs = np.where(unions == False)[0]
@@ -308,7 +335,7 @@ def sp_in_comp(sp_i, comp):
 def get_objects(picked_points_idxs, P, sp_idxs, graph_dict, unions):
     n_P = P.shape[0]
     selected_sps = uni_superpoint_idxs(picked_points_idxs=picked_points_idxs, sp_idxs=sp_idxs)
-    components_list = comp_list(graph_dict=graph_dict, unions=unions, n_P=n_P, sp_idxs=sp_idxs)
+    components_list = comp_list(graph_dict=graph_dict, unions=unions, n_P=n_P, sp_idxs=sp_idxs, half=False)
     n_comps = len(components_list)
     comps_to_reconstruct = []
     objects_to_reconstruct = []
@@ -409,10 +436,10 @@ def initial_partition(P, sp_idxs):
     return par_v
 
 
-def partition(graph_dict, unions, P, sp_idxs):
+def partition(graph_dict, unions, P, sp_idxs, half=False):
     n_P = P.shape[0]
     par_v = np.zeros((n_P, ), dtype=np.uint32)
-    c_list = comp_list(graph_dict=graph_dict, unions=unions, n_P=n_P, sp_idxs=sp_idxs)
+    c_list = comp_list(graph_dict=graph_dict, unions=unions, n_P=n_P, sp_idxs=sp_idxs, half=half)
 
     for i in range(len(c_list)):
         comp = c_list[i]
@@ -456,7 +483,7 @@ def recenter(P):
 def merge_small_singles(graph_dict, sp_idxs, unions, P, thres):
     senders = graph_dict["senders"]
     receivers = graph_dict["receivers"]
-    n_edges = int(senders.shape[0] / 2)
+    n_edges = int(senders.shape[0])
     c_list = comp_list(graph_dict=graph_dict, unions=unions, n_P=P.shape[0], sp_idxs=sp_idxs)
     single_sps = []
     for i in range(len(c_list)):
@@ -491,7 +518,7 @@ def superpoint_info(picked_points_idxs, sp_idxs, P, graph_dict):
     print("Size: {0}".format(P_idxs.shape[0]))
     senders = graph_dict["senders"]
     receivers = graph_dict["receivers"]
-    n_edges = int(senders.shape[0] / 2)
+    n_edges = int(senders.shape[0])
     print("Total number of edges: {0}".format(n_edges))
     s_idxs = np.where(senders[:n_edges] == sp_info)[0]
     r_idxs = np.where(receivers[:n_edges] == sp_info)[0]
@@ -516,10 +543,13 @@ def set_recursion(n_set_i, components, member, done):
         set_recursion(n_set_i=n_set_i, components=components, member=member_j, done=done)
 
 
-def unions_to_partition(graph_dict, unions, sp_idxs, P):
+def unions_to_partition(graph_dict, unions, sp_idxs, P, half=False):
     senders = graph_dict["senders"]
     receivers = graph_dict["receivers"]
-    n_edges = int(senders.shape[0] / 2)
+    if half:
+        n_edges = int(senders.shape[0] / 2)
+    else:
+        n_edges = int(senders.shape[0])
     components = len(sp_idxs) * [None]
     #print(len(sp_idxs))
     #return

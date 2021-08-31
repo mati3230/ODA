@@ -1,6 +1,8 @@
 import numpy as np
 import open3d as o3d
 import pptk
+import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 
 def pick_sp_points_o3d(pcd):
@@ -103,3 +105,26 @@ def coordinate_system():
     line_set.colors = o3d.utility.Vector3dVector(colors)
     line_set.lines = o3d.utility.Vector2iVector(lines)
     return line_set
+
+
+def visu_dec_bs(graph_dict, P, sp_idxs, probs, partition_func):
+    dbs = np.arange(start=0, stop=1, step=0.01)
+    n_parts = np.ones((dbs.shape[0], ), dtype=np.uint32)
+    for i in tqdm(range(dbs.shape[0]), desc="Partition:"):
+        db = dbs[i]
+        unions = np.zeros((probs.shape[0], ), dtype=np.bool)
+        unions[probs > db] = True
+        part = partition_func(
+            graph_dict=graph_dict,
+            unions=unions,
+            P=P,
+            sp_idxs=sp_idxs)
+        uni_part = np.unique(part)
+        n_parts[i] = uni_part.shape[0]
+    plt.plot(dbs, n_parts)
+    plt.title("Number of Superpoints")
+    plt.xlabel("Decision Boundary")
+    plt.ylabel("Number of Superpoints")
+    plt.axis([0, 1, 1, int(np.max(n_parts))])
+    plt.show()
+    
