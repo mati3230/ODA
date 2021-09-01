@@ -272,13 +272,13 @@ def main():
             points_idxs_r, viewer = pick_sp_points_pptk(P=P, initial_partition=init_p, partition=part, point_size=point_size, v=viewer, colors=colors)
             graph_dict, sp_idxs = reduce_superpoint(picked_points_idxs=picked_points_idxs, points_idxs_r=points_idxs_r, graph_dict=graph_dict, sp_idxs=sp_idxs)
             init_p = initial_partition(P=P, sp_idxs=sp_idxs)
-            if args.save_init_g:
-                save_init_graph(
-                    fdir=args.g_dir,
-                    P=P, graph_dict=graph_dict,
-                    sp_idxs=sp_idxs,
-                    filename=args.g_filename,
-                    half="_half")
+        if args.save_init_g:
+            save_init_graph(
+                fdir=args.g_dir,
+                P=P, graph_dict=graph_dict,
+                sp_idxs=sp_idxs,
+                filename=args.g_filename,
+                half="_half")
         part = partition(
             graph_dict=graph_dict,
             unions=unions,

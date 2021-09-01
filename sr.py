@@ -1,7 +1,7 @@
 import argparse
 
 from io_utils import load_init_graph, load_unions, save_mesh, load_cloud, load_colors
-from sp_utils import get_objects, get_remaining, partition, initial_partition, reco, to_reco_params
+from sp_utils import get_objects, get_remaining, partition, initial_partition, reco, to_reco_params, simplify_mesh, recenter
 from visu_utils import pick_sp_points_pptk, render_pptk, render_o3d
 
 
@@ -24,6 +24,9 @@ def main():
     P, graph_dict, sp_idxs = load_init_graph(fdir=args.g_dir, filename=args.g_filename, half="_half")
     unions, graph_dict = load_unions(fdir=args.g_dir, graph_dict=graph_dict, filename=args.g_filename)
 
+    print("Center point cloud.")
+    P = recenter(P=P)
+
     init_p = initial_partition(P=P, sp_idxs=sp_idxs)
     part = partition(
         graph_dict=graph_dict,
@@ -39,24 +42,32 @@ def main():
     remaining = get_remaining(P=P, objects=objects)
     objects.append(remaining)
     meshes = []
+    mesh = None
     for i in range(len(objects)):
         print("Object: {0}/{1}".format(i+1, len(objects)))
         last_one = i == len(objects) - 1
         o_idxs = objects[i]
         while True:
             #"""
-            inp = input("Continue [c] | Parameter [dims(int),radius(float),sample_size(int)]: ")
-            if inp == "c":
+            inp = input("Continue [c] | Simplify [s] | Parameter [dims(int),radius(float),sample_size(int)]: ")
+            if inp == "s":
+                if mesh is None:
+                    continue
+                mesh = simplify_mesh(mesh)
+            elif inp == "c":
                 break
-            ok, dims, radius, sample_size = to_reco_params(inp=inp)
-            if not ok:
+            else:
+                ok, dims, radius, sample_size = to_reco_params(inp=inp)
+                if not ok:
+                    continue
+                """            
+                dims=100 
+                radius=0.1
+                sample_size=10
+                """
+                mesh = reco(P=P, o_idxs=o_idxs, dims=dims, radius=radius, sample_size=sample_size)
+            if mesh is None:
                 continue
-            """            
-            dims=100 
-            radius=0.1
-            sample_size=10
-            """
-            mesh = reco(P=P, o_idxs=o_idxs, dims=dims, radius=radius, sample_size=sample_size)
             if args.save_meshes:
                 ending = args.ending
                 if last_one:

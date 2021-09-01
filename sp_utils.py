@@ -421,6 +421,8 @@ def reco(P, o_idxs, dims=150, radius=0.1, sample_size=15):
     mesh.vertex_colors = o3d.utility.Vector3dVector(v_colors/255.)
     mesh.compute_vertex_normals()
     mesh.compute_triangle_normals()
+    n_tris = tris.shape[0]
+    print("Reconstruct with {0} tris".format(n_tris))
     print("Done")
     return mesh
 
@@ -603,3 +605,16 @@ def unions_to_partition(graph_dict, unions, sp_idxs, P, half=False):
             partition_vec[P_idxs] = p_n
         p_n += 1
     return partition_vec
+
+
+def simplify_mesh(mesh):
+    t = input("Target number of tris: ")
+    try:
+        t = int(t)
+    except:
+        return mesh
+    n_tris_old = np.asarray(mesh.triangles).shape[0]
+    mesh = mesh.simplify_quadric_decimation(target_number_of_triangles=t)
+    n_tris_new = np.asarray(mesh.triangles).shape[0]
+    print("Simplified mesh from {0} to {1} triangles.".format(n_tris_old, n_tris_new))
+    return mesh
