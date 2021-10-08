@@ -157,6 +157,28 @@ def check_color_value(c):
         raise Exception("Invalid color value: {0}".format(c))
 
 
+def load_partition(file):
+    if file.endswith("npz"):
+        data = np.load(file, allow_pickle=True)
+        partition = data["partition"]
+    if file.endswith("txt"):
+        partition = np.loadtxt(file)
+    if file.endswith("h5"):
+        hf = h5py.File(file, "r")
+        partition = np.array(hf["partition"], copy=True)
+        hf.close()
+    print("Partition loaded")
+    return partition
+
+
+def save_partition(partition, fdir, fname):
+    print("Save partition")
+    hf = h5py.File("{0}/partition_{1}.h5".format(fdir, fname), "w")
+    hf.create_dataset("partition", data=partition)
+    hf.close()
+    print("Done")
+
+
 def load_cloud(file, r=255, g=0, b=0, p=1):
     print("Load point cloud...")
     if not os.path.exists(file):

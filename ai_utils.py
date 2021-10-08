@@ -6,6 +6,7 @@ from sklearn.neighbors import NearestNeighbors
 from scipy.spatial import Delaunay
 from graph_nets import utils_tf
 from tqdm import tqdm
+import time
 
 from network import FFGraphNet
 
@@ -680,6 +681,7 @@ def feature_point_cloud(P):
 def graph(cloud, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0.1, d_se_max=0, max_sp_size=7000):
     P = np.array(cloud, copy=True)
     print("Compute superpoint graph")
+    t1 = time.time()
     n_sps, n_edges, sp_idxs, senders, receivers, _ = superpoint_graph(
         xyz=P[:, :3],
         rgb=P[:, 3:],
@@ -688,8 +690,12 @@ def graph(cloud, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0
         k_nn_adj=k_nn_adj,
         lambda_edge_weight=lambda_edge_weight,
         d_se_max=d_se_max)
-    print("Superpoint graph has {0} nodes and {1} edges".format(n_sps, n_edges))
+    t2 = time.time()
+    duration = t2 - t1
+    print("Superpoint graph has {0} nodes and {1} edges (duration: {2:.3f} seconds)".format(n_sps, n_edges, duration))
     print("Compute features for every superpoint")
+
+    t1 = time.time()
     P, center = feature_point_cloud(P=P)
 
     print("Check superpoint sizes")
@@ -716,6 +722,10 @@ def graph(cloud, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0
         sp = P[idxs]
         features = compute_features(cloud=sp)
         node_features[k] = features
+
+    t2 = time.time()
+    duration = t2 - t1
+    print("Computed features in {0:.3f} seconds".format(duration))
 
     graph_dict = {
         "nodes": node_features,
@@ -763,6 +773,7 @@ def init_model(n_ft):
 
 
 def predict(graph_dict, dec_b=0.5):
+    t1 = time.time()
     n_ft = graph_dict["nodes"].shape[1]
     model = init_model(n_ft=n_ft)
     input_graphs = utils_tf.data_dicts_to_graphs_tuple([graph_dict])
@@ -775,5 +786,7 @@ def predict(graph_dict, dec_b=0.5):
     
     probs = a_dict["probs"]
     probs = probs.numpy()
-
+    t2 = time.time()
+    duration = t2 - t1
+    print("Model prediction takes {0:.3f} seconds".format(duration))
     return action, probs

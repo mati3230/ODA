@@ -71,7 +71,7 @@ def render_pptk_(P, partition=None, initial_partition=None, point_size=-1, v=Non
         v.attributes(rgb, partition)
     else:
         v.attributes(rgb, initial_partition, partition)
-    print("Press Return to continue.")
+    print("Press Return in the 3D windows to continue.")
     #set_perspective(viewer=v, p=persp)
     v.wait()
     return v
