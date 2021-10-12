@@ -35,6 +35,13 @@ def file_exists(filepath):
 
 
 def load_colors():
+    """ Load colors in order to visualize.
+    
+    Returns
+    -------
+    np.ndarray
+        n X 3 array (8 bit).
+    """
     print("Load colors...")
     data = np.load("colors.npz")
     colors = data["colors"]
@@ -43,6 +50,24 @@ def load_colors():
 
 
 def load_unions(fdir, graph_dict, filename=""):
+    """ Load the link union decisions of the agent.
+
+    Parameters
+    ----------
+    fdir : str
+        Relative or absolute directory of the file.
+    graph_dict : dict
+        Dictionary where the superpoint graph is stored.
+    filename : str
+        Name of the file.
+    
+    Returns
+    -------
+    np.ndarray, dict
+        Binary array where the link predictions are stored. 
+        Dictionary where the superpoint graph is stored.
+
+    """
     print("Load unions...")
     file = "{0}/unions_{1}.h5".format(fdir, filename)
     if not file_exists(filepath=file):
@@ -59,6 +84,19 @@ def load_unions(fdir, graph_dict, filename=""):
 
 
 def save_unions(fdir, unions, graph_dict, filename=""):
+    """ Save the link union decisions of the agent.
+
+    Parameters
+    ----------
+    fdir : str
+        Relative or absolute directory of the file.
+    unions : np.ndarray
+        Binary array where the link predictions are stored.
+    graph_dict : dict
+        Dictionary where the superpoint graph is stored.
+    filename : str
+        Name of the file.
+    """
     print("Save unions")
     mkdir(fdir)
     hf = h5py.File("{0}/unions_{1}.h5".format(fdir, filename), "w")
@@ -72,6 +110,29 @@ def save_unions(fdir, unions, graph_dict, filename=""):
 
 
 def save_probs(fdir, P, graph_dict, sp_idxs, probs, initial_db, save_init=False, filename="", half=""):
+    """ Save the link union decisions of the agent.
+
+    Parameters
+    ----------
+    fdir : str
+        Relative or absolute directory of the file.
+    P : np.ndarray
+        The point cloud.
+    graph_dict : dict
+        Dictionary where the superpoint graph is stored.
+    sp_idxs : list[np.ndarray]
+        List of the point indices for each superpoint.
+    probs : np.ndarray
+        Probabilities of the link predictions which are used to create the unions.
+    initial_db : float
+        TODO
+    save_init : bool
+        Should the initial partition be stored?
+    filename : str
+        Name of the file.
+    half : str
+        TODO
+    """
     print("Save probs")
     if save_init:
         save_init_graph(fdir=fdir, P=P, graph_dict=graph_dict, sp_idxs=sp_idxs, half=half)
@@ -84,6 +145,25 @@ def save_probs(fdir, P, graph_dict, sp_idxs, probs, initial_db, save_init=False,
 
 
 def load_probs(fdir, filename=""):
+    """ Load the probabilities of the link predictions.
+
+    Parameters
+    ----------
+    fdir : str
+        Relative or absolute directory of the file.
+    filename : str
+        Name of the file.
+    
+    Returns
+    -------
+    np.ndarray, dict, list[np.ndarray], np.ndarray, np.ndarray
+        The point cloud.
+        Dictionary where the superpoint graph is stored.
+        List of the point indices for each superpoint.
+        Probabilities of the link predictions which are used to create the unions.
+        Binary array where the link predictions are stored. 
+
+    """
     print("Load probs...")
     P, graph_dict, sp_idxs = load_init_graph(fdir=fdir, filename=filename)
     if P is None:
@@ -104,6 +184,23 @@ def load_probs(fdir, filename=""):
 
 
 def save_init_graph(fdir, P, graph_dict, sp_idxs, filename="", half=""):
+    """ Save the initial partition.
+
+    Parameters
+    ----------
+    fdir : str
+        Relative or absolute directory of the file.
+    P : np.ndarray
+        The point cloud.
+    graph_dict : dict
+        Dictionary where the superpoint graph is stored.
+    sp_idxs : list[np.ndarray]
+        List of the point indices for each superpoint.
+    filename : str
+        Name of the file.
+    half : str
+        TODO
+    """
     print("Save initial graph")
     mkdir(fdir)
     hf = h5py.File("{0}/init_graph{1}_{2}.h5".format(fdir, half, filename), "w")
@@ -123,6 +220,25 @@ def save_init_graph(fdir, P, graph_dict, sp_idxs, filename="", half=""):
 
 
 def load_init_graph(fdir, filename="", half=""):
+    """ Load the probabilities of the link predictions.
+
+    Parameters
+    ----------
+    fdir : str
+        Relative or absolute directory of the file.
+    filename : str
+        Name of the file.
+    half : str
+        TODO
+    
+    Returns
+    -------
+    np.ndarray, dict, list[np.ndarray], np.ndarray, np.ndarray
+        The point cloud.
+        Dictionary where the superpoint graph is stored.
+        List of the point indices for each superpoint.
+
+    """
     print("Load initial graph...")
     file = "{0}/init_graph{1}_{2}.h5".format(fdir, half, filename)
     if not file_exists(filepath=file):
@@ -153,11 +269,34 @@ def load_init_graph(fdir, filename="", half=""):
 
 
 def check_color_value(c):
+    """ Check if there is an invalid colour value.
+    """
     if c > 255 or c < 0:
         raise Exception("Invalid color value: {0}".format(c))
 
 
 def load_cloud(file, r=255, g=0, b=0, p=1):
+    """ Load a point cloud.
+
+    Parameters
+    ----------
+    file : str
+        Name of the file.
+    r : uint8
+        Fallback red color.
+    g : uint8
+        Fallback green color.
+    b : uint8
+        Fallback blue color.
+    p : float
+        Sampling rate lower than 1 can be used to uniformly downsample the point cloud.
+    
+    Returns
+    -------
+    np.ndarray
+        The Nx6 point cloud.
+
+    """
     print("Load point cloud...")
     if not os.path.exists(file):
         raise Exception("File not found: {0}".format(file))

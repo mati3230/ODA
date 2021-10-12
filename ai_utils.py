@@ -1,5 +1,7 @@
+# cut pursuit library (see https://github.com/loicland/superpoint_graph/tree/ssp%2Bspg/partition)
 import cp_ext as libcp
 import ply_c_ext as libply_c
+
 import numpy as np
 import numpy.matlib
 from sklearn.neighbors import NearestNeighbors
@@ -11,6 +13,8 @@ from network import FFGraphNet
 
 
 def compute_graph_nn_2(xyz, k_nn1, k_nn2, voronoi = 0.0):
+    """ This function is developed by Landrieu et al. (see https://github.com/loicland/superpoint_graph). 
+    """
     print("Compute Graph NN")
     """compute simulteneoulsy 2 knn structures
     only saves target for knn2
@@ -63,6 +67,10 @@ def compute_graph_nn_2(xyz, k_nn1, k_nn2, voronoi = 0.0):
 
 
 def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0.1, d_se_max=0):
+    """ This function is developed by Landrieu et al. 
+    (see https://github.com/loicland/superpoint_graph). 
+    We modified the output of the function to fit our use case. 
+    """
     xyz = np.ascontiguousarray(xyz, dtype=np.float32)
     rgb = np.ascontiguousarray(rgb, dtype=np.uint8)
     #---compute 10 nn graph-------
@@ -134,6 +142,9 @@ def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, 
     jump_edg = np.vstack((0, np.argwhere(np.diff(edge_comp_index)) + 1, n_edg)).flatten()
     n_sedg = len(jump_edg) - 1
 
+    ########################################
+    # Our modification
+    ########################################
     senders = []
     receivers = []
     uni_edges = []
@@ -678,6 +689,32 @@ def feature_point_cloud(P):
 
 
 def graph(cloud, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0.1, d_se_max=0, max_sp_size=7000):
+    """ This function creates a superpoint graph from a point cloud. 
+
+    Parameters
+    ----------
+    cloud : np.ndarray
+        A point cloud with the columns xyzrgb.
+    k_nn_adj : int
+        TODO.
+    k_nn_adj : int
+        TODO.
+    lambda_edge_weight : float
+        TODO
+    reg_strength : flaot
+        TODO
+    d_se_max : float
+        TODO
+    max_sp_size : int
+        Maximum size of a superpoint. 
+    
+    Returns
+    -------
+    dict, list[np.ndarray]
+        The graph dictionary which is used by the neural network.
+        A list of point indices for each superpoint.  
+    """
+    # make a copy of the original cloud to prevent that points do not change any properties
     P = np.array(cloud, copy=True)
     print("Compute superpoint graph")
     n_sps, n_edges, sp_idxs, senders, receivers, _ = superpoint_graph(
@@ -688,11 +725,21 @@ def graph(cloud, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0
         k_nn_adj=k_nn_adj,
         lambda_edge_weight=lambda_edge_weight,
         d_se_max=d_se_max)
+    """
+    n_sps: Number of superpoints (vertices) in the graph
+    n_edges: Number of edges in the graph
+    sp_idxs: A list of point indices for each superpoint
+    senders: List of start vertices for each edge in a directed graph
+    receivers: List of end vertices for each edge in a directed graph
+    """
+    #############################################
+    # create a feature vector for every superpoint
     print("Superpoint graph has {0} nodes and {1} edges".format(n_sps, n_edges))
     print("Compute features for every superpoint")
     P, center = feature_point_cloud(P=P)
 
     print("Check superpoint sizes")
+    # so that every superpoint is smaller than the max_sp_size
     sps_sizes = []
     for i in range(n_sps):
         idxs = np.unique(sp_idxs[i])

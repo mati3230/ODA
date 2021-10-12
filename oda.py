@@ -36,6 +36,9 @@ from sp_utils import\
 
 
 def main():
+    """
+    This is the app that creates partitions from a point cloud.
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument("--file", type=str, default="", help="File where the objects should be seperated.")
     parser.add_argument("--gpu", type=bool, default=False, help="Should the AI use the GPU. ")
@@ -61,20 +64,26 @@ def main():
     parser.add_argument("--load_proc_cloud", default=False, type=bool, help="Load the preprocessed point cloud from g_dir.")
     parser.add_argument("--point_size", default=0.03, type=float, help="Rendering point size.")
     args = parser.parse_args()
+    # load the colors for the parititon rendering
     colors = load_colors()
     colors = colors/255.
     viewer = None
+    # Disable the tensorflow gpu computations
     if not args.gpu:
         os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
     np.random.seed(args.seed)
+    # variable to store the point cloud
     P = None
+    # should the initial partition be loaded? 
+    # not necessary if the model probabilities of the binary link prediction should be loaded
     load_init_g = args.load_init_g and not args.load_probs
     if args.load_probs:
         P = -1
 
+    # load the initial graph
     if load_init_g:
         P, graph_dict, sp_idxs = load_init_graph(fdir=args.g_dir, filename=args.g_filename)
-    if P is None:
+    if P is None: # If no initial partition is loaded, we start from the beginning by loading and preprocessing the point cloud
         if args.load_proc_cloud:
             P = load_proc_cloud(fdir=args.g_dir, fname=args.g_filename)
         else:
@@ -91,18 +100,23 @@ def main():
                 if i == "-1":
                     break
                 elif i == "e":
+                    # close the application
                     if viewer is not None:
                         viewer.close()
                     return
                 elif i == "d":
+                    # remove the selection from the point cloud 
                     picked_points_idxs, viewer = pick_sp_points_pptk(
                         P=P, point_size=args.point_size, v=viewer, colors=colors)
                     P = delete(P=P, idxs=picked_points_idxs)
                 elif i == "r":
+                    # rotate the point cloud
                     P = rotate(P=P)
                 elif i == "re":
+                    # translate the point cloud in the origin
                     P = recenter(P=P)
                 elif i == "s":
+                    # downsample the point cloud
                     print("Point cloud size: {0}".format(P.shape[0]))
                     s = input("Percent [0,1]: ")
                     try:
@@ -114,8 +128,12 @@ def main():
                 else:
                     visualize = False
                     continue
+                # the point cloud is saved after every step
                 save_cloud(P=P, fdir=args.g_dir, fname=args.g_filename)
         #return
+        # create the initial partition graph
+        # the graph_dict is used in the neural network
+        # the sp_idxs is a list with a list of point indices for each superpoint
         graph_dict, sp_idxs = graph(
             cloud=P,
             k_nn_adj=args.k_nn_adj,
@@ -124,13 +142,14 @@ def main():
             reg_strength=args.reg_strength,
             d_se_max=args.d_se_max,
             max_sp_size=args.max_sp_size)
+        # save the initial partition graph
         if args.save_init_g:
             save_init_graph(
                 fdir=args.g_dir,
                 P=P, graph_dict=graph_dict,
                 sp_idxs=sp_idxs,
                 filename=args.g_filename)
-
+    # TODO continue comments here!
     if args.load_probs:
         P, graph_dict, sp_idxs, probs, unions = load_probs(
             fdir=args.g_dir, filename=args.g_filename)
