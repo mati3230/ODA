@@ -17,7 +17,9 @@ from io_utils import\
     save_cloud,\
     load_proc_cloud,\
     load_colors,\
-    subsample
+    subsample,\
+    save_partition,\
+    mkdir
 from ai_utils import graph, predict
 from sp_utils import\
     unify,\
@@ -71,6 +73,8 @@ def main():
     # Disable the tensorflow gpu computations
     if not args.gpu:
         os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+    mkdir("./tmp")
+    mkdir("./out")
     np.random.seed(args.seed)
     # variable to store the point cloud
     P = None
@@ -185,6 +189,7 @@ def main():
         P=P,
         sp_idxs=sp_idxs,
         half=False)
+    save_partition(partition=part, fdir=args.g_dir, fname=args.g_filename)
 
     if not args.load_unions:
         viewer = render_pptk(P=P, initial_partition=init_p, partition=part, point_size=args.point_size, v=viewer, colors=colors)
@@ -207,6 +212,7 @@ def main():
                 P=P,
                 sp_idxs=sp_idxs,
                 half=False)
+            save_partition(partition=part, fdir=args.g_dir, fname=args.g_filename)
             viewer = render_pptk(P=P, initial_partition=init_p, partition=part, point_size=args.point_size, v=viewer, colors=colors)
         save_unions(
             fdir=args.g_dir,
@@ -304,6 +310,7 @@ def main():
             P=P,
             sp_idxs=sp_idxs,
             half=False)
+        save_partition(partition=part, fdir=args.g_dir, fname=args.g_filename)
 
 
 if __name__ == "__main__":
