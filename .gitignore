@@ -7,6 +7,9 @@ tmp
 # Folder where the meshes are stored 
 out
 
+# Folder where evaluation files are stored
+eval
+
 # Weights of the neural network
 model.npz
 
