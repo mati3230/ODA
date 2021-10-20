@@ -64,6 +64,7 @@ def main():
     parser.add_argument("--g_filename", default="", type=str, help="Filename will be used as a postfix.")
     parser.add_argument("--load_unions", default=False, type=bool, help="Load the unions from g_dir.")
     parser.add_argument("--load_proc_cloud", default=False, type=bool, help="Load the preprocessed point cloud from g_dir.")
+    parser.add_argument("--partition_eval", default=False, type=bool, help="Evaluate the partition algorithm.")
     parser.add_argument("--point_size", default=0.03, type=float, help="Rendering point size.")
     args = parser.parse_args()
     # load the colors for the parititon rendering
@@ -135,6 +136,46 @@ def main():
                 # the point cloud is saved after every step
                 save_cloud(P=P, fdir=args.g_dir, fname=args.g_filename)
         #return
+        if args.partition_eval:
+            print("Start evaluation")
+            eval_dir = "./eval"
+            mkdir(eval_dir)
+            reg_strengths = [0.05, 0.1, 0.3, 0.7]
+            ei = 1
+            for rs in reg_strengths:
+                start_time = time.time()
+                graph_dict, sp_idxs = graph(
+                    cloud=P,
+                    k_nn_adj=args.k_nn_adj,
+                    k_nn_geof=args.k_nn_geof,
+                    lambda_edge_weight=args.lambda_edge_weight,
+                    reg_strength=rs,
+                    d_se_max=args.d_se_max,
+                    max_sp_size=100000000)
+                stop_time = time.time()
+                duration = stop_time - start_time
+                unions, probs = predict(graph_dict=graph_dict, dec_b=args.initial_db)
+                senders = graph_dict["senders"]
+                if 2*unions.shape[0] == senders.shape[0]:
+                    half = int(senders.shape[0] / 2)
+                    senders = senders[:half]
+                    receivers = graph_dict["receivers"]
+                    receivers = receivers[:half]
+                    graph_dict["senders"] = senders
+                    graph_dict["receivers"] = receivers
+                for db in range(0.8, 1, 0.01):
+                    unions = np.zeros((unions.shape[0], ), dtype=np.bool)
+                    unions[probs > db] = True
+                    part = partition(
+                        graph_dict=graph_dict,
+                        unions=unions,
+                        P=P,
+                        sp_idxs=sp_idxs,
+                        half=False)
+                    save_partition(partition=part, fdir=eval_dir, fname=str(ei)+"_{0:.5f}".format(duration))
+                    ei += 1
+            return
+
         # create the initial partition graph
         # the graph_dict is used in the neural network
         # the sp_idxs is a list with a list of point indices for each superpoint

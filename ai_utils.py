@@ -128,7 +128,9 @@ def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, 
     edges = np.unique(edges, axis=1)
     
     if d_se_max > 0:
+        # distance between the superpoints on the edges
         dist = np.sqrt(((xyz[edges[0,:]]-xyz[edges[1,:]])**2).sum(1))
+        # filter edges with too large distance
         edges = edges[:,dist<d_se_max]
     
     #---sort edges by alpha numeric order wrt to the components of their source/target---
