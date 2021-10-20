@@ -164,7 +164,7 @@ def main():
                     receivers = receivers[:half]
                     graph_dict["senders"] = senders
                     graph_dict["receivers"] = receivers
-                for db in range(0.8, 1, 0.01):
+                for db in np.arange(0.8, 1, 0.01):
                     unions = np.zeros((unions.shape[0], ), dtype=np.bool)
                     unions[probs > db] = True
                     part = partition(
