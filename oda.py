@@ -1,6 +1,7 @@
 import numpy as np
 import argparse
 import os
+import time
 
 from visu_utils import\
     render_pptk,\
