@@ -724,7 +724,7 @@ def feature_point(point, normals, curvature, p_idx):
     return fp
 
 
-def graph(cloud, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0.1, d_se_max=0, max_sp_size=-1):
+def graph(cloud, k_nn_adj=30, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0.1, d_se_max=0, max_sp_size=-1):
     """ This function creates a superpoint graph from a point cloud. 
 
     Parameters
@@ -754,7 +754,7 @@ def graph(cloud, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0
     P = np.array(cloud, copy=True)
     print("Compute knn graph")
     t1 = time.time()
-    normals, curvature, k_nns, ok = estimate_normals_curvature(P=P[:, :3], k_neighbours=30, nn_algo="kd_tree", verbose=True)
+    normals, curvature, k_nns, ok = estimate_normals_curvature(P=P[:, :3], k_neighbours=k_nn_adj, nn_algo="kd_tree", verbose=True)
 
     t2 = time.time()
     duration = t2 - t1

@@ -52,7 +52,7 @@ def main():
     parser.add_argument("--seed", type=int, default=42, help="Random seed which affects the subsampling.")
     parser.add_argument("--reg_strength", default=0.1, type=float, help="Regularization strength for the minimal partition.")
     parser.add_argument("--k_nn_geof", default=45, type=int, help="Number of neighbors for the geometric features.")
-    parser.add_argument("--k_nn_adj", default=10, type=int, help="Adjacency structure for the minimal partition.")
+    parser.add_argument("--k_nn_adj", default=30, type=int, help="Adjacency structure for the minimal partition.")
     parser.add_argument("--lambda_edge_weight", default=1., type=float, help="Parameter determine the edge weight for minimal part.")
     parser.add_argument("--d_se_max", default=0, type=float, help="Max length of super edges.")
     parser.add_argument("--initial_db", default=0.5, type=float, help="Initial guess for the decision boundary.")
@@ -142,37 +142,38 @@ def main():
             eval_dir = "./eval"
             mkdir(eval_dir)
             ei = 1
-            graph_dict, sp_idxs = graph(
-                cloud=P,
-                k_nn_adj=args.k_nn_adj,
-                k_nn_geof=args.k_nn_geof,
-                lambda_edge_weight=args.lambda_edge_weight,
-                reg_strength=args.reg_strength,
-                d_se_max=args.d_se_max,
-                max_sp_size=args.max_sp_size)
-            unions, probs = predict(graph_dict=graph_dict, dec_b=args.initial_db)
-            senders = graph_dict["senders"]
-            if 2*unions.shape[0] == senders.shape[0]:
-                half = int(senders.shape[0] / 2)
-                senders = senders[:half]
-                receivers = graph_dict["receivers"]
-                receivers = receivers[:half]
-                graph_dict["senders"] = senders
-                graph_dict["receivers"] = receivers
-            for db in np.arange(0.8, 0.98, 0.01):
-                start_time = time.time()
-                unions = np.zeros((unions.shape[0], ), dtype=np.bool)
-                unions[probs > db] = True
-                part = partition(
-                    graph_dict=graph_dict,
-                    unions=unions,
-                    P=P,
-                    sp_idxs=sp_idxs,
-                    half=False)
-                stop_time = time.time()
-                duration = stop_time - start_time
-                save_partition(partition=part, fdir=eval_dir, fname=str(ei)+"_{0:.5f}".format(duration))
-                ei += 1
+            for k in [5, 30]:
+                graph_dict, sp_idxs = graph(
+                    cloud=P,
+                    k_nn_adj=k,
+                    k_nn_geof=args.k_nn_geof,
+                    lambda_edge_weight=args.lambda_edge_weight,
+                    reg_strength=args.reg_strength,
+                    d_se_max=args.d_se_max,
+                    max_sp_size=args.max_sp_size)
+                unions, probs = predict(graph_dict=graph_dict, dec_b=args.initial_db)
+                senders = graph_dict["senders"]
+                if 2*unions.shape[0] == senders.shape[0]:
+                    half = int(senders.shape[0] / 2)
+                    senders = senders[:half]
+                    receivers = graph_dict["receivers"]
+                    receivers = receivers[:half]
+                    graph_dict["senders"] = senders
+                    graph_dict["receivers"] = receivers
+                for db in np.arange(0.8, 0.98, 0.01):
+                    start_time = time.time()
+                    unions = np.zeros((unions.shape[0], ), dtype=np.bool)
+                    unions[probs > db] = True
+                    part = partition(
+                        graph_dict=graph_dict,
+                        unions=unions,
+                        P=P,
+                        sp_idxs=sp_idxs,
+                        half=False)
+                    stop_time = time.time()
+                    duration = stop_time - start_time
+                    save_partition(partition=part, fdir=eval_dir, fname=str(ei)+"_{0:.5f}".format(duration))
+                    ei += 1
             return
 
         # create the initial partition graph
