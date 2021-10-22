@@ -141,40 +141,38 @@ def main():
             print("Start evaluation")
             eval_dir = "./eval"
             mkdir(eval_dir)
-            reg_strengths = [0.05, 0.1, 0.3, 0.7]
             ei = 1
-            for rs in reg_strengths:
+            graph_dict, sp_idxs = graph(
+                cloud=P,
+                k_nn_adj=args.k_nn_adj,
+                k_nn_geof=args.k_nn_geof,
+                lambda_edge_weight=args.lambda_edge_weight,
+                reg_strength=args.reg_strength,
+                d_se_max=args.d_se_max,
+                max_sp_size=args.max_sp_size)
+            unions, probs = predict(graph_dict=graph_dict, dec_b=args.initial_db)
+            senders = graph_dict["senders"]
+            if 2*unions.shape[0] == senders.shape[0]:
+                half = int(senders.shape[0] / 2)
+                senders = senders[:half]
+                receivers = graph_dict["receivers"]
+                receivers = receivers[:half]
+                graph_dict["senders"] = senders
+                graph_dict["receivers"] = receivers
+            for db in np.arange(0.8, 0.98, 0.01):
                 start_time = time.time()
-                graph_dict, sp_idxs = graph(
-                    cloud=P,
-                    k_nn_adj=args.k_nn_adj,
-                    k_nn_geof=args.k_nn_geof,
-                    lambda_edge_weight=args.lambda_edge_weight,
-                    reg_strength=rs,
-                    d_se_max=args.d_se_max,
-                    max_sp_size=args.max_sp_size)
+                unions = np.zeros((unions.shape[0], ), dtype=np.bool)
+                unions[probs > db] = True
+                part = partition(
+                    graph_dict=graph_dict,
+                    unions=unions,
+                    P=P,
+                    sp_idxs=sp_idxs,
+                    half=False)
                 stop_time = time.time()
                 duration = stop_time - start_time
-                unions, probs = predict(graph_dict=graph_dict, dec_b=args.initial_db)
-                senders = graph_dict["senders"]
-                if 2*unions.shape[0] == senders.shape[0]:
-                    half = int(senders.shape[0] / 2)
-                    senders = senders[:half]
-                    receivers = graph_dict["receivers"]
-                    receivers = receivers[:half]
-                    graph_dict["senders"] = senders
-                    graph_dict["receivers"] = receivers
-                for db in np.arange(0.8, 1, 0.01):
-                    unions = np.zeros((unions.shape[0], ), dtype=np.bool)
-                    unions[probs > db] = True
-                    part = partition(
-                        graph_dict=graph_dict,
-                        unions=unions,
-                        P=P,
-                        sp_idxs=sp_idxs,
-                        half=False)
-                    save_partition(partition=part, fdir=eval_dir, fname=str(ei)+"_{0:.5f}".format(duration))
-                    ei += 1
+                save_partition(partition=part, fdir=eval_dir, fname=str(ei)+"_{0:.5f}".format(duration))
+                ei += 1
             return
 
         # create the initial partition graph
