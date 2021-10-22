@@ -56,7 +56,7 @@ def main():
     parser.add_argument("--lambda_edge_weight", default=1., type=float, help="Parameter determine the edge weight for minimal part.")
     parser.add_argument("--d_se_max", default=0, type=float, help="Max length of super edges.")
     parser.add_argument("--initial_db", default=0.5, type=float, help="Initial guess for the decision boundary.")
-    parser.add_argument("--max_sp_size", default=7000, type=int, help="Maximum size of a superpoint.")
+    parser.add_argument("--max_sp_size", default=-1, type=int, help="Maximum size of a superpoint.")
     parser.add_argument("--save_init_g", default=False, type=bool, help="Save the initial superpoint graph in g_dir.")
     parser.add_argument("--load_init_g", default=False, type=bool, help="Load the initial superpoint graph from g_dir.")
     parser.add_argument("--save_probs", default=False, type=bool, help="Save the processed superpoint graph in g_dir.")
@@ -152,7 +152,7 @@ def main():
                     lambda_edge_weight=args.lambda_edge_weight,
                     reg_strength=rs,
                     d_se_max=args.d_se_max,
-                    max_sp_size=100000000)
+                    max_sp_size=args.max_sp_size)
                 stop_time = time.time()
                 duration = stop_time - start_time
                 unions, probs = predict(graph_dict=graph_dict, dec_b=args.initial_db)

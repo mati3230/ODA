@@ -691,7 +691,7 @@ def feature_point_cloud(P):
     return P, center
 
 
-def graph(cloud, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0.1, d_se_max=0, max_sp_size=7000):
+def graph(cloud, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0.1, d_se_max=0, max_sp_size=-1):
     """ This function creates a superpoint graph from a point cloud. 
 
     Parameters
@@ -755,7 +755,7 @@ def graph(cloud, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0
         idxs = np.unique(sp_idxs[i])
         sp_idxs[i] = idxs
         sp_size = idxs.shape[0]
-        if sp_size > max_sp_size:
+        if max_sp_size > 0 and sp_size > max_sp_size:
             raise Exception("Superpoint {0} too large with {1} points (max: {2}). Try to lower the reg_strength.".format(i, sp_size, max_sp_size))
         sps_sizes.append(sp_size)
     print("Average superpoint size: {0:.2f} ({1:.2f})".format(np.mean(sps_sizes), np.std(sps_sizes)))
