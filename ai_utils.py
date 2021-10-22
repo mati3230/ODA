@@ -616,19 +616,19 @@ def distance_sort(P, p_query):
     return d_sort, d
 
 
-def estimate_normals_curvature(P, k_neighbours=5):
+def estimate_normals_curvature(P, k_neighbours=5, nn_algo="brute", verbose=False):
     n_P = P.shape[0]
     if n_P <= k_neighbours:
         k_neighbours = 5
     n = P.shape[1]
 
     try:
-        nbrs = NearestNeighbors(n_neighbors=k_neighbours, algorithm="brute", metric="euclidean").fit(P[:, :3])
+        nbrs = NearestNeighbors(n_neighbors=k_neighbours, algorithm=nn_algo, metric="euclidean").fit(P[:, :3])
         _, nns = nbrs.kneighbors(P[:, :3])
     except Exception as e:
         normals = np.zeros((n_P, 3), dtype=np.float32)
         curvature = np.zeros((n_P, ), dtype=np.float32)
-        return normals, curvature, False
+        return normals, curvature, None, False
 
 
     k_nns = nns[:, 1:k_neighbours]
@@ -649,24 +649,40 @@ def estimate_normals_curvature(P, k_neighbours=5):
     
     normals = np.zeros((n_P,n))
     curvature = np.zeros((n_P,1))
-    
-    for i in range(n_P):
-        C_mat = np.array([[C[i,0], C[i,1], C[i,2]],
-            [C[i,1], C[i,3], C[i,4]],
-            [C[i,2], C[i,4], C[i,5]]])
-        values, vectors = np.linalg.eig(C_mat)
-        lamda = np.min(values)
-        k = np.argmin(values)
-        norm = np.linalg.norm(vectors[:,k])
-        if norm == 0:
-            norm = 1e-12
-        normals[i,:] = vectors[:,k] / np.linalg.norm(vectors[:,k])
-        sum_v = np.sum(values)
-        if sum_v == 0:
-            sum_v = 1e-12
-        curvature[i] = lamda / sum_v
+    if verbose:
+        for i in tqdm(range(n_P), desc="Compute normals"):
+            C_mat = np.array([[C[i,0], C[i,1], C[i,2]],
+                [C[i,1], C[i,3], C[i,4]],
+                [C[i,2], C[i,4], C[i,5]]])
+            values, vectors = np.linalg.eig(C_mat)
+            lamda = np.min(values)
+            k = np.argmin(values)
+            norm = np.linalg.norm(vectors[:,k])
+            if norm == 0:
+                norm = 1e-12
+            normals[i,:] = vectors[:,k] / np.linalg.norm(vectors[:,k])
+            sum_v = np.sum(values)
+            if sum_v == 0:
+                sum_v = 1e-12
+            curvature[i] = lamda / sum_v
+    else: 
+        for i in range(n_P):
+            C_mat = np.array([[C[i,0], C[i,1], C[i,2]],
+                [C[i,1], C[i,3], C[i,4]],
+                [C[i,2], C[i,4], C[i,5]]])
+            values, vectors = np.linalg.eig(C_mat)
+            lamda = np.min(values)
+            k = np.argmin(values)
+            norm = np.linalg.norm(vectors[:,k])
+            if norm == 0:
+                norm = 1e-12
+            normals[i,:] = vectors[:,k] / np.linalg.norm(vectors[:,k])
+            sum_v = np.sum(values)
+            if sum_v == 0:
+                sum_v = 1e-12
+            curvature[i] = lamda / sum_v
 
-    return normals, curvature, True
+    return normals, curvature, k_nns, True
 
 
 def get_general_bb(P):
@@ -689,6 +705,23 @@ def feature_point_cloud(P):
     P[:, 3:] -= 0.5
     P[:, 3:] *= 2
     return P, center
+
+
+def feature_point(point, normals, curvature, p_idx):    
+    pos = point[:3]
+    color = point[3:]
+    normal = normals[p_idx]
+    curv = curvature[p_idx]
+    fp = np.vstack(
+        (
+            pos[:, None],
+            color[:, None],
+            normal[:, None],
+            curv
+        ))
+    fp = fp.reshape(fp.shape[0], )
+    fp = fp.astype(dtype=np.float32)
+    return fp
 
 
 def graph(cloud, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0.1, d_se_max=0, max_sp_size=-1):
@@ -719,72 +752,65 @@ def graph(cloud, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0
     """
     # make a copy of the original cloud to prevent that points do not change any properties
     P = np.array(cloud, copy=True)
-    print("Compute superpoint graph")
+    print("Compute knn graph")
     t1 = time.time()
-    n_sps, n_edges, sp_idxs, senders, receivers, _ = superpoint_graph(
-        xyz=P[:, :3],
-        rgb=P[:, 3:],
-        reg_strength=reg_strength,
-        k_nn_geof=k_nn_geof,
-        k_nn_adj=k_nn_adj,
-        lambda_edge_weight=lambda_edge_weight,
-        d_se_max=d_se_max)
+    normals, curvature, k_nns, ok = estimate_normals_curvature(P=P[:, :3], k_neighbours=30, nn_algo="kd_tree", verbose=True)
 
-    """
-    n_sps: Number of superpoints (vertices) in the graph
-    n_edges: Number of edges in the graph
-    sp_idxs: A list of point indices for each superpoint
-    senders: List of start vertices for each edge in a directed graph
-    receivers: List of end vertices for each edge in a directed graph
-    """
-    #############################################
-    # create a feature vector for every superpoint
     t2 = time.time()
     duration = t2 - t1
-    print("Superpoint graph has {0} nodes and {1} edges (duration: {2:.3f} seconds)".format(n_sps, n_edges, duration))
+    print("done in {0:.3f} seconds".format(duration))
 
     print("Compute features for every superpoint")
 
     t1 = time.time()
     P, center = feature_point_cloud(P=P)
+    n_ft = None
+    if n_ft is None:
+        fp = feature_point(point=P[0], normals=normals, curvature=curvature, p_idx=0)
+        n_ft = fp.shape[0]
+        print("feature vector has size of {0}".format(n_ft))
 
-    print("Check superpoint sizes")
-    # so that every superpoint is smaller than the max_sp_size
-    sps_sizes = []
-    for i in range(n_sps):
-        idxs = np.unique(sp_idxs[i])
-        sp_idxs[i] = idxs
-        sp_size = idxs.shape[0]
-        if max_sp_size > 0 and sp_size > max_sp_size:
-            raise Exception("Superpoint {0} too large with {1} points (max: {2}). Try to lower the reg_strength.".format(i, sp_size, max_sp_size))
-        sps_sizes.append(sp_size)
-    print("Average superpoint size: {0:.2f} ({1:.2f})".format(np.mean(sps_sizes), np.std(sps_sizes)))
+    all_features = np.zeros((P.shape[0], n_ft), dtype=np.float32)
 
-    idxs = sp_idxs[0]
-    sp = P[idxs]
-    features = compute_features(cloud=sp)
-    n_ft = features.shape[0]
-    print("Use {0} features".format(n_ft))
+    for i in tqdm(range(P.shape[0]), desc="Compute features"):
+        point = P[i]
+        fp = feature_point(point=point, normals=normals, curvature=curvature, p_idx=i)
+        all_features[i] = fp
 
-    node_features = np.zeros((n_sps, n_ft), dtype=np.float32)
-    node_features[0] = features
-    for k in tqdm(range(1, n_sps), desc="Node features"):
-        idxs = sp_idxs[k]
-        sp = P[idxs]
-        features = compute_features(cloud=sp)
-        node_features[k] = features
+    n_edges = k_nns.shape[0] * k_nns.shape[1]
+    senders = np.zeros((n_edges, 1), dtype=np.uint32)
+    receivers = np.zeros((n_edges, 1), dtype=np.uint32)
+    unions = np.zeros((n_edges, ), dtype=np.bool)
+    edge_idx = 0
+    for p_idx in tqdm(range(k_nns.shape[0]), desc="Compute graph dictionary"):
+        for n_idx in range(k_nns.shape[1]):
+            senders[edge_idx] = p_idx
+            receivers[edge_idx] = n_idx
+            edge_idx += 1
+
+    # bidirectional
+    tmp_senders = np.array(senders, copy=True)
+    senders = np.vstack((senders, receivers))
+    receivers = np.vstack((receivers, tmp_senders))
+    senders = senders.reshape(senders.shape[0], )
+    receivers = receivers.reshape(receivers.shape[0], )
 
     t2 = time.time()
     duration = t2 - t1
     print("Computed features in {0:.3f} seconds".format(duration))
 
     graph_dict = {
-        "nodes": node_features,
+        "nodes": all_features,
         "senders": senders,
         "receivers": receivers,
         "edges": None,
         "globals": None
         }
+
+    sp_idxs = P.shape[0] * [None]
+    for i in range(P.shape[0]):
+        sp_idxs[i] = i
+
     return graph_dict, sp_idxs
 
 
@@ -803,11 +829,13 @@ def init_model(n_ft):
         head_only=True,
         observation_size=(910, ))
     n_nodes = 6
+    P = np.random.randn(n_nodes, 6)
+    normals = np.random.randn(n_nodes, 3)
+    curvature = np.random.randn(n_nodes, )
     node_features = np.zeros((n_nodes, n_ft), dtype=np.float32)
     for i in range(n_nodes):
-        sp = np.random.randn(100, 6)
-        features = compute_features(cloud=sp)
-        node_features[i] = features
+        fp = feature_point(point=P[i], normals=normals, curvature=curvature, p_idx=i)
+        node_features[i] = fp
     senders = np.array(list(range(0, n_nodes-1)), dtype=np.uint32)
     receivers = np.array(list(range(1, n_nodes)), dtype=np.uint32)
     graph_dict = {
