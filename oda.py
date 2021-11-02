@@ -72,6 +72,7 @@ def main():
     colors = load_colors()
     colors = colors/255.
     viewer = None
+
     # Disable the tensorflow gpu computations
     if not args.gpu:
         os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
@@ -177,24 +178,68 @@ def main():
                     ei += 1
             return
 
-        # create the initial partition graph
-        # the graph_dict is used in the neural network
-        # the sp_idxs is a list with a list of point indices for each superpoint
-        graph_dict, sp_idxs = graph(
-            cloud=P,
-            k_nn_adj=args.k_nn_adj,
-            k_nn_geof=args.k_nn_geof,
-            lambda_edge_weight=args.lambda_edge_weight,
-            reg_strength=args.reg_strength,
-            d_se_max=args.d_se_max,
-            max_sp_size=args.max_sp_size)
-        # save the initial partition graph
-        if args.save_init_g:
-            save_init_graph(
-                fdir=args.g_dir,
-                P=P, graph_dict=graph_dict,
-                sp_idxs=sp_idxs,
-                filename=args.g_filename)
+        reg_strength = args.reg_strength
+        k_nn_adj = args.k_nn_adj
+        k_nn_geof = args.k_nn_geof
+        lambda_edge_weight = args.lambda_edge_weight
+        calc = True
+        while True:            
+            if calc:
+                # create the initial partition graph
+                # the graph_dict is used in the neural network
+                # the sp_idxs is a list with a list of point indices for each superpoint
+                graph_dict, sp_idxs = graph(
+                    cloud=P,
+                    k_nn_adj=args.k_nn_adj,
+                    k_nn_geof=args.k_nn_geof,
+                    lambda_edge_weight=args.lambda_edge_weight,
+                    reg_strength=args.reg_strength,
+                    d_se_max=args.d_se_max,
+                    max_sp_size=args.max_sp_size)
+                # save the initial partition graph
+                if args.save_init_g:
+                    save_init_graph(
+                        fdir=args.g_dir,
+                        P=P, graph_dict=graph_dict,
+                        sp_idxs=sp_idxs,
+                        filename=args.g_filename)
+            calc = True
+            i = input("lambda [l] | k_nn_adj [a] | k_nn_geof[g] | lambda_edge_weight [w] | Continue [-1] | Exit [e]: ")
+            if i == "-1":
+                break
+            elif i == "e":
+                return
+            elif i == "l":
+                try:
+                    reg_strength = float(i)
+                except Exception as e:
+                    print(e)
+                    calc = False
+                    continue
+            elif i == "a":
+                try:
+                    k_nn_adj = int(i)
+                except Exception as e:
+                    print(e)
+                    calc = False
+                    continue
+            elif i == "g":
+                try:
+                    k_nn_geof = int(i)
+                except Exception as e:
+                    print(e)
+                    calc = False
+                    continue
+            elif i == "w":
+                try:
+                    lambda_edge_weight = float(i)
+                except Exception as e:
+                    print(e)
+                    calc = False
+                    continue
+            else:
+                calc = False
+                continue
     # TODO continue comments here!
     if args.load_probs:
         P, graph_dict, sp_idxs, probs, unions = load_probs(
