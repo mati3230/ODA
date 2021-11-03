@@ -21,7 +21,7 @@ def main():
     colors = load_colors()
     colors = colors/255.
 
-    P, graph_dict, sp_idxs = load_init_graph(fdir=args.g_dir, filename=args.g_filename, half="_half")
+    P, graph_dict, sp_idxs = load_init_graph(fdir=args.g_dir, filename=args.g_filename, half="")
     unions, graph_dict = load_unions(fdir=args.g_dir, graph_dict=graph_dict, filename=args.g_filename)
 
     print("Center point cloud.")

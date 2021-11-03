@@ -50,7 +50,7 @@ def main():
     parser.add_argument("--b", type=int, default=0, help="Blue channel if no color is available.")
     parser.add_argument("--p", type=float, default=1, help="Subsampling factor.")
     parser.add_argument("--seed", type=int, default=42, help="Random seed which affects the subsampling.")
-    parser.add_argument("--reg_strength", default=0.1, type=float, help="Regularization strength for the minimal partition.")
+    parser.add_argument("--reg_strength", default=0.1, type=float, help="Regularization strength for the minimal partition. Increase lambda for a coarser partition. ")
     parser.add_argument("--k_nn_geof", default=45, type=int, help="Number of neighbors for the geometric features.")
     parser.add_argument("--k_nn_adj", default=10, type=int, help="Adjacency structure for the minimal partition.")
     parser.add_argument("--lambda_edge_weight", default=1., type=float, help="Parameter determine the edge weight for minimal part.")
@@ -212,7 +212,8 @@ def main():
                 initial_db=args.initial_db,
                 filename=args.g_filename)
     if args.load_unions:
-        P, graph_dict, sp_idxs = load_init_graph(fdir=args.g_dir, filename=args.g_filename, half="_half")
+        # TODO: bug - half is somtimes=_half 
+        P, graph_dict, sp_idxs = load_init_graph(fdir=args.g_dir, filename=args.g_filename, half="")
         unions, graph_dict = load_unions(
             fdir=args.g_dir, graph_dict=graph_dict, filename=args.g_filename)
     senders = graph_dict["senders"]
