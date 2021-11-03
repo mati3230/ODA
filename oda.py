@@ -293,7 +293,11 @@ def main():
             if d_b == -1:
                 break
             unions = np.zeros((unions.shape[0], ), dtype=np.bool)
+            t1 = time.time()
             unions[probs > d_b] = True
+            t2 = time.time()
+            duration = t2 - t1
+            print("Threshold operation takes {0:.3f} seconds.".format(duration))
             part = partition(
                 graph_dict=graph_dict,
                 unions=unions,
