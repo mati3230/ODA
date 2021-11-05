@@ -278,7 +278,7 @@ def main():
         sp_idxs=sp_idxs,
         half=False)
     save_partition(partition=part, fdir=args.g_dir, fname=args.g_filename)
-
+    print("You can switch between the colored point cloud, the initial partition and the GNN partition by pressing: AltGr + ]")
     if not args.load_unions:
         viewer = render_pptk(P=P, initial_partition=init_p, partition=part, point_size=args.point_size, v=viewer, colors=colors)
         while True:
@@ -325,7 +325,7 @@ def main():
         mode = input("Superpoint Editing Mode: Extend Superpoint [ex] | Create [c] | Separate [s] | Point_Size [ps] | Extend points [ep] | Reduce points [r] | Merge small ones [m] | Unify [u] | Superpoint info [i] | Exit [e]: ")
         visualize = True
         if mode == "ps":
-            ps = input("Point size: ")
+            ps = input("Rendering point size: ")
             try:
                 ps = float(ps)
             except:
@@ -337,6 +337,7 @@ def main():
                 viewer.close()
             return
         elif mode == "m":
+            print("Merge superpoints that are smaller than a certain threshold.")
             thres = input("Minimum superpoint size: ")
             try:
                 thres = int(thres)
@@ -351,6 +352,18 @@ def main():
         if mode == "m":
             pick_points = False
         if pick_points:
+            if mode == "c":
+                print("Select superpoints that will be merged.")
+            elif mode == "ex":
+                print("Select one superpoint that should be extended.")
+            elif mode == "u":
+                print("Pick some points that will be unified to a new superpoint")
+            elif mode == "s":
+                print("Select a superpoint were the unions should be deleted. This is a seperation of a superpoint.")
+            elif mode == "ep":
+                print("Pick a superpoint that should be extended with points of the cloud.")
+            elif mode == "r":
+                print("Pick a superpoint where you want to reduce points.")
             picked_points_idxs, viewer = pick_sp_points_pptk(P=P, initial_partition=init_p, partition=part, point_size=point_size, v=viewer, colors=colors)
         if mode == "c":
             graph_dict, unions = unify(
@@ -359,6 +372,7 @@ def main():
                 graph_dict=graph_dict,
                 unions=unions)
         elif mode == "ex":
+            print("Select multiple superpoints. The chosen superpoint will be extended with this points.")
             points_idxs_e, viewer = pick_sp_points_pptk(P=P, initial_partition=init_p, partition=part, point_size=point_size, v=viewer, colors=colors)
             graph_dict, unions = extend_superpoint(
                 picked_points_idxs=picked_points_idxs,
@@ -383,9 +397,11 @@ def main():
             P_sp = superpoint_info(picked_points_idxs=picked_points_idxs, sp_idxs=sp_idxs, P=P, graph_dict=graph_dict)
             viewer = render_pptk(P=P_sp, v=viewer)
         elif mode == "ep":
+            print("Pick points that should be added to the superpoint chosen. ")
             points_idxs_e, viewer = pick_sp_points_pptk(P=P, initial_partition=init_p, partition=part, point_size=point_size, v=viewer, colors=colors)
             sp_idxs = extend_superpoint_points(picked_points_idxs=picked_points_idxs, points_idxs_e=points_idxs_e, sp_idxs=sp_idxs)
         elif mode == "r":
+            print("Pick points that should be reduced from the superpoint chosen. ")
             points_idxs_r, viewer = pick_sp_points_pptk(P=P, initial_partition=init_p, partition=part, point_size=point_size, v=viewer, colors=colors)
             graph_dict, sp_idxs = reduce_superpoint(picked_points_idxs=picked_points_idxs, points_idxs_r=points_idxs_r, graph_dict=graph_dict, sp_idxs=sp_idxs)
             init_p = initial_partition(P=P, sp_idxs=sp_idxs)
