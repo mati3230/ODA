@@ -331,6 +331,10 @@ def load_cloud(file, r=255, g=0, b=0, p=1):
         P = from_pcd(file=file, r=r, g=g, b=b, p=p)
     elif file.endswith("txt"):
         P = from_txt(file=file, r=r, g=g, b=b, p=p)
+    elif file.endswith("xyz"):
+        P = from_txt(file=file, r=r, g=g, b=b, p=p)
+    elif file.endswith("xyzrgb"):
+        P = from_txt(file=file, r=r, g=g, b=b, p=p)
     else:
         raise Exception("Unknwon file type: {0}".format(file))
     print("Point cloud size: {0} points".format(P.shape[0]))

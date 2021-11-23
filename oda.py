@@ -78,6 +78,9 @@ def main():
         os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
     mkdir("./tmp")
     mkdir("./out")
+
+    point_size = args.point_size
+
     np.random.seed(args.seed)
     # variable to store the point cloud
     P = None
@@ -101,8 +104,8 @@ def main():
             visualize = True
             while True:
                 if visualize:
-                    viewer = render_pptk(P=P, v=viewer)
-                i = input("Delete points [d] | Rotate [r] | recenter [re] | downsample [s] | Continue [-1] | Exit [e]: ")
+                    viewer = render_pptk(P=P, v=viewer, point_size=point_size)
+                i = input("Delete points [d] | Rotate [r] | recenter [re] | downsample [s] | point size [ps] | Continue [-1] | Exit [e]: ")
                 visualize = True
                 if i == "-1":
                     break
@@ -113,8 +116,11 @@ def main():
                     return
                 elif i == "d":
                     # remove the selection from the point cloud 
+                    print("Select some points with Ctrl + LMB and press Enter in the 3D window.")
+                    print("Points can be deleselcted with Ctrl + Shift + LMB")
+                    print("Deselect all points with RMB")
                     picked_points_idxs, viewer = pick_sp_points_pptk(
-                        P=P, point_size=args.point_size, v=viewer, colors=colors)
+                        P=P, point_size=point_size, v=viewer, colors=colors)
                     P = delete(P=P, idxs=picked_points_idxs)
                 elif i == "r":
                     # rotate the point cloud
@@ -132,6 +138,14 @@ def main():
                     except Exception as e:
                         print(e)
                         continue
+                elif i == "ps":
+                    ps = input("Rendering point size: ")
+                    try:
+                        ps = float(ps)
+                    except:
+                        continue
+                    point_size = ps
+                    continue
                 else:
                     visualize = False
                     continue
@@ -203,6 +217,8 @@ def main():
                         P=P, graph_dict=graph_dict,
                         sp_idxs=sp_idxs,
                         filename=args.g_filename)
+                init_p = initial_partition(P=P, sp_idxs=sp_idxs)
+                viewer = render_pptk(P=P, initial_partition=init_p, partition=init_p, point_size=point_size, v=viewer, colors=colors)
             calc = True
             i = input("lambda [l] | k_nn_adj [a] | k_nn_geof[g] | lambda_edge_weight [w] | Continue [-1] | Exit [e]: ")
             if i == "-1":
@@ -211,28 +227,28 @@ def main():
                 return
             elif i == "l":
                 try:
-                    reg_strength = float(i)
+                    reg_strength = float(input("lambda: "))
                 except Exception as e:
                     print(e)
                     calc = False
                     continue
             elif i == "a":
                 try:
-                    k_nn_adj = int(i)
+                    k_nn_adj = int(input("k_nn_adj: "))
                 except Exception as e:
                     print(e)
                     calc = False
                     continue
             elif i == "g":
                 try:
-                    k_nn_geof = int(i)
+                    k_nn_geof = int(input("k_nn_geof: "))
                 except Exception as e:
                     print(e)
                     calc = False
                     continue
             elif i == "w":
                 try:
-                    lambda_edge_weight = float(i)
+                    lambda_edge_weight = float(input("lambda edge weight: "))
                 except Exception as e:
                     print(e)
                     calc = False
@@ -280,7 +296,7 @@ def main():
     save_partition(partition=part, fdir=args.g_dir, fname=args.g_filename)
     print("You can switch between the colored point cloud, the initial partition and the GNN partition by pressing: AltGr + ]")
     if not args.load_unions:
-        viewer = render_pptk(P=P, initial_partition=init_p, partition=part, point_size=args.point_size, v=viewer, colors=colors)
+        viewer = render_pptk(P=P, initial_partition=init_p, partition=part, point_size=point_size, v=viewer, colors=colors)
         while True:
             d_b = input("Decision Boundary [0,1] | Decision boundary check [d] | Continue: [-1]: ")
             if d_b == "d":
@@ -305,14 +321,12 @@ def main():
                 sp_idxs=sp_idxs,
                 half=False)
             save_partition(partition=part, fdir=args.g_dir, fname=args.g_filename)
-            viewer = render_pptk(P=P, initial_partition=init_p, partition=part, point_size=args.point_size, v=viewer, colors=colors)
+            viewer = render_pptk(P=P, initial_partition=init_p, partition=part, point_size=point_size, v=viewer, colors=colors)
         save_unions(
             fdir=args.g_dir,
             unions=unions,
             graph_dict=graph_dict,
             filename=args.g_filename)
-
-    point_size = args.point_size
     visualize = True
     while True:
         save_unions(
@@ -357,7 +371,7 @@ def main():
             elif mode == "ex":
                 print("Select one superpoint that should be extended.")
             elif mode == "u":
-                print("Pick some points that will be unified to a new superpoint")
+                print("Pick two superpoints that will be unified to a new superpoint")
             elif mode == "s":
                 print("Select a superpoint were the unions should be deleted. This is a seperation of a superpoint.")
             elif mode == "ep":
