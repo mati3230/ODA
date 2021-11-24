@@ -133,7 +133,7 @@ def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, 
     geof = libply_c.compute_geof(xyz, target_fea, k_nn_geof).astype('float32')
     del target_fea
 
-    #choose here which features to use for the partition
+    #choose here which features to use for the partition (features vector for each point)
     features = np.hstack((geof, rgb/255.)).astype("float32")#add rgb as a feature for partitioning
     features[:,3] = 2. * features[:,3] #increase importance of verticality (heuristic)
                 
