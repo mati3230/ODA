@@ -15,6 +15,30 @@ from network import FFGraphNet
 
 def compute_graph_nn_2(xyz, k_nn1, k_nn2, voronoi = 0.0):
     """ This function is developed by Landrieu et al. (see https://github.com/loicland/superpoint_graph). 
+    Basically, it computes a nearest neighbour graph.  
+
+    Parameters
+    ----------
+    xyz : np.ndarray
+        Points of the point cloud.
+    k_nn1 : int
+        The k nearest neighbours. k_nn1 must be smaller than k_nn2. This parameter is used for the returned neighbourhood.
+    k_nn2 : int
+        TODO this parameter can be eliminated? k_nn1 can be used instead????
+    voronoi : float
+        Distance threshold > 0 which is used in the voronoi graph construction. 
+
+    Returns
+    -------
+    graph : dict
+        Dictionary consisting of the keys: 
+        - is_nn: This is always True
+        - source: graph source points of an edge
+        - target: graph target points of an edge
+        - distances: distance of each edge
+    target2: np.ndarray
+        Shape is (n_ver * k_nn1, ) and is the same as graph["target"] when voronoi = 0.0. 
+        This does not hold if voronoi method is used.
     """
     print("Compute Graph NN")
     """compute simulteneoulsy 2 knn structures
@@ -25,14 +49,17 @@ def compute_graph_nn_2(xyz, k_nn1, k_nn2, voronoi = 0.0):
     #compute nearest neighbors
     graph = dict([("is_nn", True)])
     nn = NearestNeighbors(n_neighbors=k_nn2+1, algorithm='kd_tree').fit(xyz)
+    # get the k nearest neighbours of every point in the point cloud.
     distances, neighbors = nn.kneighbors(xyz)
     del nn
     neighbors = neighbors[:, 1:]
     distances = distances[:, 1:]
     #---knn2---
+    # row wise flattening with shape: (n_ver * k_nn1, )
     target2 = (neighbors.flatten()).astype('uint32')
     #---knn1-----
     if voronoi>0:
+        # --- We do not use the voronoi functionality yet ---
         tri = Delaunay(xyz)
         graph["source"] = np.hstack((tri.vertices[:,0],tri.vertices[:,0], \
               tri.vertices[:,0], tri.vertices[:,1], tri.vertices[:,1], tri.vertices[:,2])).astype('uint64')
@@ -56,11 +83,35 @@ def compute_graph_nn_2(xyz, k_nn1, k_nn2, voronoi = 0.0):
        
         graph["distances"] = graph["distances"][keep_edges]
     else:
+        # matrix n_ver X k_nn1
         neighbors = neighbors[:, :k_nn1]
         distances = distances[:, :k_nn1]
-        graph["source"] = np.matlib.repmat(range(0, n_ver)
-            , k_nn1, 1).flatten(order='F').astype('uint32')
+
+        """
+        creating a source target neighbourhood representation for each edge.
+        source and target are vectors of size (n_ver * k_nn1, ). 
+        """
+        
+        """
+        with n_ver = 100 and k_nn1 = 15
+        >>> M = np.matlib.repmat(range(0, n_ver), k_nn1, 1)
+        >>> M
+        array([[ 0,  1,  2, ..., 97, 98, 99],
+               [ 0,  1,  2, ..., 97, 98, 99],
+               [ 0,  1,  2, ..., 97, 98, 99],
+               ...,
+               [ 0,  1,  2, ..., 97, 98, 99],
+               [ 0,  1,  2, ..., 97, 98, 99],
+               [ 0,  1,  2, ..., 97, 98, 99]])
+        Flatten happens column wise with shape: (n_ver * k_nn1, )
+        >>> M.flatten(order="F")
+        array([ 0,  0,  0, ..., 99, 99, 99])
+        """
+        graph["source"] = np.matlib.repmat(range(0, n_ver), k_nn1, 1).flatten(order='F').astype('uint32')
+        # neighbors.flatten(order='C') -> row wise (default) flatten with shape: (n_ver * k_nn1, )
+        # TODO taking the transpose is eventually unnecessary? 
         graph["target"] = np.transpose(neighbors.flatten(order='C')).astype('uint32')
+        # distances between the i-th point and a neighbour point
         graph["distances"] = distances.flatten().astype('float32')
     #save the graph
     print("Done")
@@ -75,6 +126,7 @@ def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, 
     xyz = np.ascontiguousarray(xyz, dtype=np.float32)
     rgb = np.ascontiguousarray(rgb, dtype=np.uint8)
     #---compute 10 nn graph-------
+    # target_fea are the indices of the k nearest neighbours of each point (a point itself is not considered as neighbour)
     graph_nn, target_fea = compute_graph_nn_2(xyz, k_nn_adj, k_nn_geof)
     #---compute geometric features-------
     print("Compute geof")
@@ -88,61 +140,112 @@ def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, 
     graph_nn["edge_weight"] = np.array(1. / ( lambda_edge_weight + graph_nn["distances"] / np.mean(graph_nn["distances"])), dtype = "float32")
     #print("        minimal partition...")
     print("Minimal Partition")
-    components, in_component = libcp.cutpursuit(features, graph_nn["source"], graph_nn["target"]
-                                 , graph_nn["edge_weight"], reg_strength)
+    """
+    components: the actual superpoint idxs which is a list of lists (where each list contains point indices)
+    in_component: this is one list with the length of number of points - here we got a superpoint idx for each point
+        this is just another representation of components.
+    """
+    components, in_component = libcp.cutpursuit(features, graph_nn["source"], graph_nn["target"], graph_nn["edge_weight"], reg_strength)
     print("Done")
     #print(components)
     #print(in_component)
+    # components represent the actual superpoints (partition) - now we need to compute the edges of the superpoints
     components = np.array(components, dtype = "object")
+    # the number of components (superpoints) n_com
     n_com = max(in_component)+1
 
     in_component = np.array(in_component)
 
+    """
+    # Uncomment to see how components and in_component are structured
+    print("len in_component", in_component.shape)
+    #print(np.unique(in_component))
+    unis = np.unique(in_component)
+    print("in_component")
+    for i in range(unis.shape[0]):
+        uni = unis[i]
+        idxs = np.where(in_component == uni)[0]
+        print(uni, len(idxs), idxs)
+
+    #print(unis)
+    print("-------------")
+    print("components")
+    #print(len(components))
+    i = 0
+    for c in components:
+        print(i, len(c), np.sort(c)[:10])
+        i += 1
+    """
+    
     tri = Delaunay(xyz)
 
-    #interface select the edges between different components
-    #edgx and edgxr converts from tetrahedrons to edges
-    #done separatly for each edge of the tetrahedrons to limit memory impact
+    #interface select the edges between different superpoints
     interface = in_component[tri.vertices[:, 0]] != in_component[tri.vertices[:, 1]]
+    #edgx and edgxr converts from tetrahedrons to edges (from i to j (edg1) and from j to i (edg1r))
+    #done separatly for each edge of the tetrahedrons to limit memory impact
     edg1 = np.vstack((tri.vertices[interface, 0], tri.vertices[interface, 1]))
     edg1r = np.vstack((tri.vertices[interface, 1], tri.vertices[interface, 0]))
+    
     interface = in_component[tri.vertices[:, 0]] != in_component[tri.vertices[:, 2]]
+    # shape: (2, n_tetras)
     edg2 = np.vstack((tri.vertices[interface, 0], tri.vertices[interface, 2]))
     edg2r = np.vstack((tri.vertices[interface, 2], tri.vertices[interface, 0]))
+    
     interface = in_component[tri.vertices[:, 0]] != in_component[tri.vertices[:, 3]]
     edg3 = np.vstack((tri.vertices[interface, 0], tri.vertices[interface, 3]))
     edg3r = np.vstack((tri.vertices[interface, 3], tri.vertices[interface, 0]))
+    
     interface = in_component[tri.vertices[:, 1]] != in_component[tri.vertices[:, 2]]
     edg4 = np.vstack((tri.vertices[interface, 1], tri.vertices[interface, 2]))
     edg4r = np.vstack((tri.vertices[interface, 2], tri.vertices[interface, 1]))
+    
     interface = in_component[tri.vertices[:, 1]] != in_component[tri.vertices[:, 3]]
     edg5 = np.vstack((tri.vertices[interface, 1], tri.vertices[interface, 3]))
     edg5r = np.vstack((tri.vertices[interface, 3], tri.vertices[interface, 1]))
+    
     interface = in_component[tri.vertices[:, 2]] != in_component[tri.vertices[:, 3]]
     edg6 = np.vstack((tri.vertices[interface, 2], tri.vertices[interface, 3]))
     edg6r = np.vstack((tri.vertices[interface, 3], tri.vertices[interface, 2]))
+    
     del tri, interface
+    # edges of points where one end point lies in a superpoint a und another end point in the superpoint b != a
     edges = np.hstack((edg1, edg2, edg3, edg4 ,edg5, edg6, edg1r, edg2r,
                        edg3r, edg4r ,edg5r, edg6r))
-    del edg1, edg2, edg3, edg4 ,edg5, edg6, edg1r, edg2r, edg3r, edg4r, edg5r, edg6r
+    del edg1, edg2, edg3, edg4 ,edg5, edg6, edg1r, edg2r, edg3r, edg4r, edg5r, edg6r    
+    # Filter edges that occur multiple times in edges, e.g. [[x, x, z], [y, y, z]] -> [[x, z], [y, z]]
     edges = np.unique(edges, axis=1)
-    
     if d_se_max > 0:
         # distance between the superpoints on the edges
         dist = np.sqrt(((xyz[edges[0,:]]-xyz[edges[1,:]])**2).sum(1))
         # filter edges with too large distance
         edges = edges[:,dist<d_se_max]
     
-    #---sort edges by alpha numeric order wrt to the components of their source/target---
+    #---sort edges by alpha numeric order wrt to the components (superpoints) of their source/target---
+    # number of edges n_edg
     n_edg = len(edges[0])
+    
+    # replace point indices in edges with the superpoint idx of each point and save it in edge_comp
     edge_comp = in_component[edges]
-    edge_comp_index = n_com * edge_comp[0,:] +  edge_comp[1,:]
+    # len(edge_comp_index) == n_edg
+    edge_comp_index = n_com * edge_comp[0,:] + edge_comp[1,:]
     order = np.argsort(edge_comp_index)
+    
+    # reordering of the edges, the edge_comp and the edge_comp_index array itself
     edges = edges[:, order]
     edge_comp = edge_comp[:, order]
     edge_comp_index = edge_comp_index[order]
+    #print(edge_comp_index)
+
+    """
+    np.argwhere(np.diff(edge_comp_index)): where does the sorted edge_comp_index change? 
+    This is stored in the array idxs_comp_change. The edge_comp array could have multiple 
+    connections between the same superpoints. Therefore, we filter them with the jump_edg 
+    in order to take once account of them. Thus, multiple edges from superpoint S_1 to S_2
+    will be filtered so that we only have one edge from S_1 to S_2.  
+    """
+    idxs_comp_change = np.argwhere(np.diff(edge_comp_index)) + 1
     #marks where the edges change components iot compting them by blocks
-    jump_edg = np.vstack((0, np.argwhere(np.diff(edge_comp_index)) + 1, n_edg)).flatten()
+    jump_edg = np.vstack((0, idxs_comp_change, n_edg)).flatten()
     n_sedg = len(jump_edg) - 1
 
     ########################################
