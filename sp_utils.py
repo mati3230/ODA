@@ -444,20 +444,26 @@ def initial_partition(P, sp_idxs):
 
 
 def partition(graph_dict, unions, P, sp_idxs, half=False, stris=None):
+    print("Calculate partition")
     is_mesh = False
     if type(P) == o3d.geometry.TriangleMesh:
         vertices = np.asarray(P.vertices)
         vertex_colors = np.asarray(P.vertex_colors)
+        triangles = np.asarray(P.triangles)
         n_P = vertices.shape[0]
         meshes = []
         is_mesh = True
+        if stris is None:
+            raise Exception("Supertriangles are missing")
     else:
         n_P = P.shape[0]
     par_v = np.zeros((n_P, ), dtype=np.uint32)
     c_list = comp_list(graph_dict=graph_dict, unions=unions, n_P=n_P, sp_idxs=sp_idxs, half=half)
 
     if is_mesh:
+        print("Calculate partition vector and partition of triangles")
         for i in range(len(c_list)):
+            #print("-----------")
             comp = c_list[i]
             n_sp_comp = len(comp)
             nstris = []
@@ -465,14 +471,23 @@ def partition(graph_dict, unions, P, sp_idxs, half=False, stris=None):
                 sp_idx = comp[j][0]
                 P_idxs = comp[j][1]
                 par_v[P_idxs] = i + 1
+                #print(sp_idx)
+                #print(stris)
                 stri = stris[sp_idx]
-                nstris.append(stri)
-            triangles = np.vstack(nstris)
-            uni_t = np.unique(triangles)
-            n_triangles = np.array(triangles, copy=True)
+                #print(stri)
+                nstris.append(stri[:, None])
+            triangle_idxs = np.vstack(nstris)
+            triangle_idxs = triangle_idxs.reshape(triangle_idxs.shape[0], )
+            m_triangles = triangles[triangle_idxs]
+            if m_triangles.shape[0] == 0:
+                continue
+
+            uni_t = np.unique(m_triangles)
+            n_triangles = np.array(m_triangles, copy=True)
             for k in range(uni_t.shape[0]):
                 v_idx = uni_t[k]
-                n_triangles[triangles == v_idx] = k
+                n_triangles[m_triangles == v_idx] = k
+            #print(n_triangles)
             m_verts = vertices[uni_t]
             m_colors = vertex_colors[uni_t]
             nmesh = o3d.geometry.TriangleMesh(
@@ -480,8 +495,9 @@ def partition(graph_dict, unions, P, sp_idxs, half=False, stris=None):
                 triangles=o3d.utility.Vector3iVector(n_triangles)
                 )
             nmesh.vertex_colors = o3d.utility.Vector3dVector(m_colors)
-
             meshes.append(nmesh)
+            # print("Add mesh with {0} vertices and {1} triangles".format(m_verts.shape[0], n_triangles.shape[0]))
+        print("Done")
         return par_v, meshes
     else:
         for i in range(len(c_list)):
@@ -490,6 +506,7 @@ def partition(graph_dict, unions, P, sp_idxs, half=False, stris=None):
             for j in range(n_sp_comp):
                 P_idxs = comp[j][1]
                 par_v[P_idxs] = i + 1    
+        print("Done")
         return par_v
 
 

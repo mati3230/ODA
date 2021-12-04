@@ -261,7 +261,7 @@ def save_init_graph(fdir, P, graph_dict, sp_idxs, filename="", half="", stris=No
     hf = h5py.File("{0}/init_graph{1}_{2}.h5".format(fdir, half, filename), "w")
     n_sps = len(sp_idxs)
     hf.create_dataset("n_sps", data=(n_sps, ))
-    if strs is None:
+    if stris is None:
         hf.create_dataset("P", data=P)
         for i in range(n_sps):
             hf.create_dataset(str(i), data=sp_idxs[i])
@@ -431,7 +431,7 @@ def load_proc_mesh(fdir, fname):
     vertices = np.array(hf["vertices"], copy=True)
     vertex_colors = np.array(hf["vertex_colors"], copy=True)
     triangles = np.array(hf["triangles"], copy=True)
-    print("Mesh size: {0} vertices, {1} triangles".format(vetices.shape[0], triangles.shape[0]))
+    print("Mesh size: {0} vertices, {1} triangles".format(vertices.shape[0], triangles.shape[0]))
     hf.close()
     mesh = o3d.geometry.TriangleMesh(
         vertices=o3d.utility.Vector3dVector(vertices), 
@@ -537,5 +537,5 @@ def save_meshes(meshes, fdir, filename=""):
 
 
 def load_mesh(file):
-    mesh = o3d.io.read_triangle_mesh(args.file)
+    mesh = o3d.io.read_triangle_mesh(file)
     return mesh

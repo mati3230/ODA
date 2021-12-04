@@ -4,6 +4,7 @@ import os
 import time
 
 from visu_utils import\
+    render_o3d,\
     render_partition_vec_o3d,\
     render_partition_o3d,\
     visu_dec_bs
@@ -12,6 +13,7 @@ from io_utils import\
     save_init_graph,\
     load_init_graph_mesh,\
     save_probs,\
+    load_probs_mesh,\
     load_mesh,\
     save_unions,\
     load_unions,\
@@ -61,7 +63,6 @@ def main():
     parser.add_argument("--g_filename", default="", type=str, help="Filename will be used as a postfix.")
     parser.add_argument("--load_unions", default=False, type=bool, help="Load the unions from g_dir.")
     parser.add_argument("--load_proc_cloud", default=False, type=bool, help="Load the preprocessed point cloud from g_dir.")
-    parser.add_argument("--partition_eval", default=False, type=bool, help="Evaluate the partition algorithm.")
     args = parser.parse_args()
     # load the colors for the parititon rendering
     colors = load_colors()
@@ -81,7 +82,7 @@ def main():
     if args.load_init_g:
         mesh, graph_dict, sp_idxs, stris = load_init_graph_mesh(fdir=args.g_dir, filename=args.g_filename)
     if mesh is None: # If no initial partition is loaded, we start from the beginning by loading and preprocessing the point cloud
-        if args.load_proc_mesh:
+        if args.load_proc_cloud:
             mesh = load_proc_mesh(fdir=args.g_dir, fname=args.g_filename)
         else:
             mesh = load_mesh(file=args.file)
@@ -91,7 +92,7 @@ def main():
             visualize = True
             while True:
                 if visualize:
-                    render_o3d(mesh)
+                    render_o3d(mesh, w_co=True)
                 i = input("Rotate [r] | recenter [re] | Continue [-1] | Exit [e]: ")
                 visualize = True
                 if i == "-1":
@@ -206,19 +207,34 @@ def main():
         graph_dict["senders"] = senders
         graph_dict["receivers"] = receivers
 
+    init_p = initial_partition(P=mesh, sp_idxs=sp_idxs)
+    render_partition_o3d(mesh=mesh, sp_idxs=sp_idxs, colors=colors)
     #init_p = initial_partition(P=mesh, sp_idxs=sp_idxs)
     part, meshes = partition(
         graph_dict=graph_dict,
         unions=unions,
         P=mesh,
         sp_idxs=sp_idxs,
-        half=False)
-    for i in range(len(meshes)):
-        mesh_i = meshes[i]
-        render_o3d(mesh_i)
+        half=False,
+        stris=stris)
     save_partition(partition=part, fdir=args.g_dir, fname=args.g_filename)
     if not args.load_unions:
         render_partition_vec_o3d(mesh=mesh, partition=part, colors=colors)
+        #############################DELETE################################
+        print("Nr of meshes: {0}".format(len(meshes)))
+        sizes = len(meshes)*[None]
+        for i in range(len(meshes)):
+            mi = meshes[i]
+            mv = np.asarray(mi.vertices)
+            sizes[i] = mv.shape[0]
+        order = np.argsort(sizes)
+        selection = order[::-1]
+        selection = selection[:6]
+        for i in selection:
+            print("mesh", i, "size", sizes[i])
+            mesh_i = meshes[i]
+            render_o3d(mesh_i)
+        ###################################################################
         while True:
             d_b = input("Decision Boundary [0,1] | Decision boundary check [d] | Continue: [-1]: ")
             if d_b == "d":
@@ -239,11 +255,27 @@ def main():
             part, meshes = partition(
                 graph_dict=graph_dict,
                 unions=unions,
-                P=P,
+                P=mesh,
                 sp_idxs=sp_idxs,
-                half=False)
+                half=False,
+                stris=stris)
             save_partition(partition=part, fdir=args.g_dir, fname=args.g_filename)
             render_partition_vec_o3d(mesh=mesh, partition=part, colors=colors)
+            #############################DELETE################################
+            print("Nr of meshes: {0}".format(len(meshes)))
+            sizes = len(meshes)*[None]
+            for i in range(len(meshes)):
+                mi = meshes[i]
+                mv = np.asarray(mi.vertices)
+                sizes[i] = mv.shape[0]
+            order = np.argsort(sizes)
+            selection = order[::-1]
+            selection = selection[:6]
+            for i in selection:
+                print("mesh", i, "size", sizes[i])
+                mesh_i = meshes[i]
+                render_o3d(mesh_i)
+            ###################################################################
         save_unions(
             fdir=args.g_dir,
             unions=unions,

@@ -5,9 +5,10 @@ import ply_c_ext as libply_c
 import numpy as np
 import numpy.matlib
 from sklearn.neighbors import NearestNeighbors
-from scipy.spatial import Delaunay
+from scipy.spatial import Delaunay, KDTree
 from graph_nets import utils_tf
 from tqdm import tqdm
+from multiprocessing import Pool
 import time
 
 from network import FFGraphNet
@@ -1907,6 +1908,8 @@ def superpoint_graph_mesh(mesh_vertices_xyz, mesh_vertices_rgb, mesh_tris, adj_l
                 stris[big_sp].append(i)
                 # all points must now move to big_sp
                 v_to_move.append((idx0, idx1, idx2, big_sp))
+        for i in range(len(stris)):
+            stris[i] = np.array(stris[i], dtype=np.uint32)
 
         if move_vertices:
             tmp_comps = np.array(components, copy=True)
