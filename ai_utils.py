@@ -891,7 +891,7 @@ def graph(cloud, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0
     return graph_dict, sp_idxs
 
 
-def init_model(n_ft):
+def init_model(n_ft, is_mesh=False):
     model = FFGraphNet(
         name="target_policy",
         n_ft_outpt=8,
@@ -906,10 +906,15 @@ def init_model(n_ft):
         head_only=True,
         observation_size=(910, ))
     n_nodes = 6
+    features_points = 6
+    feature_func = compute_features
+    if is_mesh:
+        features_points = 9
+        feature_func = compute_mesh_features
     node_features = np.zeros((n_nodes, n_ft), dtype=np.float32)
     for i in range(n_nodes):
-        sp = np.random.randn(100, 6)
-        features = compute_features(cloud=sp)
+        sp = np.random.randn(100, features_points)
+        features = feature_func(cloud=sp)
         node_features[i] = features
     senders = np.array(list(range(0, n_nodes-1)), dtype=np.uint32)
     receivers = np.array(list(range(1, n_nodes)), dtype=np.uint32)
@@ -926,10 +931,10 @@ def init_model(n_ft):
     return model
 
 
-def predict(graph_dict, dec_b=0.5):
+def predict(graph_dict, dec_b=0.5, is_mesh=False):
     t1 = time.time()
     n_ft = graph_dict["nodes"].shape[1]
-    model = init_model(n_ft=n_ft)
+    model = init_model(n_ft=n_ft, is_mesh=is_mesh)
     input_graphs = utils_tf.data_dicts_to_graphs_tuple([graph_dict])
     
     a_dict = model.action(obs=input_graphs, training=False, decision_boundary=dec_b)
@@ -944,3 +949,1099 @@ def predict(graph_dict, dec_b=0.5):
     duration = t2 - t1
     print("Model prediction takes {0:.3f} seconds".format(duration))
     return action, probs
+
+
+def c(k, sp_idxs, P):
+    idxs = sp_idxs[k]
+    sp = P[idxs]
+    features = compute_mesh_features(cloud=sp)
+    return features
+
+
+def compute_mesh_features(cloud, k_far=30, n_normal=30, bins=10, min_r=-0.5, max_r=0.5):
+    """Compute features from a point cloud P. The features of a point cloud are:
+    - Mean color 
+    - Median color
+    - 25% Quantil of the color
+    - 75% Quantil of the color
+    - Standard deviation of all features
+    - Average normal
+    - Standard deviation of the normals
+    - Median normal
+    - 25% Quantil of the normals
+    - 75% Quantil of the normals
+    - n_normal/2 maximum angles of the normals with the x-axis
+    - n_normal/2 minimum angles of the normals with the x-axis
+    - n_normal/2 points that correspond to the max normal angle values
+    - n_normal/2 points that correspond to the min normal angle values
+    - k_far farthest points
+    - k_far distances of the farthest points
+    - volume of the spatial bounding box
+    - volume of the color bounding box
+    - histograms of every dimension
+
+    Parameters
+    ----------
+    P : np.ndarray
+        The input point cloud.
+    k_far : int
+        Number of points to sample the farthest points.  
+    n_normal : int
+        Number of normal features.
+    bins : int
+        Number of bins for a histogram in every dimension of the point cloud.
+    min_r : float
+        Minimum value to consider to calculate the histogram.
+    max_r : float
+        Maximum value to consider to calculate the histogram.
+
+
+    Returns
+    -------
+    np.ndarray
+        The calculated features.
+    """
+    P = cloud[:, :6]
+    normals = cloud[:, 6:9]
+    center = np.mean(P, axis=0)
+    std = np.std(P, axis=0)
+    median_color = np.median(P[:, 3:], axis=0)
+    q_25_color = np.quantile(P[:, 3:], 0.25, axis=0)
+    q_75_color = np.quantile(P[:, 3:], 0.75, axis=0)
+    
+    ########normals########
+    # mean, std
+    mean_normal = np.mean(normals, axis=0)
+    std_normal = np.std(normals, axis=0)
+    median_normal = np.median(normals, axis=0)
+    q_25_normal = np.quantile(normals, 0.25, axis=0)
+    q_75_normal = np.quantile(normals, 0.75, axis=0)
+    #print("mean: {0}\nstd: {1}\nmedian: {2}\nq25: {3}\nq75: {4}".format(mean_normal.shape, std_normal.shape, median_normal.shape, q_25_normal.shape, q_75_normal.shape))
+
+    # min, max
+    ref_normal = np.zeros((normals.shape[0], 3))
+    ref_normal[:, 0] = 1
+    normal_dot, _, _ = np_fast_dot(a=ref_normal, b=normals)
+    min_normal, max_normal, min_n_idxs, max_n_idxs = get_min_max(feature=normal_dot, target=n_normal)
+    min_P_n, max_P_n = extract_min_max_points(P=P, min_idxs=min_n_idxs, max_idxs=max_n_idxs, target=int(n_normal/2), center=center, center_max=3)
+    #print("min f: {0}\nmax f: {1}".format(min_normal.shape, max_normal.shape))
+    #print("min P: {0}\nmax P: {1}".format(min_P_n.shape, max_P_n.shape))
+
+    ########farthest points########
+    idxs, dists = get_characteristic_points(P=P, center=center, k=k_far, far_points=True)
+    far_points = P[idxs]
+    far_points[:, :3] -= center[:3]
+    far_points = zero_padding(x=far_points, target_size=k_far)
+    far_points = far_points.flatten()
+    dists = zero_padding(x=dists, target_size=k_far)
+
+    ########volumes########
+    bb = get_general_bb(P=P)
+    spatial_volume = get_volume(bb=bb, off=0)
+    color_volume = get_volume(bb=bb, off=6)
+    volumes = np.array([spatial_volume, color_volume])
+
+    ########hists########
+    hists = hists_feature(P=P, center=center, bins=bins, min_r=min_r, max_r=max_r)
+    hists -= 0.5
+    hists *= 2
+
+    ########concatenation########
+    features = np.vstack(
+        (
+        center[3:, None],#3,abs
+        median_color[:, None],#3,abs
+        q_25_color[:, None],#3,abs
+        q_75_color[:, None],#3,abs
+        std[:, None],#6
+        
+        mean_normal[:, None],#3
+        std_normal[:, None],#3
+        median_normal[:, None],#3,abs
+        q_25_normal[:, None],
+        q_75_normal[:, None],
+        min_normal[:, None],#n_normal*3
+        max_normal[:, None],#n_normal*3
+        
+        min_P_n[:, None],#n_normal*6,local
+        max_P_n[:, None],#n_normal*6,local
+        
+        far_points[:, None],#k_far*6,local
+        dists[:, None],#k_far
+        volumes[:, None],#2
+        hists[:, None]#6*bins
+        ))
+    features = features.astype(dtype=np.float32)
+    #features = features.reshape(features.shape[0], )
+    return features
+
+
+def get_neighbourhood(c, direct_neigh_idxs, n_edges, edges, distances, visited):
+    """
+    Parameters
+    ----------
+    c : int
+        Vertex index (in reference to the graph) of the currently
+        closest vertex to the start vertex 's'.
+    edges : np.array(int)
+        2X|E| array that stores the edges. The first row represents the
+        start vertex and the second row the target vertices of an edge. 
+        The array should be sorted according to the start vertices.  
+    direct_neigh_idxs : np.array(int)
+        Indices to the first target vertex in the 'edges' array. 
+    n_edges : np.array(int)
+        Number of edges that origin from a start vertex. 
+    distances : np.array(float)
+        The weight of each edge (e.g. the spatial distance) 
+    visited : list(int)
+        Vertices that are already considered as closest vertices to 's'
+    """
+    # get the neighbour vertices of 'c'
+    start_i = direct_neigh_idxs[c]
+    stop_i = start_i + n_edges[c]
+    N_c = edges[1, start_i:stop_i]
+    # and the corresponding distances from 's'
+    d_N = distances[start_i:stop_i]
+    # filter vertices which we already considered
+    N_c_ = []
+    d_N_ = []
+    for j in range(len(N_c)):
+        i = N_c[j]
+        if i in visited:
+            continue
+        # only append vertices that we have not visited yet
+        N_c_.append(i)
+        d_N_.append(d_N[j])
+    return N_c_, d_N_
+
+
+def get_next(R, d_R):
+    """
+    Parameters
+    ----------
+    R : list(int)
+        List of vertex indices (in reference to the graph) of vertices
+        which can be considered as next closest vertices to 's'.
+    d_R : list(float)
+        The distances of the vertices in 'R'.
+    """
+    R = np.array(R)
+    d_R = np.array(d_R)
+    # sort 'R' and 'd_R' according to the distances from 's'
+    sortation = np.argsort(d_R)
+    R = R[sortation].tolist()
+    d_R = d_R[sortation].tolist()
+    
+    # take the closest vertex to 's' and the distance 'd_sc'
+    c = R[0]
+    d_sc = d_R[0]
+    # delete them as points that can be considered second closest vertices 
+    del R[0]
+    del d_R[0]
+
+    # assign the second closest vertex 'n' and its distance 'd_sn'
+    n = R[0]
+    d_sn = d_R[0]
+    return c, d_sc, n, d_sn, R, d_R
+
+
+def search(c, d_sc, n, d_sn, R, d_R, t, N_f, d_f, 
+        direct_neigh_idxs, n_edges, edges, distances):  
+    """
+    Parameters
+    ----------
+    c : int
+        Vertex index (in reference to the graph) of the currently
+        closest vertex to the start vertex 's'.
+    d_sc : float
+        The geodesic distance between 's' and 'c'.
+    n : int
+        Vertex index (in reference to the graph) of the currently
+        second closest vertex to 's'.
+    d_sn : float
+        The geodesic distance between 's' and 'n'.
+    R : list(int)
+        List of vertex indices (in reference to the graph) of vertices
+        which can be considered as next closest vertices to 's'.
+    d_R : list(float)
+        The distances of the vertices in 'R'.
+    t : int
+        The number of neighbours that should be found.
+    N_f : list(int)
+        The final vertex indices (in reference to the graph) of the closest
+        vertices to 's'.
+    d_f : list(float)
+        The distances of the vertices in 'N_f'.
+    edges : np.array(int)
+        2X|E| array that stores the edges. The first row represents the
+        start vertex and the second row the target vertices of an edge. 
+        The array should be sorted according to the start vertices.  
+    direct_neigh_idxs : np.array(int)
+        Indices to the first target vertex in the 'edges' array. 
+    n_edges : np.array(int)
+        Number of edges that origin from a start vertex. 
+    distances : np.array(float)
+        The weight of each edge (e.g. the spatial distance) 
+    """
+    len_R = len(R)
+    # we do not want to visit a vertex 'c' twice
+    if c in N_f:
+        # if we can determine a best and a second best vertex
+        if len_R > 1:
+            c, d_sc, n, d_sn, R, d_R = get_next(R=R, d_R=d_R)
+            search(
+                c=c, d_sc=d_sc, n=n, d_sn=d_sn, R=R, d_R=d_R, t=t, 
+                N_f=N_f, d_f=d_f, direct_neigh_idxs=direct_neigh_idxs,
+                n_edges=n_edges, edges=edges, distances=distances)
+        elif len_R == 1:
+            # add the last remaining vertex
+            N_f.append(R[0])
+            d_f.append(d_R[0])
+        return
+    # append the current vertex 'c' to our final list as it is the clostest vertex
+    N_f.append(c)
+    d_f.append(d_sc)
+    # if we have enough neighbours or no second best vertex can be determined
+    if len(N_f) >= t or len_R <= 1:
+        if len_R == 1:
+            # add the last remaining vertex
+            N_f.append(R[0])
+            d_f.append(d_R[0])
+        return
+    # get the neighbour vertices of 'c' and their distances to c ('d_N')
+    N_c, d_N = get_neighbourhood(
+                c=c,
+                direct_neigh_idxs=direct_neigh_idxs,
+                n_edges=n_edges,
+                edges=edges,
+                distances=distances,
+                visited=N_f)
+    len_N_c = len(N_c)
+    # in case of a empty neighbourhood
+    if len_N_c == 0:
+        if len_R > 1:
+            c, d_sc, n, d_sn, R, d_R = get_next(R=R, d_R=d_R)
+            search(
+                c=c, d_sc=d_sc, n=n, d_sn=d_sn, R=R, d_R=d_R, t=t, 
+                N_f=N_f, d_f=d_f, direct_neigh_idxs=direct_neigh_idxs,
+                n_edges=n_edges, edges=edges, distances=distances)
+        elif len_R == 1:
+            # add the last remaining vertex
+            N_f.append(R[0])
+            d_f.append(d_R[0])
+        return
+    """
+    determine if a neighbour 'i' is closer to the start vertex than the
+    second closest vertex 'n'
+    """
+
+    """
+    flag to indicate wether the second best vertex should be updated
+    this is the case if every neighbour vertex of 'c' is more far away
+    from the start vertex 's' than the second best neigbour 'n'
+    """
+    u = True
+    # vertex index (in the graph) of the closest
+    next_ = None
+    # container to determine the closest neighbour 'i' to the start vertex
+    # distance of the closest 
+    d_next = np.inf
+    # vertex index (in the neighbourhood of 'c') of the closest
+    i_next = None
+    for j in range(len_N_c):
+        i = N_c[j]
+        d_ci = d_N[j]
+        """
+        the distance from the start vertex 's' to a vertex 'i' is the distance
+        from the start vertex 's' to the current vertex 'c' ('d_sc') plus the distance
+        from the current vertex 'c' to a neighbour vertex 'i' ('d_ci') 
+        """ 
+        d_si = d_sc + d_ci
+        # update the distance of that neighbour
+        d_N[j] = d_si
+        # if the neighbour is closer to the start vertex than the second closest vertex 'n'
+        if d_si <= d_sn:
+            # at least one neighbour 'i' is closer to the start vertex 's' than 'n'
+            u = False
+            # determine which neighbour is closest to 's'
+            if d_si < d_next:
+                d_next = d_si
+                next_ = i
+                i_next = j
+    # if the 'n' is closer to 's' than all neighbours of 'c'
+    if u:
+        # set 'n' as 'c' and determine the next best vertex
+        R.extend(N_c)
+        d_R.extend(d_N)
+        c, d_sc, n, d_sn, R, d_R = get_next(R=R, d_R=d_R)
+    else:
+        # we do not need to consider the closest 'i'-th neighbour anymore
+        del N_c[i_next]
+        del d_N[i_next]
+        # the remaining neighbourhood can be considered as future closest vertices
+        R.extend(N_c)
+        d_R.extend(d_N)
+        # assign the closest 'i'-th neighbour as 'c'
+        c = next_
+        d_sc = d_next
+    search(
+        c=c, d_sc=d_sc, n=n, d_sn=d_sn, R=R, d_R=d_R, t=t,
+        N_f=N_f, d_f=d_f, direct_neigh_idxs=direct_neigh_idxs,
+        n_edges=n_edges, edges=edges, distances=distances)
+
+
+def f(v_idx, knn, edges, direct_neigh_idxs, n_edges, distances, v, tree):
+    N_f = [v_idx]
+    d_f = [0]
+    N_c, d_N = get_neighbourhood(
+        c=v_idx,
+        direct_neigh_idxs=direct_neigh_idxs,
+        n_edges=n_edges,
+        edges=edges,
+        distances=distances,
+        visited=N_f)
+    R = N_c.copy()
+    d_R = d_N.copy()
+    c, d_sc, n, d_sn, R, d_R = get_next(R=R, d_R=d_R)
+    search(
+        c=c, d_sc=d_sc, n=n, d_sn=d_sn, R=R, d_R=d_R, t=knn+1, N_f=N_f,
+        d_f=d_f, direct_neigh_idxs=direct_neigh_idxs,
+        n_edges=n_edges, edges=edges, distances=distances)
+    d_f = np.array(d_f[1:])
+    N_f = np.array(N_f[1:])
+    sortation = np.argsort(d_f)
+    N_f = N_f[sortation]
+    d_f = d_f[sortation]
+
+    f_edges = np.zeros((3, knn), dtype=np.float32)
+    f_edges[0, :] = v_idx
+    vi = 0
+    stop_i = knn
+
+    if len(N_f) < knn:
+        #print("test", len(N_f))
+        f_edges[1, vi:vi+len(N_f)] = N_f
+        # we have found less neighbours than knn
+        missing = knn - len(N_f)
+        # search the euclidean nearest neighbours which we haven't considered as neighbours yet
+        nn_distances, nn_indices = tree.query(x=v, k=knn+1)
+        nn_distances = nn_distances[1:]
+        nn_indices = nn_indices[1:]
+        # filter vertices that we already consider as neighbours
+        add_n = []
+        add_d = []
+        for j in range(len(nn_indices)):
+            idx = nn_indices[j]
+            if idx in N_f:
+                # we already consider this vertex as neighbour
+                continue
+            add_n.append(idx)
+            add_d.append(nn_distances[j])
+            # check if we have enough neighbours
+            if len(add_n) == missing:
+                break
+        if len(add_n) < missing:
+            raise Exception("Choose another k: {0}".format(knn))
+        if missing == 1:
+            # we only need to set one neighbour
+            # determine the index of that neighbour
+            vix = stop_i - 1
+            # save the edge and the distance
+            f_edges[1, vix] = add_n[0]
+            f_edges[2, vix] = add_d[0]
+        else:
+            # we need to set the 'missing neighbours'
+            # determine the interval where have to set the neighbours
+            vi_start = stop_i - missing
+            # save the edges and the distances
+            f_edges[1, vi_start:] = add_n
+            f_edges[2, vi_start:] = add_d
+    else:
+        f_edges[1, :] = N_f[:knn]
+        f_edges[2, :] = d_f[:knn]
+    return f_edges
+
+
+def geodesics(v_idx, direct_neigh_idxs, n_edges, edges, distances, target, node_distance, tmp_distances, tmp_neighbours, depth, depths, start_vertex, num_edges):
+    depth += 1
+    if len(tmp_distances) >= target:
+        # if we have enough neighbours
+        return tmp_distances, tmp_neighbours, depths
+    else:
+        # we have to consider more neighbours
+        # query the neighbours of a point
+        start_i = direct_neigh_idxs[v_idx]
+        stop_i = start_i + n_edges[v_idx]
+        # direct neighbours of the vertex 'v_idx'
+        neighbour_vertices = edges[1, start_i:stop_i]
+        # the distances of the neighbours are the distance to this node/vertex plus the distances to the neighbourhood nodes
+        neigh_dists = node_distance + distances[start_i:stop_i]
+
+        # vertex idxs of the neighbourhood that should be considered
+        neighbour_vertices_ = []
+        # distances of that neighbours to the vertex 'v_idx'
+        neigh_dists_ = []
+        # filter vertices that are already in the neighbourhood of the vertex 'start_vertex'
+        for j in range(neighbour_vertices.shape[0]):
+            neighbour_v_idx = neighbour_vertices[j]
+            neigh_dist = neigh_dists[j]
+            if neighbour_v_idx in tmp_neighbours:
+                continue # this vertex is already in our neighbourhood 
+            elif neighbour_v_idx == start_vertex:
+                continue # this vertex is the start vertex
+            # we definitely should consider this vertex
+            neighbour_vertices_.append(neighbour_v_idx)
+            neigh_dists_.append(neigh_dist)
+        if len(neigh_dists_) == 0:
+            # we already considered the whole neighbourhood of this vertex
+            return tmp_distances, tmp_neighbours, depths
+
+        # extend the list of neighbour vertices
+        tmp_neighbours.extend(neighbour_vertices_)
+        tmp_distances.extend(neigh_dists_)
+        depths.extend(len(neigh_dists_)*[depth])
+        
+        # lets check again if we have considered enough neighbours
+        if len(tmp_distances) >= target:
+            return tmp_distances, tmp_neighbours, depths
+
+        # check more neighbourhood at deeper depth
+        for j in range(len(neigh_dists_)):
+            # vertex idx of this neighbour
+            neighbour_v_idx = neighbour_vertices_[j]
+            # distance from the parent vertex to this neighbour
+            dist = neigh_dists_[j]
+            tmp_distances, tmp_neighbours, depths = geodesics(
+                v_idx=neighbour_v_idx,
+                direct_neigh_idxs=direct_neigh_idxs,
+                n_edges=n_edges,
+                edges=edges,
+                distances=distances,
+                target=target,
+                node_distance=node_distance+dist,
+                tmp_distances=tmp_distances,
+                tmp_neighbours=tmp_neighbours,
+                depth=depth,
+                depths=depths,
+                start_vertex=start_vertex, 
+                num_edges=num_edges)
+        # we considered all neighbours of that vertex
+        return tmp_distances, tmp_neighbours, depths
+
+
+def mesh_edges_distances(mesh_vertices, mesh_tris, adj_list, knn=45, respect_direct_neigh=False, use_cartesian=False, bidirectional=False, n_proc=1):
+    """ Extract the knn nearest neighbours according to the geodesic distance of the vertices.
+
+    adj_list: list()
+        The set adjacency_list[i] contains the indices of adjacent vertices of vertex i as a set.
+    """
+    if use_cartesian:
+        # first, we calculate the edges of the mesh via a cartesian product
+        # the edges will be stored in this list 
+        edges = []
+        for al in adj_list:
+            cartesian = list(itertools.product(*[al, al]))
+            n = len(al)
+
+            # delete self loop of the vertices
+            r = np.arange(n)
+            idxs_to_del = n * r + r
+            for idx in reversed(idxs_to_del):
+                del cartesian[int(idx)]
+            # cartesian are the direct neighbours of a point P
+            edges.extend(cartesian)
+        # edges as 2Xn array
+        edges = np.array(edges, dtype=np.uint32).transpose()
+        edges = np.unique(edges, axis=1)
+        # sort the source vertices
+        sortation = np.argsort(edges[0])
+        edges = edges[:, sortation]
+    else:
+        # extract the neighbourhood of each point
+        neighbours = []
+        v_idxs = []
+        vi = 0
+        for al in adj_list:
+            v_idxs.extend(len(al) * [vi])
+            neighbours.extend(list(al))
+            vi += 1
+        # edges as 2Xn array
+        edges = np.zeros((2, len(neighbours)), dtype=np.uint32)
+        edges[0, :] = v_idxs
+        edges[1, :] = neighbours
+        edges = np.unique(edges, axis=1)
+        if bidirectional:
+            r_edges = np.zeros((2, edges.shape[1]), dtype=np.uint32)
+            r_edges[0, :] = edges[1]
+            r_edges[1, :] = edges[0]
+            edges = np.hstack((edges, r_edges))
+        
+        # sort the source vertices
+        sortation = np.argsort(edges[0])
+        edges = edges[:, sortation]
+    
+    # edges in source, target layout
+    source = edges[0]
+    target = edges[1]
+
+    # distances of the edges from a vertex v_i to v_j 
+    distances = np.sqrt(np.sum((mesh_vertices[source] - mesh_vertices[target])**2, axis=1))
+    
+    # unique vertices with the begin of each vertex (which is stored in 'direct_neigh_idxs') plus the number of neighbours 'n_edges'
+    uni_verts, direct_neigh_idxs, n_edges = np.unique(edges[0, :], return_index=True, return_counts=True)
+    # target number of edges
+    f_target = knn*mesh_vertices.shape[0]
+    # container where we store the final edges
+    f_edges = np.zeros((2, f_target), dtype=np.uint32)
+    f_distances = np.zeros((f_target, ), dtype=np.float32)
+
+    # number of original edges
+    num_edges = edges.shape[1]
+    # kd tree is used if the geodesic neighbourhood is not large enough (< knn) which is a rare case
+    tree = KDTree(data=mesh_vertices)
+    
+    if respect_direct_neigh:
+        # check if direct neighbourhood is greater than 'knn'
+        vi = 0
+        # vertex indices that have a smaller neighbourhood than 'knn'
+        idxs_todo = []
+        for v_idx in tqdm(range(uni_verts.shape[0]), desc="Sampling"):
+            # number of edges of this vertex 'v_idx'
+            n_edges_vertex = n_edges[v_idx]
+            # set the source vertex for every edge as this vertex 'v_idx'
+            i_stop = vi+knn      
+            f_edges[0, vi:i_stop] = v_idx
+            if n_edges_vertex > knn:
+                # we have more edges than knn -> sample the knn nearest neighbours
+
+                # determine the interval of the neighbourhood for the edges array
+                start_i = direct_neigh_idxs[v_idx]
+                stop_i = start_i + n_edges_vertex
+                
+                # extract the neighbourhood with the distances of vertex 'v_idx'
+                neighbour_vertices = edges[1, start_i:stop_i]
+                neighbour_distances = distances[start_i:stop_i]
+                
+                # sort the neighbours and the distances according to the distances
+                sortation = np.argsort(neighbour_distances)
+                neighbour_vertices = neighbour_vertices[sortation]
+                neighbour_distances = neighbour_distances[sortation]
+                
+                # sample the knn nearest neighbours
+                neighbour_vertices = neighbour_vertices[:knn]
+                neighbour_distances = neighbour_distances[:knn]
+
+                # save the nearest neighbours in the final arrays f_edges and f_distances
+                f_edges[1, vi:i_stop] = neighbour_vertices
+                f_distances[vi:i_stop] = neighbour_distances
+            else:
+                # we have less or equal edges than knn
+                
+                # determine the interval of the neighbourhood of this vertex 'v_idx'
+                n_neighbours = n_edges[v_idx]
+                start_i = direct_neigh_idxs[v_idx]
+                stop_i = start_i + n_neighbours
+                
+                # assign the direct neighbourhood to this vertex
+                i_stop = vi + n_neighbours
+                f_edges[1, vi:i_stop] = edges[1, start_i:stop_i]
+                f_distances[vi:i_stop] = distances[start_i:stop_i]
+                
+                if n_edges_vertex < knn:
+                    # we have to search the nearest neighbours with resprect to the surface (next for loop)
+                    idxs_todo.append(v_idx)
+            vi += knn
+
+        # for every vertex where the geodesic search has to be conducted
+        for k in tqdm(range(len(idxs_todo)), desc="Calculate geodesics"):
+            # extract the vertex index
+            v_idx = idxs_todo[k]
+            # extract the number of edges of that vertex 'v_idx'
+            n_edges_vertex = n_edges[v_idx]
+            # output lists
+            tmp_distances = []
+            tmp_neighbours = []
+            depths = []
+            depth = 0
+            tmp_distances, tmp_neighbours, depths = geodesics(
+                v_idx=v_idx,
+                direct_neigh_idxs=direct_neigh_idxs,
+                n_edges=n_edges,
+                edges=edges,
+                distances=distances,
+                target=knn,
+                node_distance=0,
+                tmp_distances=tmp_distances,
+                tmp_neighbours=tmp_neighbours,
+                depth=depth,
+                depths=depths,
+                start_vertex=v_idx,
+                num_edges=num_edges)
+            if len(tmp_neighbours) < knn:
+                # we have found less neighbours than knn
+                missing = knn - len(tmp_neighbours)
+                # search the euclidean nearest neighbours which we haven't considered as neighbours yet 
+                v = mesh_vertices[v_idx]
+                nn_distances, nn_indices = tree.query(x=v, k=knn+1)
+                nn_distances = nn_distances[1:]
+                nn_indices = nn_indices[1:]
+                # filter vertices that we already consider as neighbours
+                add_n = []
+                add_d = []
+                for j in range(len(nn_indices)):
+                    idx = nn_indices[j]
+                    if idx in tmp_neighbours:
+                        # we already consider this vertex as neighbour
+                        continue
+                    add_n.append(idx)
+                    add_d.append(nn_distances[j])
+                    # check if we have enough neighbours
+                    if len(add_n) == missing:
+                        break
+                if missing == 1:
+                    # we only need to set one neighbour
+                    # determine the index of that neighbour
+                    vi = knn * v_idx + knn - 1
+                    # save the edge and the distance
+                    f_edges[0, vi] = v_idx
+                    f_edges[1, vi] = add_n[0]
+                    f_distances[vi] = add_d[0]
+                else:
+                    # we need to set the 'missing neighbours'
+                    # determine the interval where have to set the neighbours
+                    vi_stop = knn * v_idx + knn
+                    vi_start = vi_stop - missing
+                    # save the edges and the distances
+                    f_edges[0, vi_start:vi_stop] = v_idx
+                    f_edges[1, vi_start:vi_stop] = add_n
+                    f_distances[vi_start:vi_stop] = add_d
+            else:
+                # we need to filter the neighbours as there are more neighbours than knn
+                # number of neighbour that we need to set
+                residual = knn - n_edges_vertex
+
+                # exclude the direct neighbourhood to only consider vertices with depth >= 2
+                tmp_neighbours = np.array(tmp_neighbours[n_edges_vertex:])
+                tmp_distances = np.array(tmp_distances[n_edges_vertex:])
+
+                # sort them according to their distances
+                sortation = np.argsort(tmp_distances)
+                tmp_neighbours = tmp_neighbours[sortation]
+                tmp_distances = tmp_distances[sortation]
+                
+                # query the necessary amount of  neighbours and distances
+                tmp_neighbours = tmp_neighbours[:residual]
+                tmp_distances = tmp_distances[:residual]
+
+                # determine the interval to set the neighbours and their distances
+                vi_stop = knn * v_idx + knn
+                vi_start = vi_stop - residual
+                if residual == 1:
+                    # we only need one neighbour
+                    f_edges[0, vi_start] = v_idx
+                    f_edges[1, vi_start] = tmp_neighbours[0]
+                    f_distances[vi_start] = tmp_distances[0]
+                else:
+                    f_edges[0, vi_start:vi_stop] = v_idx
+                    f_edges[1, vi_start:vi_stop] = tmp_neighbours
+                    f_distances[vi_start:vi_stop] = tmp_distances
+    else:
+        if n_proc > 1:
+            args = [(vidx, knn, edges, direct_neigh_idxs, n_edges, distances, mesh_vertices[vidx], tree) for vidx in range(uni_verts.shape[0])]
+            t1 = time.time()
+            print("Use {0} processes".format(n_proc))
+            with Pool(processes=n_proc) as p:
+                res = p.starmap(f, args)
+            t2 = time.time()
+            medges = np.hstack(res)
+            f_edges = medges[:2, :].astype(np.uint32)
+            f_distances = medges[2, :]
+            print("Done in {0:.3f} seconds".format(t2-t1))
+        else:
+            vi = 0
+            for v_idx in tqdm(range(uni_verts.shape[0]), desc="Searching"):
+                N_f = [v_idx]
+                d_f = [0]
+                visited = [v_idx]
+                N_c, d_N = get_neighbourhood(
+                    c=v_idx,
+                    direct_neigh_idxs=direct_neigh_idxs,
+                    n_edges=n_edges,
+                    edges=edges,
+                    distances=distances,
+                    visited=N_f)
+                R = N_c.copy()
+                d_R = d_N.copy()
+                c, d_sc, n, d_sn, R, d_R = get_next(R=R, d_R=d_R)
+                search(
+                    c=c, d_sc=d_sc, n=n, d_sn=d_sn, R=R, d_R=d_R, t=knn+1, N_f=N_f,
+                    d_f=d_f, direct_neigh_idxs=direct_neigh_idxs,
+                    n_edges=n_edges, edges=edges, distances=distances)
+                d_f = np.array(d_f[1:])
+                N_f = np.array(N_f[1:])
+                sortation = np.argsort(d_f)
+                N_f = N_f[sortation]
+                d_f = d_f[sortation]
+
+                stop_i = vi + knn
+                
+                if len(N_f) < knn:
+                    #print("test", len(N_f))
+                    f_edges[1, vi:vi+len(N_f)] = N_f
+                    # we have found less neighbours than knn
+                    missing = knn - len(N_f)
+                    # search the euclidean nearest neighbours which we haven't considered as neighbours yet 
+                    v = mesh_vertices[v_idx]
+                    nn_distances, nn_indices = tree.query(x=v, k=knn+1)
+                    nn_indices = nn_indices[1:]
+                    nn_distances = nn_distances[1:]
+                    # filter vertices that we already consider as neighbours
+                    add_n = []
+                    add_d = []
+                    for j in range(len(nn_indices)):
+                        idx = nn_indices[j]
+                        if idx in N_f:
+                            # we already consider this vertex as neighbour
+                            continue
+                        add_n.append(idx)
+                        add_d.append(nn_distances[j])
+                        # check if we have enough neighbours
+                        if len(add_n) == missing:
+                            break
+                    if len(add_n) < missing:
+                        raise Exception("Choose another k: {0}".format(knn))
+                    if missing == 1:
+                        # we only need to set one neighbour
+                        # determine the index of that neighbour
+                        vix = stop_i - 1
+                        # save the edge and the distance
+                        f_edges[1, vix] = add_n[0]
+                        f_distances[vix] = add_d[0]
+                    else:
+                        # we need to set the 'missing neighbours'
+                        # determine the interval where have to set the neighbours
+                        vi_start = stop_i - missing
+                        # save the edges and the distances
+                        f_edges[1, vi_start:stop_i] = add_n
+                        f_distances[vi_start:stop_i] = add_d
+                else:
+                    f_edges[1, vi:stop_i] = N_f
+                    f_distances[vi:stop_i] = d_f
+                f_edges[0, vi:stop_i] = v_idx
+                #print(v_idx, vi, stop_i, f_edges[:, :200])
+                vi = stop_i
+    source = f_edges[0]
+    target = f_edges[1]
+
+    return {"source": source, "target": target, "distances": f_distances}
+
+
+def superpoint_graph_mesh(mesh_vertices_xyz, mesh_vertices_rgb, mesh_tris, adj_list, lambda_edge_weight=1, reg_strength=0.1, d_se_max=0, k_nn_adj=45, use_cartesian=True, bidirectional=False, respect_direct_neigh=False, n_proc=1, move_vertices=False):
+    adj_list_ = adj_list.copy()
+    xyz = np.array(np.asarray(mesh_vertices_xyz), copy=True)
+    rgb = np.array(np.asarray(mesh_vertices_rgb), copy=True)
+    xyz = np.ascontiguousarray(xyz, dtype=np.float32)
+    rgb = np.ascontiguousarray(rgb, dtype=np.uint8)
+    tris = np.array(np.asarray(mesh_tris), copy=True)
+    print("Calculate geodesic nearest neighbours")
+    d_mesh = mesh_edges_distances(
+        mesh_vertices=xyz,
+        mesh_tris=tris,
+        adj_list=adj_list_,
+        knn=k_nn_adj,
+        respect_direct_neigh=respect_direct_neigh,
+        use_cartesian=use_cartesian,
+        bidirectional=bidirectional,
+        n_proc=n_proc)
+    print("Done")
+    d_mesh["edge_weight"] = np.array(1. / ( lambda_edge_weight + d_mesh["distances"] / np.mean(d_mesh["distances"])), dtype = "float32")
+    
+    #print("geof")
+    # TODO we could add geodesic features that leverage the mesh structure
+    geof = libply_c.compute_geof(xyz, d_mesh["target"], k_nn_adj).astype('float32')
+    #print("end")
+    #choose here which features to use for the partition
+    features = np.hstack((geof, rgb/255.)).astype("float32")#add rgb as a feature for partitioning
+    features[:,3] *= 2. #increase importance of verticality (heuristic)
+    #print(features)
+    print("Compute cut pursuit")
+    components, in_component = libcp.cutpursuit(features, d_mesh["source"], d_mesh["target"], d_mesh["edge_weight"], reg_strength)
+    print("Done")
+    # components represent the actual superpoints (partition) - now we need to compute the edges of the superpoints
+    components = np.array(components, dtype = "object")
+    # the number of components (superpoints) n_com
+    n_com = max(in_component)+1
+
+    in_component = np.array(in_component)    
+
+    landrieu_method = False
+    stris = []
+
+    if landrieu_method:
+        #interface select the edges between different superpoints
+        interface = in_component[tris[:, 0]] != in_component[tris[:, 1]]
+        n_inter_edges = interface.shape[0]
+        #edgx and edgxr converts from tetrahedrons to edges (from i to j (edg1) and from j to i (edg1r))
+        #done separatly for each edge of the tetrahedrons to limit memory impact
+        edg1 = np.vstack((tris[interface, 0], tris[interface, 1]))
+        edg1r = np.vstack((tris[interface, 1], tris[interface, 0]))
+        
+        interface = in_component[tris[:, 0]] != in_component[tris[:, 2]]
+        n_inter_edges += interface.shape[0]
+        # shape: (2, n_tetras)
+        edg2 = np.vstack((tris[interface, 0], tris[interface, 2]))
+        edg2r = np.vstack((tris[interface, 2], tris[interface, 0]))
+        
+        interface = in_component[tris[:, 1]] != in_component[tris[:, 2]]
+        n_inter_edges += interface.shape[0]
+        edg4 = np.vstack((tris[interface, 1], tris[interface, 2]))
+        edg4r = np.vstack((tris[interface, 2], tris[interface, 1]))
+        print("Number of edges that are between two superpoints: {0}/{1} ({2:.1f}%)".format(n_inter_edges, d_mesh["distances"].shape[0], 100*n_inter_edges/d_mesh["distances"].shape[0]))
+        
+        del interface
+        # edges of points where one end point lies in a superpoint a und another end point in the superpoint b != a
+        edges = np.hstack((edg1, edg2, edg4, edg1r, edg2r, edg4r))
+        del edg1, edg2, edg4, edg1r, edg2r, edg4r  
+        # Filter edges that occur multiple times in edges, e.g. [[x, x, z], [y, y, z]] -> [[x, z], [y, z]]
+        edges = np.unique(edges, axis=1)
+        if d_se_max > 0:
+            # distance between the superpoints on the edges
+            dist = np.sqrt(((xyz[edges[0,:]]-xyz[edges[1,:]])**2).sum(1))
+            # filter edges with too large distance
+            edges = edges[:,dist<d_se_max]
+        
+        #---sort edges by alpha numeric order wrt to the components (superpoints) of their source/target---
+        # number of edges n_edg
+        n_edg = len(edges[0])
+        
+        # replace point indices in edges with the superpoint idx of each point and save it in edge_comp
+        edge_comp = in_component[edges]
+        # len(edge_comp_index) == n_edg
+        edge_comp_index = n_com * edge_comp[0,:] + edge_comp[1,:]
+        order = np.argsort(edge_comp_index)
+        
+        # reordering of the edges, the edge_comp and the edge_comp_index array itself
+        edges = edges[:, order]
+        edge_comp = edge_comp[:, order]
+        edge_comp_index = edge_comp_index[order]
+        #print(edge_comp_index)
+
+        """
+        np.argwhere(np.diff(edge_comp_index)): where does the sorted edge_comp_index change? 
+        This is stored in the array idxs_comp_change. The edge_comp array could have multiple 
+        connections between the same superpoints. Therefore, we filter them with the jump_edg 
+        in order to take once account of them. Thus, multiple edges from superpoint S_1 to S_2
+        will be filtered so that we only have one edge from S_1 to S_2.  
+        """
+        idxs_comp_change = np.argwhere(np.diff(edge_comp_index)) + 1
+        #marks where the edges change components iot compting them by blocks
+        jump_edg = np.vstack((0, idxs_comp_change, n_edg)).flatten()
+        n_sedg = len(jump_edg) - 1
+
+        ########################################
+        # Our modification
+        ########################################
+        senders = []
+        receivers = []
+        uni_edges = []
+        print("Total number of superpoints (superedges): {0} ({1})".format(n_com, n_sedg))
+        n_filtered = 0
+        #---compute the superedges features---
+        for i_sedg in tqdm(range(0, n_sedg), desc="Compute Superedges"):
+            i_edg_begin = jump_edg[i_sedg]
+            i_edg_end = jump_edg[i_sedg + 1]
+            #ver_source = edges[0, range(i_edg_begin, i_edg_end)]
+            #ver_target = edges[1, range(i_edg_begin, i_edg_end)]
+            com_source = edge_comp[0, i_edg_begin]
+            com_target = edge_comp[1, i_edg_begin]
+            #xyz_source = xyz[ver_source, :]
+            #xyz_target = xyz[ver_target, :]
+            edge = (com_source, com_target)
+            if edge in uni_edges:
+                n_filtered += 1
+                continue
+            senders.append(com_source)
+            receivers.append(com_target)
+            inv_edge = (com_target, com_source)
+            # bidirectional
+            uni_edges.append(inv_edge)
+    else:
+        sedges = []
+        ssizes = len(components) * [None]
+        for i in range(len(components)):
+            stris.append(list())
+            ssizes[i] = len(components[i])
+        v_to_move = []
+        for i in tqdm(range(tris.shape[0]), desc="Determine Superedges"):
+            tri = tris[i]
+
+            idx0 = tri[0]
+            idx1 = tri[1]
+            idx2 = tri[2]
+            
+            # TODO check if in_component is a partition vec?
+            sp0 = in_component[idx0]
+            sp1 = in_component[idx1]
+            sp2 = in_component[idx2]
+
+            in_tri = True
+            if sp0 != sp1:
+                in_tri = False
+                sedges.append([sp0, sp1])
+            if sp0 != sp2:
+                in_tri = False
+                sedges.append([sp0, sp2])
+            if sp1 != sp2:
+                in_tri = False
+                sedges.append([sp1, sp2])
+            if in_tri:
+                stris[sp0].append(i)
+            else: 
+                s0 = ssizes[sp0]
+                s1 = ssizes[sp1]
+                s2 = ssizes[sp2]
+                sp_sizes = [s0, s1, s2]
+                idx = np.argmax([s0, s1, s2])
+                sps = [sp0, sp1, sp2]
+                big_sp = sps[idx]
+                stris[big_sp].append(i)
+                # all points must now move to big_sp
+                v_to_move.append((idx0, idx1, idx2, big_sp))
+
+        if move_vertices:
+            tmp_comps = np.array(components, copy=True)
+
+            def move_v(comps, spX, sp, iX):
+                idxs = comps[spX].tolist()
+                idxs.remove(iX)
+                comps[spX] = np.array(idxs, dtype=np.uint32)
+                idxs = comps[sp].tolist()
+                idxs.append(iX)
+                comps[sp] = np.array(idxs, dtype=np.uint32)
+
+            for i in range(len(v_to_move)):
+                i0, i1, i2, sp = v_to_move[i]
+                sp0 = in_component[i0]
+                sp1 = in_component[i1]
+                sp2 = in_component[i2]
+                if sp0 != sp:
+                    move_v(comps=tmp_comps, spX=sp0, sp=sp, iX=i0)
+                if sp1 != sp:
+                    move_v(comps=tmp_comps, spX=sp1, sp=sp, iX=i1)
+                if sp2 != sp:
+                    move_v(comps=tmp_comps, spX=sp2, sp=sp, iX=i2)
+            components = tmp_comps
+
+        sedges = np.array(sedges, dtype=np.uint32)
+        uni_edges = np.unique(sedges, axis=0)
+        senders = uni_edges[:, 0].tolist()
+        receivers = uni_edges[:, 1].tolist()
+        n_sedg = uni_edges.shape[0]
+
+    tmp_senders = senders.copy()
+    senders.extend(receivers)
+    receivers.extend(tmp_senders)
+    senders = np.array(senders, dtype=np.uint32)
+    receivers = np.array(receivers, dtype=np.uint32)
+    return n_com, n_sedg, components, senders, receivers, stris
+
+
+def graph_mesh(mesh, reg_strength=0.1, lambda_edge_weight=1.0, k_nn_adj=30, use_cartesian=False, bidirectional=False, respect_direct_neigh=False, n_proc=10):
+    """ This function creates a superpoint graph from a point cloud. 
+
+    Parameters
+    ----------
+    cloud : np.ndarray
+        A point cloud with the columns xyzrgb.
+    k_nn_adj : int
+        TODO.
+    k_nn_adj : int
+        TODO.
+    lambda_edge_weight : float
+        TODO
+    reg_strength : flaot
+        TODO
+    d_se_max : float
+        TODO
+    max_sp_size : int
+        Maximum size of a superpoint. 
+    
+    Returns
+    -------
+    dict, list[np.ndarray]
+        The graph dictionary which is used by the neural network.
+        A list of point indices for each superpoint.  
+    """
+    # make a copy of the original cloud to prevent that points do not change any properties
+    cloud = np.hstack((np.asarray(mesh.vertices), np.asarray(mesh.vertex_colors)))
+    P = np.array(cloud, copy=True)
+    print("Compute superpoint graph")
+    t1 = time.time()
+
+    mesh.compute_adjacency_list()
+
+    n_sps, n_sedg, sp_idxs, senders, receivers, stris = \
+        superpoint_graph_mesh(
+            mesh_vertices_xyz=mesh.vertices,
+            mesh_vertices_rgb=mesh.vertex_colors,
+            mesh_tris=mesh.triangles,
+            adj_list=mesh.adjacency_list,
+            reg_strength=reg_strength,
+            lambda_edge_weight=lambda_edge_weight,
+            k_nn_adj=k_nn_adj,
+            use_cartesian=use_cartesian,
+            bidirectional=bidirectional,
+            respect_direct_neigh=respect_direct_neigh,
+            n_proc=n_proc)
+
+    """
+    n_sps: Number of superpoints (vertices) in the graph
+    n_edges: Number of edges in the graph
+    sp_idxs: A list of point indices for each superpoint
+    senders: List of start vertices for each edge in a directed graph
+    receivers: List of end vertices for each edge in a directed graph
+    """
+    #############################################
+    # create a feature vector for every superpoint
+    t2 = time.time()
+    duration = t2 - t1
+    print("Superpoint graph has {0} nodes and {1} edges (duration: {2:.3f} seconds)".format(n_sps, n_sedg, duration))
+
+    print("Compute features for every superpoint")
+
+    t1 = time.time()
+    P, center = feature_point_cloud(P=P)
+
+    print("Check superpoint sizes")
+    # so that every superpoint is smaller than the max_sp_size
+    sps_sizes = []
+    for i in range(n_sps):
+        idxs = np.unique(sp_idxs[i])
+        sp_idxs[i] = idxs
+        sp_size = idxs.shape[0]
+        sps_sizes.append(sp_size)
+    print("Average superpoint size: {0:.2f} ({1:.2f})".format(np.mean(sps_sizes), np.std(sps_sizes)))
+    mesh.compute_vertex_normals()
+    normals = np.asarray(mesh.vertex_normals)
+    P = np.hstack((P, normals))
+
+    args = [(k, sp_idxs, P) for k in range(n_sps)]
+    print("Use {0} processes".format(n_proc))
+    with Pool(processes=n_proc) as p:
+        res = p.starmap(c, args)
+    node_features = np.hstack(res)
+    node_features = node_features.transpose()
+    print("Nr of graph features {0}*{1}".format(node_features.shape[0], node_features.shape[1]))
+
+    t2 = time.time()
+    duration = t2 - t1
+    print("Computed features in {0:.3f} seconds".format(duration))
+
+    graph_dict = {
+        "nodes": node_features,
+        "senders": senders,
+        "receivers": receivers,
+        "edges": None,
+        "globals": None
+        }
+    return graph_dict, sp_idxs, stris, P, n_sedg

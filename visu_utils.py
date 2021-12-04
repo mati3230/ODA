@@ -82,6 +82,37 @@ def render_pptk(P, partition=None, initial_partition=None, point_size=-1, v=None
     return v
 
 
+def render_partition_vec_o3d(mesh, partition, colors):
+    vertices = np.asarray(mesh.vertices)
+    n_vert = vertices.shape[0]
+    rgb = np.zeros((n_vert, 3), dtype=np.float32)
+    uni_p = np.unique(partition)
+    for i in range(len(uni_p)):
+        sp_v = uni_p[i]
+        idxs = np.where(partition == sp_v)[0]
+        color = colors[i]
+        rgb[idxs] = color
+    pmesh = o3d.geometry.TriangleMesh(
+        vertices=mesh.vertices,
+        triangles=mesh.triangles)
+    pmesh.vertex_colors = o3d.utility.Vector3dVector(rgb)
+    render_o3d(pmeshs)
+
+def render_partition_o3d(mesh, sp_idxs, colors):
+    vertices = np.asarray(mesh.vertices)
+    n_vert = vertices.shape[0]
+    rgb = np.zeros((n_vert, 3), dtype=np.float32)
+    for i in range(len(sp_idxs)):
+        sp = sp_idxs[i]
+        color = colors[i]
+        rgb[sp] = color
+    pmesh = o3d.geometry.TriangleMesh(
+        vertices=mesh.vertices,
+        triangles=mesh.triangles)
+    pmesh.vertex_colors = o3d.utility.Vector3dVector(rgb)
+    render_o3d(pmeshs)
+
+
 def render_o3d(x, w_co=False):
     if type(x) == list:
         if w_co:
@@ -110,6 +141,9 @@ def coordinate_system():
 def visu_dec_bs(graph_dict, P, sp_idxs, probs, partition_func):
     dbs = np.arange(start=0, stop=1, step=0.01)
     n_parts = np.ones((dbs.shape[0], ), dtype=np.uint32)
+    is_mesh = False
+    if type(P) == o3d.geometry.TriangleMesh:
+        P = np.asarray(P.vertices)
     for i in tqdm(range(dbs.shape[0]), desc="Partition:"):
         db = dbs[i]
         unions = np.zeros((probs.shape[0], ), dtype=np.bool)

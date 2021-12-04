@@ -109,7 +109,7 @@ def save_unions(fdir, unions, graph_dict, filename=""):
     print("Done")
 
 
-def save_probs(fdir, P, graph_dict, sp_idxs, probs, initial_db, save_init=False, filename="", half=""):
+def save_probs(fdir, P, graph_dict, sp_idxs, probs, initial_db, save_init=False, filename="", half="", stris=None):
     """ Save the link union decisions of the agent.
 
     Parameters
@@ -135,7 +135,13 @@ def save_probs(fdir, P, graph_dict, sp_idxs, probs, initial_db, save_init=False,
     """
     print("Save probs")
     if save_init:
-        save_init_graph(fdir=fdir, P=P, graph_dict=graph_dict, sp_idxs=sp_idxs, half=half)
+        save_init_graph(
+            fdir=fdir,
+            P=P,
+            graph_dict=graph_dict,
+            sp_idxs=sp_idxs,
+            half=half,
+            stris=stris)
     mkdir(fdir)
     hf = h5py.File("{0}/probs_{1}.h5".format(fdir, filename), "w")
     hf.create_dataset("probs", data=probs)
@@ -183,7 +189,56 @@ def load_probs(fdir, filename=""):
     return P, graph_dict, sp_idxs, probs, unions
 
 
-def save_init_graph(fdir, P, graph_dict, sp_idxs, filename="", half=""):
+def load_probs_mesh(fdir, filename=""):
+    """ Load the probabilities of the link predictions.
+
+    Parameters
+    ----------
+    fdir : str
+        Relative or absolute directory of the file.
+    filename : str
+        Name of the file.
+    
+    Returns
+    -------
+    np.ndarray, dict, list[np.ndarray], np.ndarray, np.ndarray
+        The point cloud.
+        Dictionary where the superpoint graph is stored.
+        List of the point indices for each superpoint.
+        Probabilities of the link predictions which are used to create the unions.
+        Binary array where the link predictions are stored. 
+
+    """
+    print("Load probs...")
+    mesh, graph_dict, sp_idxs, stris = load_init_graph_mesh(fdir=fdir, filename=filename)
+    if mesh is None:
+        return None, None, None, None, None, None, None
+    vertices = np.asarray(mesh.vertices)
+    triangles = np.asarray(mesh.triangles)
+    print("Mesh size: {0} vertices, {1} triangles".format(vertices.shape[0], triangles.shape[0]))
+
+    file = "{0}/probs_{1}.h5".format(fdir, filename)
+    if not file_exists(filepath=file):
+        return None, None, None, None, None, None, None
+    hf = h5py.File(file, "r")
+    probs = np.array(hf["probs"], copy=True)
+    initial_db = float(hf["initial_db"][0])
+    unions = np.zeros((probs.shape[0], ), dtype=np.bool)
+    unions[probs > initial_db] = True
+    hf.close()
+    print("Done")
+    return mesh, graph_dict, sp_idxs, probs, unions, stris
+
+
+"""
+save_init_graph(
+    fdir=args.g_dir,
+    P=mesh, graph_dict=graph_dict,
+    sp_idxs=sp_idxs,
+    filename=args.g_filename,
+    stris=stris)
+"""
+def save_init_graph(fdir, P, graph_dict, sp_idxs, filename="", half="", stris=None):
     """ Save the initial partition.
 
     Parameters
@@ -204,11 +259,23 @@ def save_init_graph(fdir, P, graph_dict, sp_idxs, filename="", half=""):
     print("Save initial graph")
     mkdir(fdir)
     hf = h5py.File("{0}/init_graph{1}_{2}.h5".format(fdir, half, filename), "w")
-    hf.create_dataset("P", data=P)
     n_sps = len(sp_idxs)
     hf.create_dataset("n_sps", data=(n_sps, ))
-    for i in range(n_sps):
-        hf.create_dataset(str(i), data=sp_idxs[i])
+    if strs is None:
+        hf.create_dataset("P", data=P)
+        for i in range(n_sps):
+            hf.create_dataset(str(i), data=sp_idxs[i])
+    else:
+        vertices = np.asarray(P.vertices)
+        vertex_colors = np.asarray(P.vertex_colors)
+        triangles = np.asarray(P.triangles)
+        hf.create_dataset("vertices", data=vertices)
+        hf.create_dataset("vertex_colors", data=vertex_colors)
+        hf.create_dataset("triangles", data=triangles)
+        for i in range(n_sps):
+            hf.create_dataset(str(i), data=sp_idxs[i])
+            hf.create_dataset("t" + str(i), data=stris[i])
+
     nodes = graph_dict["nodes"]
     senders = graph_dict["senders"]
     receivers = graph_dict["receivers"]
@@ -219,7 +286,7 @@ def save_init_graph(fdir, P, graph_dict, sp_idxs, filename="", half=""):
     print("Done")
 
 
-def load_init_graph(fdir, filename="", half=""):
+def load_init_graph_mesh(fdir, filename="", half=""):
     """ Load the probabilities of the link predictions.
 
     Parameters
@@ -255,17 +322,26 @@ def load_init_graph(fdir, filename="", half=""):
         "edges": None,
         "globals": None
     }
-    P = np.array(hf["P"], copy=True)
-    print("Point cloud size: {0} points".format(P.shape[0]))
+    vertices = np.array(hf["vertices"], copy=True)
+    vertex_colors = np.array(hf["vertex_colors"], copy=True)
+    triangles = np.array(hf["triangles"], copy=True)
+    print("Mesh size: {0} vertices, {1} triangles".format(vertices.shape[0], triangles.shape[0]))
+    mesh = o3d.geometry.TriangleMesh(
+        vertices=o3d.utility.Vector3dVector(vertices),
+        triangles=o3d.utility.Vector3iVector(triangles)
+        )
+    mesh.vertex_colors = o3d.utility.Vector3dVector(vertex_colors)
     n_sps = int(hf["n_sps"][0])
     sp_idxs = n_sps * [None]
+    stris = n_sps * [None]
     for i in range(n_sps):
         idxs = np.array(hf[str(i)], copy=True)
         sp_idxs[i] = idxs
+        stris[i] = np.array(hf["t"+str(i)], copy=True)
     sp_idxs = np.array(sp_idxs, dtype = "object")
     hf.close()
     print("Done")
-    return P, graph_dict, sp_idxs
+    return mesh, graph_dict, sp_idxs, stris
 
 
 def check_color_value(c):
@@ -350,12 +426,40 @@ def load_proc_cloud(fdir, fname):
     return P
 
 
-def save_cloud(P, fdir, fname):
-    print("Save cloud")
-    hf = h5py.File("{0}/P_{1}.h5".format(fdir, fname), "w")
-    hf.create_dataset("P", data=P)
+def load_proc_mesh(fdir, fname):
+    hf = h5py.File("{0}/mesh_{1}.h5".format(fdir, fname), "r")
+    vertices = np.array(hf["vertices"], copy=True)
+    vertex_colors = np.array(hf["vertex_colors"], copy=True)
+    triangles = np.array(hf["triangles"], copy=True)
+    print("Mesh size: {0} vertices, {1} triangles".format(vetices.shape[0], triangles.shape[0]))
     hf.close()
-    print("Done")
+    mesh = o3d.geometry.TriangleMesh(
+        vertices=o3d.utility.Vector3dVector(vertices), 
+        triangles=o3d.utility.Vector3iVector(triangles)
+        )
+    mesh.vertex_colors = o3d.utility.Vector3dVector(vertex_colors)
+    return mesh
+
+
+
+def save_cloud(P, fdir, fname):
+    if type(P) == o3d.geometry.TriangleMesh:
+        print("Save mesh")
+        hf = h5py.File("{0}/mesh_{1}.h5".format(fdir, fname), "w")
+        vertices = np.asarray(P.vertices)
+        vertex_colors = np.asarray(P.vertex_colors)
+        triangles = np.asarray(P.triangles)
+        hf.create_dataset("vertices", data=vertices)
+        hf.create_dataset("vertex_colors", data=vertex_colors)
+        hf.create_dataset("triangles", data=triangles)
+        hf.close()
+        print("Done")
+    else:
+        print("Save cloud")
+        hf = h5py.File("{0}/P_{1}.h5".format(fdir, fname), "w")
+        hf.create_dataset("P", data=P)
+        hf.close()
+        print("Done")
 
 
 def cloud(P, r=255, g=0, b=0, p=1):
@@ -430,3 +534,8 @@ def save_meshes(meshes, fdir, filename=""):
     for i in range(len(meshes)):
         mesh = meshes[i]
         save_mesh(mesh=mesh, fdir=fdir, filename=filename, o_id=i)
+
+
+def load_mesh(file):
+    mesh = o3d.io.read_triangle_mesh(args.file)
+    return mesh

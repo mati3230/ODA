@@ -428,7 +428,12 @@ def reco(P, o_idxs, dims=150, radius=0.1, sample_size=15):
 
 
 def initial_partition(P, sp_idxs):
-    n_P = P.shape[0]
+    if type(P) == o3d.geometry.TriangleMesh:
+        vertices = np.asarray(P.vertices)
+        n_P = vertices.shape[0]
+    else:
+        n_P = P.shape[0]
+
     par_v = np.zeros((n_P, ), dtype=np.uint32)
     n_sps = len(sp_idxs)
     print("Number of superpoints: {0}".format(n_sps))
@@ -438,18 +443,54 @@ def initial_partition(P, sp_idxs):
     return par_v
 
 
-def partition(graph_dict, unions, P, sp_idxs, half=False):
-    n_P = P.shape[0]
+def partition(graph_dict, unions, P, sp_idxs, half=False, stris=None):
+    is_mesh = False
+    if type(P) == o3d.geometry.TriangleMesh:
+        vertices = np.asarray(P.vertices)
+        vertex_colors = np.asarray(P.vertex_colors)
+        n_P = vertices.shape[0]
+        meshes = []
+        is_mesh = True
+    else:
+        n_P = P.shape[0]
     par_v = np.zeros((n_P, ), dtype=np.uint32)
     c_list = comp_list(graph_dict=graph_dict, unions=unions, n_P=n_P, sp_idxs=sp_idxs, half=half)
 
-    for i in range(len(c_list)):
-        comp = c_list[i]
-        n_sp_comp = len(comp)
-        for j in range(n_sp_comp):
-            P_idxs = comp[j][1]
-            par_v[P_idxs] = i + 1
-    return par_v
+    if is_mesh:
+        for i in range(len(c_list)):
+            comp = c_list[i]
+            n_sp_comp = len(comp)
+            nstris = []
+            for j in range(n_sp_comp):
+                sp_idx = comp[j][0]
+                P_idxs = comp[j][1]
+                par_v[P_idxs] = i + 1
+                stri = stris[sp_idx]
+                nstris.append(stri)
+            triangles = np.vstack(nstris)
+            uni_t = np.unique(triangles)
+            n_triangles = np.array(triangles, copy=True)
+            for k in range(uni_t.shape[0]):
+                v_idx = uni_t[k]
+                n_triangles[triangles == v_idx] = k
+            m_verts = vertices[uni_t]
+            m_colors = vertex_colors[uni_t]
+            nmesh = o3d.geometry.TriangleMesh(
+                vertices=o3d.utility.Vector3dVector(m_verts),
+                triangles=o3d.utility.Vector3iVector(n_triangles)
+                )
+            nmesh.vertex_colors = o3d.utility.Vector3dVector(m_colors)
+
+            meshes.append(nmesh)
+        return par_v, meshes
+    else:
+        for i in range(len(c_list)):
+            comp = c_list[i]
+            n_sp_comp = len(comp)
+            for j in range(n_sp_comp):
+                P_idxs = comp[j][1]
+                par_v[P_idxs] = i + 1    
+        return par_v
 
 
 def delete(P, idxs):
@@ -471,14 +512,24 @@ def rotate(P):
     if degree < -180 or degree > 180:
         return P
     r = Rotation.from_euler(axis, degree, degrees=True)
-    P[:, :3] = r.apply(P[:, :3])
+    if type(P) == o3d.geometry.TriangleMesh:
+        verts = np.asarray(P.vertices)
+        verts = r.apply(verts)
+        P.vertices = o3d.utility.Vector3dVector(verts)
+    else:
+        P[:, :3] = r.apply(P[:, :3])
     return P
 
 
 def recenter(P):
-    center = np.mean(P[:, :3], axis=0)
-    #print(center)
-    P[:, :3] -= center
+    if type(P) == o3d.geometry.TriangleMesh:
+        verts = np.asarray(P.vertices)
+        center = np.mean(verts, axis=0)
+        verts -= center
+        P.vertices = o3d.utility.Vector3dVector(verts)
+    else:
+        center = np.mean(P[:, :3], axis=0)
+        P[:, :3] -= center
     return P
 
 
