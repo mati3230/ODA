@@ -212,14 +212,14 @@ def load_probs_mesh(fdir, filename=""):
     print("Load probs...")
     mesh, graph_dict, sp_idxs, stris = load_init_graph_mesh(fdir=fdir, filename=filename)
     if mesh is None:
-        return None, None, None, None, None, None, None
+        return None, None, None, None, None, None
     vertices = np.asarray(mesh.vertices)
     triangles = np.asarray(mesh.triangles)
     print("Mesh size: {0} vertices, {1} triangles".format(vertices.shape[0], triangles.shape[0]))
 
     file = "{0}/probs_{1}.h5".format(fdir, filename)
     if not file_exists(filepath=file):
-        return None, None, None, None, None, None, None
+        return None, None, None, None, None, None
     hf = h5py.File(file, "r")
     probs = np.array(hf["probs"], copy=True)
     initial_db = float(hf["initial_db"][0])
@@ -524,16 +524,17 @@ def subsample(P, p):
 
 def save_mesh(mesh, fdir, filename, o_id, ending="glb"):
     mkdir(fdir)
-    file = "{0}/mesh_{1}_{2}{3}".format(fdir, filename, o_id, ending)
+    file = "{0}/mesh_{1}_{2}.{3}".format(fdir, filename, o_id, ending)
     print("Save mesh: {0}".format(file))
     o3d.io.write_triangle_mesh(file, mesh)
     print("Done")
 
-def save_meshes(meshes, fdir, filename=""):
+def save_meshes(meshes, fdir, filename="", ending="glb"):
+    print("Save meshes")
     mkdir(fdir)
     for i in range(len(meshes)):
         mesh = meshes[i]
-        save_mesh(mesh=mesh, fdir=fdir, filename=filename, o_id=i)
+        save_mesh(mesh=mesh, fdir=fdir, filename=filename, o_id=i, ending=ending)
 
 
 def load_mesh(file):

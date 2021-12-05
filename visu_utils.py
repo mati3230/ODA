@@ -5,19 +5,25 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 
-def pick_sp_points_o3d(pcd):
+def pick_sp_points_o3d(pcd, is_mesh=False):
     print("")
     print("1) Pick superpoints that should by unified by using [shift + left click]")
     print("Press [shift + right click] to undo a selection")
     print("2) After picking the superpoints, press 'Q' to close the window")
-    vis = o3d.visualization.VisualizerWithEditing()
+    if is_mesh:
+        vis = o3d.visualization.VisualizerWithVertexSelection()
+    else:
+        vis = o3d.visualization.VisualizerWithEditing()
     vis.create_window()
     vis.add_geometry(pcd)
     vis.run()  # user picks points
     vis.destroy_window()
     print("")
-    return vis.get_picked_points()
-
+    pp = vis.get_picked_points()
+    picked_points = len(pp)*[None]
+    for i in range(len(pp)):
+        picked_points[i] = pp[i].index
+    return picked_points
 
 def pick_sp_points_pptk(P, partition=None, initial_partition=None, point_size=-1, v=None, colors=None):
     v = render_pptk_(P=P, partition=partition, initial_partition=initial_partition, point_size=point_size, v=v, colors=colors)

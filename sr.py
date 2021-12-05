@@ -12,7 +12,7 @@ def main():
     parser.add_argument("--save_meshes", default=False, type=bool, help="Should the meshes be stored in the o_dir?")
     parser.add_argument("--g_filename", default="", type=str, help="Filename will be used as a postfix.")
     parser.add_argument("--point_size", default=0.03, type=float, help="Rendering point size.")
-    parser.add_argument("--ending", default=".glb", type=str, help="File format of the meshes (glb, obj, ...)")
+    parser.add_argument("--ending", default="glb", type=str, help="File format of the meshes (glb, obj, ...)")
     parser.add_argument("--co", default=False, type=bool, help="Visualize an o3d coordinate system")
     #parser.add_argument("--all", default=False, type=bool, help="Triangulate all meshes")
     args = parser.parse_args()

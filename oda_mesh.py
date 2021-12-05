@@ -7,9 +7,9 @@ from visu_utils import\
     render_o3d,\
     render_partition_vec_o3d,\
     render_partition_o3d,\
+    pick_sp_points_o3d,\
     visu_dec_bs
 from io_utils import\
-    load_cloud,\
     save_init_graph,\
     load_init_graph_mesh,\
     save_probs,\
@@ -20,9 +20,9 @@ from io_utils import\
     save_cloud,\
     load_proc_mesh,\
     load_colors,\
-    subsample,\
     save_partition,\
-    mkdir
+    mkdir,\
+    save_meshes
 from ai_utils import graph_mesh, predict, calculate_stris
 from sp_utils import\
     unify,\
@@ -30,7 +30,6 @@ from sp_utils import\
     separate_superpoint,\
     partition,\
     initial_partition,\
-    delete,\
     extend_superpoint_points,\
     reduce_superpoint,\
     rotate,\
@@ -60,9 +59,11 @@ def main():
     parser.add_argument("--save_probs", default=False, type=bool, help="Save the processed superpoint graph in g_dir.")
     parser.add_argument("--load_probs", default=False, type=bool, help="Load the processed superpoint graph from g_dir.")
     parser.add_argument("--g_dir", default="./tmp", type=str, help="Directory where the graphs will be stored.")
+    parser.add_argument("--o_dir", default="./out", type=str, help="Directory where the graphs will be stored.")
     parser.add_argument("--g_filename", default="", type=str, help="Filename will be used as a postfix.")
     parser.add_argument("--load_unions", default=False, type=bool, help="Load the unions from g_dir.")
     parser.add_argument("--load_proc_cloud", default=False, type=bool, help="Load the preprocessed point cloud from g_dir.")
+    parser.add_argument("--ending", default="glb", type=str, help="File format of the meshes (glb, obj, ...)")
     args = parser.parse_args()
     # load the colors for the parititon rendering
     colors = load_colors()
@@ -295,7 +296,7 @@ def main():
             "Superpoint Editing Mode: Extend Superpoint [ex] | " +\
             "Create [c] | " +\
             "Separate [s] | " +\
-            "Extend points [ep] |" +\
+            "Extend points [ep] | " +\
             "Reduce points [r] | " +\
             "Merge small ones [m] | " +\
             "Unify [u] | " +\
@@ -341,7 +342,7 @@ def main():
                 print("Pick a superpoint that should be extended with points of the cloud.")
             elif mode == "r":
                 print("Pick a superpoint where you want to reduce points.")
-            picked_points_idxs = pick_sp_points_o3d(pcd=pmesh)
+            picked_points_idxs = pick_sp_points_o3d(pcd=pmesh, is_mesh=True)
         if mode == "c":
             # unify superpoints
             graph_dict, unions = unify(
@@ -351,7 +352,7 @@ def main():
                 unions=unions)
         elif mode == "ex":
             print("Select multiple superpoints. The chosen superpoint will be extended with this points.")
-            points_idxs_e = pick_sp_points_o3d(pcd=pmesh)
+            points_idxs_e = pick_sp_points_o3d(pcd=pmesh, is_mesh=True)
             graph_dict, unions = extend_superpoint(
                 picked_points_idxs=picked_points_idxs,
                 points_idxs_e=points_idxs_e,
@@ -378,7 +379,7 @@ def main():
             render_o3d(mesh_sp)
         elif mode == "ep":
             print("Pick points that should be added to the superpoint chosen. ")
-            points_idxs_e = pick_sp_points_o3d(pcd=pmesh)
+            points_idxs_e = pick_sp_points_o3d(pcd=pmesh, is_mesh=True)
             sp_idxs = extend_superpoint_points(picked_points_idxs=picked_points_idxs, points_idxs_e=points_idxs_e, sp_idxs=sp_idxs)
             init_p = initial_partition(P=mesh, sp_idxs=sp_idxs)
             stris, _, _, _ =\
@@ -387,7 +388,7 @@ def main():
                     partition_vec=init_p, sp_idxs=sp_idxs)
         elif mode == "r":
             print("Pick points that should be reduced from the superpoint chosen. ")
-            points_idxs_r = pick_sp_points_o3d(pcd=pmesh)
+            points_idxs_r = pick_sp_points_o3d(pcd=pmesh, is_mesh=True)
             graph_dict, sp_idxs = reduce_superpoint(
                 picked_points_idxs=picked_points_idxs,
                 points_idxs_r=points_idxs_r, graph_dict=graph_dict,
@@ -414,6 +415,7 @@ def main():
             half=False,
             stris=stris)
         save_partition(partition=part, fdir=args.g_dir, fname=args.g_filename)
+        save_meshes(meshes=meshes, fdir=args.o_dir, filename=args.g_filename, ending=args.ending)
 
 
 if __name__ == "__main__":
