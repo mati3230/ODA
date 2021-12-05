@@ -1737,6 +1737,54 @@ def mesh_edges_distances(mesh_vertices, mesh_tris, adj_list, knn=45, respect_dir
     return {"source": source, "target": target, "distances": f_distances}
 
 
+def calculate_stris(tris, partition_vec, sp_idxs):
+    sedges = []
+    stris = []
+    ssizes = len(sp_idxs) * [None]
+    for i in range(len(sp_idxs)):
+        stris.append(list())
+        ssizes[i] = len(sp_idxs[i])
+    v_to_move = []
+    for i in tqdm(range(tris.shape[0]), desc="Determine Superedges"):
+        tri = tris[i]
+
+        idx0 = tri[0]
+        idx1 = tri[1]
+        idx2 = tri[2]
+        
+        # TODO check if in_component is a partition vec?
+        sp0 = partition_vec[idx0]
+        sp1 = partition_vec[idx1]
+        sp2 = partition_vec[idx2]
+
+        in_tri = True
+        if sp0 != sp1:
+            in_tri = False
+            sedges.append([sp0, sp1])
+        if sp0 != sp2:
+            in_tri = False
+            sedges.append([sp0, sp2])
+        if sp1 != sp2:
+            in_tri = False
+            sedges.append([sp1, sp2])
+        if in_tri:
+            stris[sp0].append(i)
+        else: 
+            s0 = ssizes[sp0]
+            s1 = ssizes[sp1]
+            s2 = ssizes[sp2]
+            sp_sizes = [s0, s1, s2]
+            idx = np.argmax([s0, s1, s2])
+            sps = [sp0, sp1, sp2]
+            big_sp = sps[idx]
+            stris[big_sp].append(i)
+            # all points must now move to big_sp
+            v_to_move.append((idx0, idx1, idx2, big_sp))
+    for i in range(len(stris)):
+        stris[i] = np.array(stris[i], dtype=np.uint32)
+    return stris, v_to_move, ssizes, sedges
+
+
 def superpoint_graph_mesh(mesh_vertices_xyz, mesh_vertices_rgb, mesh_tris, adj_list, lambda_edge_weight=1, reg_strength=0.1, d_se_max=0, k_nn_adj=45, use_cartesian=True, bidirectional=False, respect_direct_neigh=False, n_proc=1, move_vertices=False):
     adj_list_ = adj_list.copy()
     xyz = np.array(np.asarray(mesh_vertices_xyz), copy=True)
@@ -1776,7 +1824,6 @@ def superpoint_graph_mesh(mesh_vertices_xyz, mesh_vertices_rgb, mesh_tris, adj_l
     in_component = np.array(in_component)    
 
     landrieu_method = False
-    stris = []
 
     if landrieu_method:
         #interface select the edges between different superpoints
@@ -1867,50 +1914,10 @@ def superpoint_graph_mesh(mesh_vertices_xyz, mesh_vertices_rgb, mesh_tris, adj_l
             # bidirectional
             uni_edges.append(inv_edge)
     else:
-        sedges = []
-        ssizes = len(components) * [None]
-        for i in range(len(components)):
-            stris.append(list())
-            ssizes[i] = len(components[i])
-        v_to_move = []
-        for i in tqdm(range(tris.shape[0]), desc="Determine Superedges"):
-            tri = tris[i]
-
-            idx0 = tri[0]
-            idx1 = tri[1]
-            idx2 = tri[2]
-            
-            # TODO check if in_component is a partition vec?
-            sp0 = in_component[idx0]
-            sp1 = in_component[idx1]
-            sp2 = in_component[idx2]
-
-            in_tri = True
-            if sp0 != sp1:
-                in_tri = False
-                sedges.append([sp0, sp1])
-            if sp0 != sp2:
-                in_tri = False
-                sedges.append([sp0, sp2])
-            if sp1 != sp2:
-                in_tri = False
-                sedges.append([sp1, sp2])
-            if in_tri:
-                stris[sp0].append(i)
-            else: 
-                s0 = ssizes[sp0]
-                s1 = ssizes[sp1]
-                s2 = ssizes[sp2]
-                sp_sizes = [s0, s1, s2]
-                idx = np.argmax([s0, s1, s2])
-                sps = [sp0, sp1, sp2]
-                big_sp = sps[idx]
-                stris[big_sp].append(i)
-                # all points must now move to big_sp
-                v_to_move.append((idx0, idx1, idx2, big_sp))
-        for i in range(len(stris)):
-            stris[i] = np.array(stris[i], dtype=np.uint32)
-
+        stris, v_to_move, ssizes, sedges =\
+            calculate_stris(
+                tris=tris, partition_vec=in_component, sp_idxs=components)
+        
         if move_vertices:
             tmp_comps = np.array(components, copy=True)
 

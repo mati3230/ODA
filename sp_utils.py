@@ -81,6 +81,7 @@ def reduce_superpoint(picked_points_idxs, points_idxs_r, graph_dict, sp_idxs):
     new_node = np.zeros((1, nodes.shape[-1]), dtype=nodes.dtype)
     nodes = np.vstack((nodes, new_node))
     graph_dict["nodes"] = nodes
+
     return graph_dict, sp_idxs
 
 
@@ -551,10 +552,15 @@ def recenter(P):
 
 
 def merge_small_singles(graph_dict, sp_idxs, unions, P, thres):
+    if type(P) == o3d.geometry.TriangleMesh:
+        n_P = np.asarray(P.vertices)
+    else:
+        n_P = P.shape[0]
     senders = graph_dict["senders"]
     receivers = graph_dict["receivers"]
     n_edges = int(senders.shape[0])
-    c_list = comp_list(graph_dict=graph_dict, unions=unions, n_P=P.shape[0], sp_idxs=sp_idxs)
+    c_list = comp_list(
+        graph_dict=graph_dict, unions=unions, n_P=n_P, sp_idxs=sp_idxs)
     single_sps = []
     for i in range(len(c_list)):
         comp = c_list[i]
@@ -578,9 +584,10 @@ def merge_small_singles(graph_dict, sp_idxs, unions, P, thres):
     return unions
 
 
-def superpoint_info(picked_points_idxs, sp_idxs, P, graph_dict):
+def superpoint_info(picked_points_idxs, sp_idxs, P, graph_dict, stris=None):
     if len(picked_points_idxs) != 1:
         return
+
     sp_info = uni_superpoint_idxs(picked_points_idxs=picked_points_idxs, sp_idxs=sp_idxs)
     sp_info = sp_info[0]
     P_idxs = sp_idxs[sp_info]
@@ -597,8 +604,21 @@ def superpoint_info(picked_points_idxs, sp_idxs, P, graph_dict):
     print("Sender edges (Idxs, Sender, Receivers):\n{0}".format(sp_senders))
     sp_receivers = np.hstack((r_idxs[:, None], senders[r_idxs][:, None], receivers[r_idxs][:, None]))
     print("Receiver edges (Idxs, Sender, Receivers):\n{0}".format(sp_receivers))
+    if type(P) == o3d.geometry.TriangleMesh:
+        vertices = np.asarray(P.vertices)
+        vertex_colors = np.asarray(P.vertex_colors)
+        triangles = np.asarray(P.triangles)
 
-    return P[P_idxs]
+        verts = vertices[P_idxs]
+        vert_cols = vertex_colors[P_idxs]
+        tris = stris[sp_info]
+        mesh = o3d.geometry.TriangleMesh(
+            vertices=o3d.utility.Vector3dVector(verts),
+            triangles=o3d.utility.Vector3iVector(tris))
+        mesh.vertex_colors = vert_cols
+        return mesh
+    else:
+        return P[P_idxs]
 
 
 def set_recursion(n_set_i, components, member, done):

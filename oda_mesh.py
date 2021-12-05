@@ -23,7 +23,7 @@ from io_utils import\
     subsample,\
     save_partition,\
     mkdir
-from ai_utils import graph_mesh, predict
+from ai_utils import graph_mesh, predict, calculate_stris
 from sp_utils import\
     unify,\
     extend_superpoint,\
@@ -219,8 +219,8 @@ def main():
         stris=stris)
     save_partition(partition=part, fdir=args.g_dir, fname=args.g_filename)
     if not args.load_unions:
-        render_partition_vec_o3d(mesh=mesh, partition=part, colors=colors)
-        #############################DELETE################################
+        pmesh = render_partition_vec_o3d(mesh=mesh, partition=part, colors=colors)
+        """
         print("Nr of meshes: {0}".format(len(meshes)))
         sizes = len(meshes)*[None]
         for i in range(len(meshes)):
@@ -234,7 +234,7 @@ def main():
             print("mesh", i, "size", sizes[i])
             mesh_i = meshes[i]
             render_o3d(mesh_i)
-        ###################################################################
+        """
         while True:
             d_b = input("Decision Boundary [0,1] | Decision boundary check [d] | Continue: [-1]: ")
             if d_b == "d":
@@ -260,8 +260,8 @@ def main():
                 half=False,
                 stris=stris)
             save_partition(partition=part, fdir=args.g_dir, fname=args.g_filename)
-            render_partition_vec_o3d(mesh=mesh, partition=part, colors=colors)
-            #############################DELETE################################
+            pmesh = render_partition_vec_o3d(mesh=mesh, partition=part, colors=colors)
+            """
             print("Nr of meshes: {0}".format(len(meshes)))
             sizes = len(meshes)*[None]
             for i in range(len(meshes)):
@@ -275,14 +275,13 @@ def main():
                 print("mesh", i, "size", sizes[i])
                 mesh_i = meshes[i]
                 render_o3d(mesh_i)
-            ###################################################################
+            """
         save_unions(
             fdir=args.g_dir,
             unions=unions,
             graph_dict=graph_dict,
             filename=args.g_filename)
-    return
-    ###################################################################
+
     visualize = True
     while True:
         save_unions(
@@ -291,20 +290,19 @@ def main():
             graph_dict=graph_dict,
             filename=args.g_filename)
         if visualize:
-            viewer = render_pptk(P=P, initial_partition=init_p, partition=part, point_size=point_size, v=viewer, colors=colors)
-        mode = input("Superpoint Editing Mode: Extend Superpoint [ex] | Create [c] | Separate [s] | Point_Size [ps] | Extend points [ep] | Reduce points [r] | Merge small ones [m] | Unify [u] | Superpoint info [i] | Exit [e]: ")
+            pmesh = render_partition_vec_o3d(mesh=mesh, partition=part, colors=colors)
+        mode = input(
+            "Superpoint Editing Mode: Extend Superpoint [ex] | " +\
+            "Create [c] | " +\
+            "Separate [s] | " +\
+            "Extend points [ep] |" +\
+            "Reduce points [r] | " +\
+            "Merge small ones [m] | " +\
+            "Unify [u] | " +\
+            "Superpoint info [i] | " +\
+            "Exit [e]: ")
         visualize = True
-        if mode == "ps":
-            ps = input("Rendering point size: ")
-            try:
-                ps = float(ps)
-            except:
-                continue
-            point_size = ps
-            continue
-        elif mode == "e":
-            if viewer is not None:
-                viewer.close()
+        if mode == "e":
             return
         elif mode == "m":
             print("Merge superpoints that are smaller than a certain threshold.")
@@ -315,8 +313,17 @@ def main():
                 continue
             if thres <= 0:
                 continue
-            unions = merge_small_singles(graph_dict=graph_dict, sp_idxs=sp_idxs, unions=unions, thres=thres, P=P)
-        if mode != "c" and mode != "ex" and mode != "s" and mode != "ep" and mode != "r" and mode != "i" and mode != "m" and mode != "u":
+            unions = merge_small_singles(
+                graph_dict=graph_dict, sp_idxs=sp_idxs,
+                unions=unions, thres=thres, P=mesh)
+        if mode != "c" and\
+                mode != "ex" and\
+                mode != "s" and\
+                mode != "ep" and\
+                mode != "r" and\
+                mode != "i" and\
+                mode != "m" and\
+                mode != "u":
             continue
         pick_points = True
         if mode == "m":
@@ -334,8 +341,9 @@ def main():
                 print("Pick a superpoint that should be extended with points of the cloud.")
             elif mode == "r":
                 print("Pick a superpoint where you want to reduce points.")
-            picked_points_idxs, viewer = pick_sp_points_pptk(P=P, initial_partition=init_p, partition=part, point_size=point_size, v=viewer, colors=colors)
+            picked_points_idxs = pick_sp_points_o3d(pcd=pmesh)
         if mode == "c":
+            # unify superpoints
             graph_dict, unions = unify(
                 picked_points_idxs=picked_points_idxs,
                 sp_idxs=sp_idxs,
@@ -343,7 +351,7 @@ def main():
                 unions=unions)
         elif mode == "ex":
             print("Select multiple superpoints. The chosen superpoint will be extended with this points.")
-            points_idxs_e, viewer = pick_sp_points_pptk(P=P, initial_partition=init_p, partition=part, point_size=point_size, v=viewer, colors=colors)
+            points_idxs_e = pick_sp_points_o3d(pcd=pmesh)
             graph_dict, unions = extend_superpoint(
                 picked_points_idxs=picked_points_idxs,
                 points_idxs_e=points_idxs_e,
@@ -364,30 +372,47 @@ def main():
                 graph_dict=graph_dict,
                 unions=unions)
         elif mode == "i":
-            P_sp = superpoint_info(picked_points_idxs=picked_points_idxs, sp_idxs=sp_idxs, P=P, graph_dict=graph_dict)
-            viewer = render_pptk(P=P_sp, v=viewer)
+            mesh_sp = superpoint_info(
+                picked_points_idxs=picked_points_idxs,
+                sp_idxs=sp_idxs, P=mesh, graph_dict=graph_dict, stris=stris)
+            render_o3d(mesh_sp)
         elif mode == "ep":
             print("Pick points that should be added to the superpoint chosen. ")
-            points_idxs_e, viewer = pick_sp_points_pptk(P=P, initial_partition=init_p, partition=part, point_size=point_size, v=viewer, colors=colors)
+            points_idxs_e = pick_sp_points_o3d(pcd=pmesh)
             sp_idxs = extend_superpoint_points(picked_points_idxs=picked_points_idxs, points_idxs_e=points_idxs_e, sp_idxs=sp_idxs)
+            init_p = initial_partition(P=mesh, sp_idxs=sp_idxs)
+            stris, _, _, _ =\
+                calculate_stris(
+                    tris=np.asarray(mesh.triangles),
+                    partition_vec=init_p, sp_idxs=sp_idxs)
         elif mode == "r":
             print("Pick points that should be reduced from the superpoint chosen. ")
-            points_idxs_r, viewer = pick_sp_points_pptk(P=P, initial_partition=init_p, partition=part, point_size=point_size, v=viewer, colors=colors)
-            graph_dict, sp_idxs = reduce_superpoint(picked_points_idxs=picked_points_idxs, points_idxs_r=points_idxs_r, graph_dict=graph_dict, sp_idxs=sp_idxs)
-            init_p = initial_partition(P=P, sp_idxs=sp_idxs)
+            points_idxs_r = pick_sp_points_o3d(pcd=pmesh)
+            graph_dict, sp_idxs = reduce_superpoint(
+                picked_points_idxs=picked_points_idxs,
+                points_idxs_r=points_idxs_r, graph_dict=graph_dict,
+                sp_idxs=sp_idxs)
+            init_p = initial_partition(P=mesh, sp_idxs=sp_idxs)
+            stris, _, _, _ =\
+                calculate_stris(
+                    tris=np.asarray(mesh.triangles),
+                    partition_vec=init_p, sp_idxs=sp_idxs)
+        
         if args.save_init_g:
             save_init_graph(
                 fdir=args.g_dir,
-                P=P, graph_dict=graph_dict,
+                P=mesh, graph_dict=graph_dict,
                 sp_idxs=sp_idxs,
                 filename=args.g_filename,
+                stris=stris,
                 half="_half")
         part, meshes = partition(
             graph_dict=graph_dict,
             unions=unions,
-            P=P,
+            P=mesh,
             sp_idxs=sp_idxs,
-            half=False)
+            half=False,
+            stris=stris)
         save_partition(partition=part, fdir=args.g_dir, fname=args.g_filename)
 
 
