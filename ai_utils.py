@@ -916,6 +916,7 @@ def init_model(n_ft, is_mesh=False):
     for i in range(n_nodes):
         sp = np.random.randn(100, features_points)
         features = feature_func(cloud=sp)
+        features = features.reshape(features.shape[0], )        
         node_features[i] = features
     senders = np.array(list(range(0, n_nodes-1)), dtype=np.uint32)
     receivers = np.array(list(range(1, n_nodes)), dtype=np.uint32)

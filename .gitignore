@@ -12,6 +12,7 @@ eval
 
 # Weights of the neural network
 model.npz
+model_cloud.npz
 
 # Python
 __pycache__

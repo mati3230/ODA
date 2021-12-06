@@ -175,13 +175,13 @@ def main():
         mesh, graph_dict, sp_idxs, probs, unions, stris = load_probs_mesh(
             fdir=args.g_dir, filename=args.g_filename)
     else:
-        #unions, probs = predict(
-        #    graph_dict=graph_dict, dec_b=args.initial_db, is_mesh=True)
+        unions, probs = predict(
+            graph_dict=graph_dict, dec_b=args.initial_db, is_mesh=True)
         ######################DELETE THIS#################################
         # TODO delete the next lines and uncomment the two lines above
-        n_decisions = graph_dict["senders"].shape[0]
-        unions = np.random.randint(low=0, high=2, size=(n_decisions, )).astype(np.bool)
-        probs = np.random.rand(n_decisions, )
+        #n_decisions = graph_dict["senders"].shape[0]
+        #unions = np.random.randint(low=0, high=2, size=(n_decisions, )).astype(np.bool)
+        #probs = np.random.rand(n_decisions, )
         ##################################################################
         if args.save_probs:
             save_probs(
