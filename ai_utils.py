@@ -1205,10 +1205,12 @@ def search(c, d_sc, n, d_sn, R, d_R, t, N_f, d_f,
     d_f.append(d_sc)
     # if we have enough neighbours or no second best vertex can be determined
     if len(N_f) >= t or len_R <= 1:
-        if len_R == 1:
+        ###########WE DO NOT NEED THIS?########################
+        #if len_R == 1:
             # add the last remaining vertex
-            N_f.append(R[0])
-            d_f.append(d_R[0])
+            #N_f.append(R[0])
+            #d_f.append(d_R[0])
+        ###########WE DO NOT NEED THIS?########################
         return
     # get the neighbour vertices of 'c' and their distances to c ('d_N')
     N_c, d_N = get_neighbourhood(
