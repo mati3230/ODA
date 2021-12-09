@@ -10,6 +10,7 @@ from graph_nets import utils_tf
 from tqdm import tqdm
 from multiprocessing import Pool
 import time
+import sys
 
 from network import FFGraphNet
 
@@ -1380,18 +1381,21 @@ def search_bfs(vi, edges, distances, direct_neigh_idxs, n_edges, k):
 
     #print("----------")
     shortest_paths = []
-    paths_to_check = [([i], 0)]
+    paths_to_check = [([vi], 0)]
     paths = []
     #paths.extend(paths_to_check)
     bound = sys.maxsize
     k_reached = False
-
+    all_p_lens = {}
     while len(paths_to_check) > 0:
         tmp_paths_to_check = []
+        #print("---------------------")
         while len(paths_to_check) > 0:
             path_tuple = paths_to_check.pop(0)
             path = path_tuple[0]
+            #print(path[-1], bound, k_reached)
             path_distance = path_tuple[1]
+            #print(path[-1], len(path), path_distance)
             if path_distance >= bound:
                 continue
             ns, ds = get_neigh(
@@ -1404,20 +1408,37 @@ def search_bfs(vi, edges, distances, direct_neigh_idxs, n_edges, k):
             target_vs = {}
             for z in range(ns.shape[0]):
                 vn = int(ns[z])
-                if vn == i:
+                if vn == vi:
                     continue
                 new_path_z = path + [vn]
                 ds_z = ds[z]
                 if vn in target_vs:
                     if ds_z >= target_vs[vn]:
                         continue
+                if vn in all_p_lens:
+                    p_d = all_p_lens[vn]
+                    if ds_z >= p_d:
+                        continue
+                all_p_lens[vn] = ds_z
                 target_vs[vn] = ds_z
                 path_tuple = (new_path_z, ds_z)
                 tmp_paths_to_check.append(path_tuple)
         # end inner while loop
         paths.extend(tmp_paths_to_check)
         # sort paths according to the distances
-        all_dists = [ds for (p, ds) in paths]
+        tmp_paths = []
+        all_dists = []
+        for j in range(len(paths)):
+            path, path_distance = paths[j]
+            target = path[-1]
+            if target in all_p_lens:
+                p_d = all_p_lens[target]
+                if path_distance >= p_d:
+                    continue
+            all_dists.append(path_distance)
+            all_p_lens[target] = path_distance
+            tmp_paths.append((path, path_distance))
+        paths = tmp_paths.copy() 
         sortation = np.argsort(all_dists)
         tmp_paths = len(paths) * [None]
         for j in range(len(paths)):
@@ -1441,9 +1462,11 @@ def search_bfs(vi, edges, distances, direct_neigh_idxs, n_edges, k):
                 k_reached = True
                 break
         if k_reached:
+            #print(shortest_paths[-1][0][-1], bound)
             old_bound = bound
             bound = shortest_paths[-1][1]
             if bound > old_bound:
+                #print(shortest_paths)
                 raise Exception("Bound Error: {0}, {1}".format(bound, old_bound))
         
         # throw paths away that have a larger distance than bound
@@ -1772,9 +1795,24 @@ def mesh_edges_distances(mesh_vertices, mesh_tris, adj_list, knn=45, respect_dir
             f_distances = medges[2, :]
             print("Done in {0:.3f} seconds".format(t2-t1))
         else:
+            #"""
+            for s in tqdm(range(uni_verts.shape[0]), desc="Check Bidirectionality"):
+                start = direct_neigh_idxs[s]
+                stop = start + n_edges[s]
+                neighbours = edges[1, start:stop]
+                for j in range(neighbours.shape[0]):
+                    t = neighbours[j]
+                    startt = direct_neigh_idxs[t]
+                    stopt = startt + n_edges[t]
+                    bidirec = s in edges[1, startt:stopt]
+                    if not bidirec:
+                        print(s, t)
+                        raise Exception("not bidirec")
+            #"""
+
             vi = 0
             f_edges = np.zeros((2, uni_verts.shape[0]*knn), dtype=np.uint32)
-            f_distances = np.zeros((2, uni_verts.shape[0]*knn), dtype=np.float32)
+            f_distances = np.zeros((uni_verts.shape[0]*knn, ), dtype=np.float32)
             arr_idx = 0
             for v_idx in tqdm(range(uni_verts.shape[0]), desc="Searching"):
                 fedges = search_bfs(vi=v_idx, edges=edges, distances=distances,
@@ -1844,7 +1882,7 @@ def superpoint_graph_mesh(mesh_vertices_xyz, mesh_vertices_rgb, mesh_tris, adj_l
     xyz = np.ascontiguousarray(xyz, dtype=np.float32)
     rgb = np.ascontiguousarray(rgb, dtype=np.uint8)
     tris = np.array(np.asarray(mesh_tris), copy=True)
-    print("Calculate geodesic nearest neighbours")
+    print("Calculate geodesic nearest neighbours, {0} vertices, {1} triangles".format(xyz.shape[0], tris.shape[0]))
     d_mesh = mesh_edges_distances(
         mesh_vertices=xyz,
         mesh_tris=tris,
