@@ -1773,77 +1773,16 @@ def mesh_edges_distances(mesh_vertices, mesh_tris, adj_list, knn=45, respect_dir
             print("Done in {0:.3f} seconds".format(t2-t1))
         else:
             vi = 0
+            f_edges = np.zeros((2, uni_verts.shape[0]*knn), dtype=np.uint32)
+            f_distances = np.zeros((2, uni_verts.shape[0]*knn), dtype=np.float32)
+            arr_idx = 0
             for v_idx in tqdm(range(uni_verts.shape[0]), desc="Searching"):
-                N_f = [v_idx]
-                d_f = [0]
-                visited = [v_idx]
-                N_c, d_N = get_neighbourhood(
-                    c=v_idx,
-                    direct_neigh_idxs=direct_neigh_idxs,
-                    n_edges=n_edges,
-                    edges=edges,
-                    distances=distances,
-                    visited=N_f)
-                R = N_c.copy()
-                d_R = d_N.copy()
-                c, d_sc, n, d_sn, R, d_R = get_next(R=R, d_R=d_R)
-                search(
-                    c=c, d_sc=d_sc, n=n, d_sn=d_sn, R=R, d_R=d_R, t=knn+1, N_f=N_f,
-                    d_f=d_f, direct_neigh_idxs=direct_neigh_idxs,
-                    n_edges=n_edges, edges=edges, distances=distances)
-                d_f = np.array(d_f[1:])
-                N_f = np.array(N_f[1:])
-                sortation = np.argsort(d_f)
-                N_f = N_f[sortation]
-                d_f = d_f[sortation]
-
-                stop_i = vi + knn
-                
-                if len(N_f) < knn:
-                    #print("test", len(N_f))
-                    f_edges[1, vi:vi+len(N_f)] = N_f
-                    # we have found less neighbours than knn
-                    missing = knn - len(N_f)
-                    # search the euclidean nearest neighbours which we haven't considered as neighbours yet 
-                    v = mesh_vertices[v_idx]
-                    nn_distances, nn_indices = tree.query(x=v, k=knn+1)
-                    nn_indices = nn_indices[1:]
-                    nn_distances = nn_distances[1:]
-                    # filter vertices that we already consider as neighbours
-                    add_n = []
-                    add_d = []
-                    for j in range(len(nn_indices)):
-                        idx = nn_indices[j]
-                        if idx in N_f:
-                            # we already consider this vertex as neighbour
-                            continue
-                        add_n.append(idx)
-                        add_d.append(nn_distances[j])
-                        # check if we have enough neighbours
-                        if len(add_n) == missing:
-                            break
-                    if len(add_n) < missing:
-                        raise Exception("Choose another k: {0}".format(knn))
-                    if missing == 1:
-                        # we only need to set one neighbour
-                        # determine the index of that neighbour
-                        vix = stop_i - 1
-                        # save the edge and the distance
-                        f_edges[1, vix] = add_n[0]
-                        f_distances[vix] = add_d[0]
-                    else:
-                        # we need to set the 'missing neighbours'
-                        # determine the interval where have to set the neighbours
-                        vi_start = stop_i - missing
-                        # save the edges and the distances
-                        f_edges[1, vi_start:stop_i] = add_n
-                        f_distances[vi_start:stop_i] = add_d
-                else:
-                    f_edges[1, vi:stop_i] = N_f
-                    f_distances[vi:stop_i] = d_f
-                f_edges[0, vi:stop_i] = v_idx
-                #print(v_idx, vi, stop_i, f_edges[:, :200])
-                vi = stop_i
+                fedges = search_bfs(vi=v_idx, edges=edges, distances=distances,
+                    direct_neigh_idxs=direct_neigh_idxs, n_edges=n_edges, k=knn)
+                f_edges[0, arr_idx:arr_idx+knn] = v_idx
+                f_edges[1, arr_idx:arr_idx+knn] = fedges[1, :]
+                f_distances[arr_idx:arr_idx+knn] = fedges[2, :]
+                arr_idx += knn
     source = f_edges[0]
     target = f_edges[1]
 
