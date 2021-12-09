@@ -1366,6 +1366,116 @@ def f(v_idx, knn, edges, direct_neigh_idxs, n_edges, distances, v, tree):
     return f_edges
 
 
+def get_neigh(v, dv, edges, direct_neigh_idxs, n_edges, distances):
+    start = direct_neigh_idxs[v]
+    stop = start + n_edges[v]
+    neighs = edges[1, start:stop]
+    dists = dv + distances[start:stop]
+    return neighs, dists
+
+
+def search_bfs(vi, edges, distances, direct_neigh_idxs, n_edges, k):
+    fedges = np.zeros((3, k), dtype=np.float32)
+    fedges[0, :] = vi
+
+    #print("----------")
+    shortest_paths = []
+    paths_to_check = [([i], 0)]
+    paths = []
+    #paths.extend(paths_to_check)
+    bound = sys.maxsize
+    k_reached = False
+
+    while len(paths_to_check) > 0:
+        tmp_paths_to_check = []
+        while len(paths_to_check) > 0:
+            path_tuple = paths_to_check.pop(0)
+            path = path_tuple[0]
+            path_distance = path_tuple[1]
+            if path_distance >= bound:
+                continue
+            ns, ds = get_neigh(
+                v=path[-1],
+                dv=path_distance,
+                edges=edges,
+                direct_neigh_idxs=direct_neigh_idxs,
+                n_edges=n_edges,
+                distances=distances)
+            target_vs = {}
+            for z in range(ns.shape[0]):
+                vn = int(ns[z])
+                if vn == i:
+                    continue
+                new_path_z = path + [vn]
+                ds_z = ds[z]
+                if vn in target_vs:
+                    if ds_z >= target_vs[vn]:
+                        continue
+                target_vs[vn] = ds_z
+                path_tuple = (new_path_z, ds_z)
+                tmp_paths_to_check.append(path_tuple)
+        # end inner while loop
+        paths.extend(tmp_paths_to_check)
+        # sort paths according to the distances
+        all_dists = [ds for (p, ds) in paths]
+        sortation = np.argsort(all_dists)
+        tmp_paths = len(paths) * [None]
+        for j in range(len(paths)):
+            new_pos = sortation[j]
+            path_tuple = paths[new_pos]
+            tmp_paths[j] = path_tuple
+        paths = tmp_paths.copy()
+        
+        shortest_paths = []
+        target_vs = []
+        for j in range(len(tmp_paths)):
+            path_tuple = tmp_paths[j]
+            path = path_tuple[0]
+            path_distance = path_tuple[1]
+            target_v = path[-1]
+            if target_v in target_vs:
+                continue
+            shortest_paths.append(path_tuple)
+            target_vs.append(target_v)
+            if len(shortest_paths) == k:
+                k_reached = True
+                break
+        if k_reached:
+            old_bound = bound
+            bound = shortest_paths[-1][1]
+            if bound > old_bound:
+                raise Exception("Bound Error: {0}, {1}".format(bound, old_bound))
+        
+        # throw paths away that have a larger distance than bound
+        targets = {}
+        for j in range(len(tmp_paths_to_check)):
+            path_tuple = tmp_paths_to_check[j]
+            path = path_tuple[0]
+            path_distance = path_tuple[1]
+            if path_distance >= bound:
+                continue
+            skip = False
+            target = path[-1]
+            dist = path_distance
+            if target in targets:
+                tdist = targets[target][1]
+                if tdist >= dist:
+                    continue
+            targets[target] = path_tuple
+        for key, val in targets.items():
+            paths_to_check.append(val)
+        #if i == 1:
+        #    print(len(paths_to_check), len(tmp_paths), len(shortest_paths), bound)
+    # end outer while loop
+    for j in range(len(shortest_paths)):
+        path_tuple = shortest_paths[j]
+        path = path_tuple[0]
+        path_distance = path_tuple[1]
+        fedges[1, j] = path[-1]
+        fedges[2, j] = path_distance
+    return fedges
+
+
 def geodesics(v_idx, direct_neigh_idxs, n_edges, edges, distances, target, node_distance, tmp_distances, tmp_neighbours, depth, depths, start_vertex, num_edges):
     depth += 1
     if len(tmp_distances) >= target:
@@ -1651,11 +1761,11 @@ def mesh_edges_distances(mesh_vertices, mesh_tris, adj_list, knn=45, respect_dir
                     f_distances[vi_start:vi_stop] = tmp_distances
     else:
         if n_proc > 1:
-            args = [(vidx, knn, edges, direct_neigh_idxs, n_edges, distances, mesh_vertices[vidx], tree) for vidx in range(uni_verts.shape[0])]
+            args = [(vidx, edges, distances, direct_neigh_idxs, n_edges, knn) for vidx in range(uni_verts.shape[0])]
             t1 = time.time()
             print("Use {0} processes".format(n_proc))
             with Pool(processes=n_proc) as p:
-                res = p.starmap(f, args)
+                res = p.starmap(search_bfs, args)
             t2 = time.time()
             medges = np.hstack(res)
             f_edges = medges[:2, :].astype(np.uint32)
