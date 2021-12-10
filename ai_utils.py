@@ -1428,20 +1428,21 @@ def search_bfs(vi, edges, distances, direct_neigh_idxs, n_edges, k):
         # end inner while loop
         # sort the paths according to the distances in ascending order
         all_p_lens = dict(sorted(all_p_lens.items(), key=lambda x: x[1], reverse=False))
-        # update the upper bound
+        # update the bound
         if len(all_p_lens) >= k:
             old_bound = bound
             bound = list(all_p_lens.values())[k-1]
-            if bound > old_bound:
-                raise Exception("Bound Error: {0}, {1}".format(bound, old_bound))
+            #if bound > old_bound:
+            #    raise Exception("Bound Error: {0}, {1}".format(bound, old_bound))
         
-        # throw paths away that have a larger distance than bound
+        # throw paths away that have a larger distance than the bound
         for j in range(len(tmp_paths_to_check)):
             target, path_distance = tmp_paths_to_check[j]
             if path_distance >= bound:
                 continue
             paths_to_check.append((target, path_distance))
     # end outer while loop
+    # finally, return thek nearest targets and distances
     added = 0
     for key, value in all_p_lens.items():
         if added >= k:
@@ -1449,6 +1450,8 @@ def search_bfs(vi, edges, distances, direct_neigh_idxs, n_edges, k):
         fedges[1, added] = key
         fedges[2, added] = value
         added += 1
+    if added != k:
+        raise Exception("Only found {0}/{1} neighbours".format(added, k))
     return fedges
 
 
