@@ -1426,28 +1426,13 @@ def search_bfs(vi, edges, distances, direct_neigh_idxs, n_edges, k):
                 # new path that to be considered in the next iteration
                 tmp_paths_to_check.append((vn, ds_z))
         # end inner while loop
-        #paths.extend(tmp_paths_to_check)
-        # sort paths according to the distances
-        all_dists = list(all_p_lens.values())
-        targets  =list(all_p_lens.keys())
-        sortation = np.argsort(all_dists)
-        added = 0
-        for j in range(len(sortation)):
-            new_pos = sortation[j]
-            key = targets[new_pos]
-            value = all_dists[new_pos]
-            if added >= k:
-                k_reached = True
-                continue
-            fedges[1, added] = key
-            fedges[2, added] = value
-            added += 1
+        # sort the paths according to the distances in ascending order
+        all_p_lens = dict(sorted(all_p_lens.items(), key=lambda x: x[1], reverse=False))
         # update the upper bound
-        if k_reached:
+        if len(all_p_lens) >= k:
             old_bound = bound
-            bound = fedges[2, -1]
+            bound = list(all_p_lens.values())[k-1]
             if bound > old_bound:
-                #print(shortest_paths)
                 raise Exception("Bound Error: {0}, {1}".format(bound, old_bound))
         
         # throw paths away that have a larger distance than bound
@@ -1457,6 +1442,13 @@ def search_bfs(vi, edges, distances, direct_neigh_idxs, n_edges, k):
                 continue
             paths_to_check.append((target, path_distance))
     # end outer while loop
+    added = 0
+    for key, value in all_p_lens.items():
+        if added >= k:
+            break
+        fedges[1, added] = key
+        fedges[2, added] = value
+        added += 1
     return fedges
 
 
