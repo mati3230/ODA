@@ -1376,126 +1376,87 @@ def get_neigh(v, dv, edges, direct_neigh_idxs, n_edges, distances):
 
 
 def search_bfs(vi, edges, distances, direct_neigh_idxs, n_edges, k):
+    # output structures
     fedges = np.zeros((3, k), dtype=np.float32)
     fedges[0, :] = vi
 
-    #print("----------")
-    shortest_paths = []
-    paths_to_check = [([vi], 0)]
-    paths = []
-    #paths.extend(paths_to_check)
+    # a list of tuples where each tuple consist of a path and its length
+    #shortest_paths = []
+    paths_to_check = [(vi, 0)]
+    # all paths that we observe
+    #paths = []
+    # bound to consider a path as nearest neighbour
     bound = sys.maxsize
+    # does the shortest paths contain k neighbours?, i.e. len(sortest_paths) == k
     k_reached = False
-    all_p_lens = {}
+    # dictionary containing all target vertices with the path length as value
+    all_p_lens = {vi:0}
+    # outer while loop
     while len(paths_to_check) > 0:
+        # ---------BFS--------------
         tmp_paths_to_check = []
-        #print("---------------------")
+        # we empty all paths to check at each iteration and fill them up at the end of the outer while loop
         while len(paths_to_check) > 0:
-            path_tuple = paths_to_check.pop(0)
-            path = path_tuple[0]
-            #print(path[-1], bound, k_reached)
-            path_distance = path_tuple[1]
-            #print(path[-1], len(path), path_distance)
+            target, path_distance = paths_to_check.pop(0)
+            # if path is too long, we do not need to consider it anymore
             if path_distance >= bound:
                 continue
+            # get the adjacent vertices of the target (last) vertex of this path 
             ns, ds = get_neigh(
-                v=path[-1],
+                v=target,
                 dv=path_distance,
                 edges=edges,
                 direct_neigh_idxs=direct_neigh_idxs,
                 n_edges=n_edges,
                 distances=distances)
-            target_vs = {}
+
             for z in range(ns.shape[0]):
                 vn = int(ns[z])
-                if vn == vi:
-                    continue
-                new_path_z = path + [vn]
+                #new_path_z = path + [vn]
                 ds_z = ds[z]
-                if vn in target_vs:
-                    if ds_z >= target_vs[vn]:
-                        continue
+                """
+                ensure that you always save the shortest path to a target
+                and that this shortest path is considered for future iterations
+                """
                 if vn in all_p_lens:
                     p_d = all_p_lens[vn]
                     if ds_z >= p_d:
                         continue
                 all_p_lens[vn] = ds_z
-                target_vs[vn] = ds_z
-                path_tuple = (new_path_z, ds_z)
-                tmp_paths_to_check.append(path_tuple)
+                # new path that to be considered in the next iteration
+                tmp_paths_to_check.append((vn, ds_z))
         # end inner while loop
-        paths.extend(tmp_paths_to_check)
+        #paths.extend(tmp_paths_to_check)
         # sort paths according to the distances
-        tmp_paths = []
-        all_dists = []
-        for j in range(len(paths)):
-            path, path_distance = paths[j]
-            target = path[-1]
-            if target in all_p_lens:
-                p_d = all_p_lens[target]
-                if path_distance >= p_d:
-                    continue
-            all_dists.append(path_distance)
-            all_p_lens[target] = path_distance
-            tmp_paths.append((path, path_distance))
-        paths = tmp_paths.copy() 
+        all_dists = list(all_p_lens.values())
+        targets  =list(all_p_lens.keys())
         sortation = np.argsort(all_dists)
-        tmp_paths = len(paths) * [None]
-        for j in range(len(paths)):
+        added = 0
+        for j in range(len(sortation)):
             new_pos = sortation[j]
-            path_tuple = paths[new_pos]
-            tmp_paths[j] = path_tuple
-        paths = tmp_paths.copy()
-        
-        shortest_paths = []
-        target_vs = []
-        for j in range(len(tmp_paths)):
-            path_tuple = tmp_paths[j]
-            path = path_tuple[0]
-            path_distance = path_tuple[1]
-            target_v = path[-1]
-            if target_v in target_vs:
-                continue
-            shortest_paths.append(path_tuple)
-            target_vs.append(target_v)
-            if len(shortest_paths) == k:
+            key = targets[new_pos]
+            value = all_dists[new_pos]
+            if added >= k:
                 k_reached = True
-                break
+                continue
+            fedges[1, added] = key
+            fedges[2, added] = value
+            added += 1
+        # update the upper bound
         if k_reached:
-            #print(shortest_paths[-1][0][-1], bound)
             old_bound = bound
-            bound = shortest_paths[-1][1]
+            bound = fedges[2, -1]
             if bound > old_bound:
                 #print(shortest_paths)
                 raise Exception("Bound Error: {0}, {1}".format(bound, old_bound))
         
         # throw paths away that have a larger distance than bound
-        targets = {}
         for j in range(len(tmp_paths_to_check)):
-            path_tuple = tmp_paths_to_check[j]
-            path = path_tuple[0]
-            path_distance = path_tuple[1]
+            target, path_distance = tmp_paths_to_check[j]
             if path_distance >= bound:
                 continue
-            skip = False
-            target = path[-1]
-            dist = path_distance
-            if target in targets:
-                tdist = targets[target][1]
-                if tdist >= dist:
-                    continue
-            targets[target] = path_tuple
-        for key, val in targets.items():
-            paths_to_check.append(val)
-        #if i == 1:
-        #    print(len(paths_to_check), len(tmp_paths), len(shortest_paths), bound)
+            paths_to_check.append((target, path_distance))
     # end outer while loop
-    for j in range(len(shortest_paths)):
-        path_tuple = shortest_paths[j]
-        path = path_tuple[0]
-        path_distance = path_tuple[1]
-        fedges[1, j] = path[-1]
-        fedges[2, j] = path_distance
     return fedges
 
 
