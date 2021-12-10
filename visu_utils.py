@@ -130,7 +130,17 @@ def render_o3d(x, w_co=False):
             x.pop(-1)
     else:
         if w_co:
+            #cols = np.asarray(x.vertex_colors)
+            #cols[:, :] = 0.5
+            #cols[271, 0] = 1
+            #verts = np.asarray(x.vertices)
+            #x.vertex_colors = o3d.utility.Vector3dVector(cols)
+            #mesh = o3d.geometry.TriangleMesh()
+            #sphere = o3d.geometry.TriangleMesh.create_sphere(radius=0.1, resolution=5)
+            #sphere.translate(verts[271])
+            #sphere.paint_uniform_color(np.array([1,0,0]))
             o3d.visualization.draw_geometries([x, coordinate_system()])
+            #o3d.visualization.draw_geometries([x, coordinate_system(), sphere])
         else:
             o3d.visualization.draw_geometries([x])
 

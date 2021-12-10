@@ -1393,6 +1393,7 @@ def search_bfs(vi, edges, distances, direct_neigh_idxs, n_edges, k):
     all_p_lens = {vi:0}
     # outer while loop
     while len(paths_to_check) > 0:
+        #print("iter")
         # ---------BFS--------------
         tmp_paths_to_check = []
         # we empty all paths to check at each iteration and fill them up at the end of the outer while loop
@@ -1409,10 +1410,8 @@ def search_bfs(vi, edges, distances, direct_neigh_idxs, n_edges, k):
                 direct_neigh_idxs=direct_neigh_idxs,
                 n_edges=n_edges,
                 distances=distances)
-
             for z in range(ns.shape[0]):
                 vn = int(ns[z])
-                #new_path_z = path + [vn]
                 ds_z = ds[z]
                 """
                 ensure that you always save the shortest path to a target
@@ -1429,9 +1428,9 @@ def search_bfs(vi, edges, distances, direct_neigh_idxs, n_edges, k):
         # sort the paths according to the distances in ascending order
         all_p_lens = dict(sorted(all_p_lens.items(), key=lambda x: x[1], reverse=False))
         # update the bound
-        if len(all_p_lens) >= k:
+        if len(all_p_lens) >= k+1:
             old_bound = bound
-            bound = list(all_p_lens.values())[k-1]
+            bound = list(all_p_lens.values())[k]
             #if bound > old_bound:
             #    raise Exception("Bound Error: {0}, {1}".format(bound, old_bound))
         
@@ -1445,13 +1444,15 @@ def search_bfs(vi, edges, distances, direct_neigh_idxs, n_edges, k):
     # finally, return thek nearest targets and distances
     added = 0
     for key, value in all_p_lens.items():
-        if added >= k:
+        if key == vi:
+            continue
+        if added == k:
             break
         fedges[1, added] = key
         fedges[2, added] = value
         added += 1
     if added != k:
-        raise Exception("Only found {0}/{1} neighbours".format(added, k))
+        raise Exception("Vertex {2}: Only found {0}/{1} neighbours".format(added, k, vi))
     return fedges
 
 
