@@ -14,6 +14,8 @@ import sys
 
 from network import FFGraphNet
 
+from io_utils import load_nn_file, save_nn_file
+
 
 def compute_graph_nn_2(xyz, k_nn1, k_nn2, voronoi = 0.0):
     """ This function is developed by Landrieu et al. (see https://github.com/loicland/superpoint_graph). 
@@ -1832,25 +1834,32 @@ def calculate_stris(tris, partition_vec, sp_idxs):
     return stris, v_to_move, ssizes, sedges
 
 
-def superpoint_graph_mesh(mesh_vertices_xyz, mesh_vertices_rgb, mesh_tris, adj_list, lambda_edge_weight=1, reg_strength=0.1, d_se_max=0, k_nn_adj=45, use_cartesian=True, bidirectional=False, respect_direct_neigh=False, n_proc=1, move_vertices=False):
+def superpoint_graph_mesh(mesh_vertices_xyz, mesh_vertices_rgb, mesh_tris, adj_list, 
+        lambda_edge_weight=1, reg_strength=0.1, d_se_max=0, k_nn_adj=45, use_cartesian=True, 
+        bidirectional=False, respect_direct_neigh=False, n_proc=1, move_vertices=False,
+        g_dir="", g_filename=""):
     adj_list_ = adj_list.copy()
     xyz = np.array(np.asarray(mesh_vertices_xyz), copy=True)
     rgb = np.array(np.asarray(mesh_vertices_rgb), copy=True)
     xyz = np.ascontiguousarray(xyz, dtype=np.float32)
     rgb = np.ascontiguousarray(rgb, dtype=np.uint8)
     tris = np.array(np.asarray(mesh_tris), copy=True)
-    print("Calculate geodesic nearest neighbours, {0} vertices, {1} triangles".format(xyz.shape[0], tris.shape[0]))
-    d_mesh = mesh_edges_distances(
-        mesh_vertices=xyz,
-        mesh_tris=tris,
-        adj_list=adj_list_,
-        knn=k_nn_adj,
-        respect_direct_neigh=respect_direct_neigh,
-        use_cartesian=use_cartesian,
-        bidirectional=bidirectional,
-        n_proc=n_proc)
-    print("Done")
-    d_mesh["edge_weight"] = np.array(1. / ( lambda_edge_weight + d_mesh["distances"] / np.mean(d_mesh["distances"])), dtype = "float32")
+    try:
+        d_mesh = load_nn_file(fdir=g_dir, fname=g_filename, a=k_nn_adj)
+    except:
+        print("Calculate geodesic nearest neighbours, {0} vertices, {1} triangles".format(xyz.shape[0], tris.shape[0]))
+        d_mesh = mesh_edges_distances(
+            mesh_vertices=xyz,
+            mesh_tris=tris,
+            adj_list=adj_list_,
+            knn=k_nn_adj,
+            respect_direct_neigh=respect_direct_neigh,
+            use_cartesian=use_cartesian,
+            bidirectional=bidirectional,
+            n_proc=n_proc)
+        d_mesh["edge_weight"] = np.array(1. / ( lambda_edge_weight + d_mesh["distances"] / np.mean(d_mesh["distances"])), dtype = "float32")
+        save_nn_file(fdir=g_dir, fname=g_filename, d_mesh=d_mesh, a=k_nn_adj)
+        print("Done")
     
     #print("geof")
     # TODO we could add geodesic features that leverage the mesh structure
@@ -2003,7 +2012,8 @@ def superpoint_graph_mesh(mesh_vertices_xyz, mesh_vertices_rgb, mesh_tris, adj_l
     return n_com, n_sedg, components, senders, receivers, stris
 
 
-def graph_mesh(mesh, reg_strength=0.1, lambda_edge_weight=1.0, k_nn_adj=30, use_cartesian=False, bidirectional=False, respect_direct_neigh=False, n_proc=10):
+def graph_mesh(mesh, reg_strength=0.1, lambda_edge_weight=1.0, k_nn_adj=30, use_cartesian=False, 
+        bidirectional=False, respect_direct_neigh=False, n_proc=10, g_dir="", g_filename=""):
     """ This function creates a superpoint graph from a point cloud. 
 
     Parameters
@@ -2049,7 +2059,9 @@ def graph_mesh(mesh, reg_strength=0.1, lambda_edge_weight=1.0, k_nn_adj=30, use_
             use_cartesian=use_cartesian,
             bidirectional=bidirectional,
             respect_direct_neigh=respect_direct_neigh,
-            n_proc=n_proc)
+            n_proc=n_proc,
+            g_dir=g_dir,
+            g_filename=g_filename)
 
     """
     n_sps: Number of superpoints (vertices) in the graph

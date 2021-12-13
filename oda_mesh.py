@@ -107,7 +107,6 @@ def main():
                 elif i == "re":
                     # translate the point cloud in the origin
                     mesh = recenter(P=mesh)
-                    continue
                 else:
                     visualize = False
                     continue
@@ -129,7 +128,9 @@ def main():
                         reg_strength=reg_strength,
                         lambda_edge_weight=lambda_edge_weight,
                         k_nn_adj=k_nn_adj,
-                        n_proc=args.n_proc)
+                        n_proc=args.n_proc,
+                        g_dir=args.g_dir,
+                        g_filename=args.g_filename)
                 # save the initial partition graph
                 if args.save_init_g:
                     save_init_graph(

@@ -30,3 +30,13 @@ At the beginning of the code a point cloud is loaded. This is realized with the 
 ## Creation of the Superpoint Graph
 
 The superpoint graph is created by a function which is called graph (see [ai_utils.py](./ai_utils.py)). The superpoint graph which is later passed to the neural network is created by functions of [Landrieu et al.](https://github.com/loicland/superpoint_graph). The end of the function superpoint_graph (see [ai_utils.py](./ai_utils.py)) returns the used graph data structure. 
+
+## DEMO
+
+Show the coloured mesh:
+
+python oda_mesh.py --file ../sn000000.ply --g_filename sn000000 --n_proc 1 --load_proc_cloud True
+
+Show the partitioned mesh:
+
+python oda_mesh.py --file ../sn000000.ply --g_filename sn000000 --n_proc 1 --save_init_g True --save_probs True --load_init_g True --load_probs True --load_unions True

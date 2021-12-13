@@ -441,6 +441,35 @@ def load_proc_mesh(fdir, fname):
     return mesh
 
 
+def load_nn_file(fdir, fname, a):
+    print("Load nearest neighbours")
+    hf = h5py.File("{0}/nn_{1}_{2}.h5".format(fdir, fname, a), "r")
+
+    distances = np.array(hf["distances"], copy=True)
+    edge_weight = np.array(hf["edge_weight"], copy=True)
+    source = np.array(hf["source"], copy=True)
+    target = np.array(hf["target"], copy=True)
+
+    d_mesh = {
+        "distances": distances,
+        "edge_weight": edge_weight,
+        "source": source,
+        "target": target
+    }
+    print("Done")
+    return d_mesh
+
+
+def save_nn_file(fdir, fname, a ,d_mesh):
+    print("Save nearest neighbours")
+    hf = h5py.File("{0}/nn_{1}_{2}.h5".format(fdir, fname, a), "w")
+    hf.create_dataset("source", data=d_mesh["source"])
+    hf.create_dataset("target", data=d_mesh["target"])
+    hf.create_dataset("distances", data=d_mesh["distances"])
+    hf.create_dataset("edge_weight", data=d_mesh["edge_weight"])
+    hf.close()
+    print("Done")
+
 
 def save_cloud(P, fdir, fname):
     if type(P) == o3d.geometry.TriangleMesh:
