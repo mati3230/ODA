@@ -22,3 +22,5 @@ boost_numpy36-vc142-mt-x64-1_74.dll
 boost_python36-vc142-mt-x64-1_74.dll
 cp_ext.pyd
 ply_c_ext.pyd
+libcp.so
+libply_c.so

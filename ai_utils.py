@@ -1,6 +1,10 @@
 # cut pursuit library (see https://github.com/loicland/superpoint_graph/tree/ssp%2Bspg/partition)
-import cp_ext as libcp
-import ply_c_ext as libply_c
+try:
+    import cp_ext as libcp
+    import ply_c_ext as libply_c
+except:
+    import libcp
+    import libply_c
 
 import numpy as np
 import numpy.matlib
@@ -1787,6 +1791,31 @@ def mesh_edges_distances(mesh_vertices, mesh_tris, adj_list, knn=45, respect_dir
 
 
 def calculate_stris(tris, partition_vec, sp_idxs):
+    """
+    Calculate a partition of triangles, the so called supertriangles, and the 
+    superedges that connect two superpoints.
+
+    Parameters
+    ----------
+    tris : np.ndarray 
+        Array with triangles as three vertex indices (Size: #tris x 3).
+    partition_vec : np.ndarray
+        Vector that represents the partition.
+    sp_idxs : list(np.ndarray)
+        A list of superpoints. A superpoint consist of a set of vertex indices.
+
+    Returns
+    -------
+    stris : np.ndarray
+        A list of supertriangles. A supertrianlge is a set of triangles.
+    v_to_move : list(tuple(idx0, idx1, idx2, sp_idx))
+        A list of tuples. A tuple consist of three vertex indices and a superpoint
+        index where the vertices belong to. 
+    ssizes : list(int)
+        A list with the size of each superpoint
+    sedges : list()
+        A list of links between the superpoints
+    """
     sedges = []
     stris = []
     ssizes = len(sp_idxs) * [None]
@@ -1794,41 +1823,47 @@ def calculate_stris(tris, partition_vec, sp_idxs):
         stris.append(list())
         ssizes[i] = len(sp_idxs[i])
     v_to_move = []
-    for i in tqdm(range(tris.shape[0]), desc="Determine Superedges"):
+    for i in tqdm(range(tris.shape[0]), desc="Determine Supertriangles and -edges"):
         tri = tris[i]
 
+        # determine the vertices of a triangle
         idx0 = tri[0]
         idx1 = tri[1]
         idx2 = tri[2]
         
-        # TODO check if in_component is a partition vec?
+        # determine the superpoint index of each vertex in the triangle
         sp0 = partition_vec[idx0]
         sp1 = partition_vec[idx1]
         sp2 = partition_vec[idx2]
 
-        in_tri = True
+        # determine if the triangles is shared by at least two superpoints
+        is_not_shared = True
         if sp0 != sp1:
-            in_tri = False
+            # is shared
+            is_not_shared = False
             sedges.append([sp0, sp1])
         if sp0 != sp2:
-            in_tri = False
+            is_not_shared = False
             sedges.append([sp0, sp2])
         if sp1 != sp2:
-            in_tri = False
+            is_not_shared = False
             sedges.append([sp1, sp2])
-        if in_tri:
+        if is_not_shared:
+            # we can take any superpoint index and assign the triangle to this index
             stris[sp0].append(i)
         else: 
+            # the largest superpoint will get the triangle and the vertices 
             s0 = ssizes[sp0]
             s1 = ssizes[sp1]
             s2 = ssizes[sp2]
-            sp_sizes = [s0, s1, s2]
             idx = np.argmax([s0, s1, s2])
             sps = [sp0, sp1, sp2]
+            # index of the largest superpoint
             big_sp = sps[idx]
             stris[big_sp].append(i)
             # all points must now move to big_sp
             v_to_move.append((idx0, idx1, idx2, big_sp))
+    # store the final triangle partition as numpy arrays
     for i in range(len(stris)):
         stris[i] = np.array(stris[i], dtype=np.uint32)
     return stris, v_to_move, ssizes, sedges
@@ -1838,6 +1873,57 @@ def superpoint_graph_mesh(mesh_vertices_xyz, mesh_vertices_rgb, mesh_tris, adj_l
         lambda_edge_weight=1, reg_strength=0.1, d_se_max=0, k_nn_adj=45, use_cartesian=True, 
         bidirectional=False, respect_direct_neigh=False, n_proc=1, move_vertices=False,
         g_dir="", g_filename=""):
+    """TODO
+
+    Parameters
+    ----------
+    mesh_vertices_xyz : o3d.geometry.Vector3dVector
+        Vertices of the mesh.
+    mesh_vertices_rgb : o3d.geometry.Vector3dVector
+        Vertex colours of the mesh.
+    mesh_tris : o3d.geometry.Vector3iVector
+        Triangles of the mesh.
+    adj_list : list()
+        Adjacancy list for each point, i.e. the adjacent points of each point.
+    lambda_edge_weight : float
+        Parameter determine the edge weight for minimal part.
+    reg_strength : float
+        Regularization strength for the minimal partition. Increase lambda for a coarser partition.
+    d_se_max : float
+        Can be used to ignore long edges in the nearest neighbour graph.
+    k_nn_adj : int
+        Number of neighbours of the nearest neighbour graph.
+    use_cartesian : bool
+        Use the cartesian product to link all superpoints.
+    bidirectional : bool
+        Make to nearest neighbour edges bidirectional.
+    respect_direct_neigh : bool
+        Keep the direct neighbours into the neighbourhood.
+    n_proc : int
+        How many processes should be used to calculate the nearest neighbours and superpoint features.
+    move_vertices : bool
+        If True, then the vertices that are in triangles that are in different
+        superpoints will belong to the biggest of these superpoint. 
+    g_dir : str
+        Directory to store the temporary files.
+    g_filename : str
+        Name of the temporary file
+
+    Returns
+    -------
+    n_com : int
+        Number of superpoints.
+    n_sedg : int
+        Number of superedges.
+    components : list(np.ndarray)
+        The list of superpoints. A superpoint consist of point indices.
+    senders : np.ndarray
+        The sender nodes of an edge.
+    receivers : np.ndarray
+        The receiver nodes of an edge.
+    stris : list(np.ndarray)
+        A partition of the triangles.
+    """
     adj_list_ = adj_list.copy()
     xyz = np.array(np.asarray(mesh_vertices_xyz), copy=True)
     rgb = np.array(np.asarray(mesh_vertices_rgb), copy=True)
@@ -1861,10 +1947,8 @@ def superpoint_graph_mesh(mesh_vertices_xyz, mesh_vertices_rgb, mesh_tris, adj_l
         save_nn_file(fdir=g_dir, fname=g_filename, d_mesh=d_mesh, a=k_nn_adj)
         print("Done")
     
-    #print("geof")
     # TODO we could add geodesic features that leverage the mesh structure
     geof = libply_c.compute_geof(xyz, d_mesh["target"], k_nn_adj).astype('float32')
-    #print("end")
     #choose here which features to use for the partition
     features = np.hstack((geof, rgb/255.)).astype("float32")#add rgb as a feature for partitioning
     features[:,3] *= 2. #increase importance of verticality (heuristic)
@@ -1970,11 +2054,13 @@ def superpoint_graph_mesh(mesh_vertices_xyz, mesh_vertices_rgb, mesh_tris, adj_l
             # bidirectional
             uni_edges.append(inv_edge)
     else:
+        # calculate superedges and supertriangles
         stris, v_to_move, ssizes, sedges =\
             calculate_stris(
                 tris=tris, partition_vec=in_component, sp_idxs=components)
         
         if move_vertices:
+            # move vertices from superpoint A to B if it is part of a triangle that is inbetween 2 or more superpoints
             tmp_comps = np.array(components, copy=True)
 
             def move_v(comps, spX, sp, iX):
@@ -1998,12 +2084,14 @@ def superpoint_graph_mesh(mesh_vertices_xyz, mesh_vertices_rgb, mesh_tris, adj_l
                     move_v(comps=tmp_comps, spX=sp2, sp=sp, iX=i2)
             components = tmp_comps
 
+        # store the superedges
         sedges = np.array(sedges, dtype=np.uint32)
         uni_edges = np.unique(sedges, axis=0)
         senders = uni_edges[:, 0].tolist()
         receivers = uni_edges[:, 1].tolist()
         n_sedg = uni_edges.shape[0]
 
+    # make the superedges bidectional
     tmp_senders = senders.copy()
     senders.extend(receivers)
     receivers.extend(tmp_senders)
@@ -2018,26 +2106,39 @@ def graph_mesh(mesh, reg_strength=0.1, lambda_edge_weight=1.0, k_nn_adj=30, use_
 
     Parameters
     ----------
-    cloud : np.ndarray
-        A point cloud with the columns xyzrgb.
-    k_nn_adj : int
-        TODO.
-    k_nn_adj : int
-        TODO.
-    lambda_edge_weight : float
+    mesh : o3d.geometry.TriangleMesh
         TODO
     reg_strength : flaot
         TODO
-    d_se_max : float
+    lambda_edge_weight : float
         TODO
-    max_sp_size : int
-        Maximum size of a superpoint. 
+    k_nn_adj : int
+        TODO
+    use_cartesian : bool
+        TODO
+    bidirectional : bool
+        TODO
+    respect_direct_neigh : bool
+        TODO
+    n_proc : int
+        TODO
+    g_dir : str
+        TODO
+    g_filename : str
+        TODO
     
     Returns
     -------
-    dict, list[np.ndarray]
+    dict : graph_dict
         The graph dictionary which is used by the neural network.
+    sp_idxs : list[np.ndarray]
         A list of point indices for each superpoint.  
+    stris : list[np.ndarray]
+        A list of triangles per superpoint.
+    P : np.ndarray
+        The vertices of the mesh from which the features are calculated.
+    n_sedg : int
+        Number of superedges.
     """
     # make a copy of the original cloud to prevent that points do not change any properties
     cloud = np.hstack((np.asarray(mesh.vertices), np.asarray(mesh.vertex_colors)))
@@ -2061,7 +2162,8 @@ def graph_mesh(mesh, reg_strength=0.1, lambda_edge_weight=1.0, k_nn_adj=30, use_
             respect_direct_neigh=respect_direct_neigh,
             n_proc=n_proc,
             g_dir=g_dir,
-            g_filename=g_filename)
+            g_filename=g_filename,
+            move_vertices=False)
 
     """
     n_sps: Number of superpoints (vertices) in the graph
