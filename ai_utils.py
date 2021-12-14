@@ -900,6 +900,18 @@ def graph(cloud, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0
 
 
 def init_model(n_ft, is_mesh=False):
+    """Initialize the neural network.
+
+    Parameters
+    ----------
+    n_ft : int
+        Number of features n_ft that are used by the neural network
+
+    Returns
+    -------
+    model : network.FFGraphNet
+        The model that predicts the correlations
+    """
     model = FFGraphNet(
         name="target_policy",
         n_ft_outpt=8,
@@ -941,6 +953,25 @@ def init_model(n_ft, is_mesh=False):
 
 
 def predict(graph_dict, dec_b=0.5, is_mesh=False):
+    """Predict correlations between the nodes in the graph
+
+    Parameters
+    ----------
+    graph_dict : dict()
+        Superpoint graph.
+    dec_b : float
+        Decision boundary in the range between [0,1].
+    is_mesh : bool
+        Is a mesh subject of the prediction?
+
+    Returns
+    -------
+    action : np.ndarray
+        Which nodes in the graph should be unified.
+    probs : np.ndarray
+        Correlations between the nodes
+
+    """
     t1 = time.time()
     n_ft = graph_dict["nodes"].shape[1]
     model = init_model(n_ft=n_ft, is_mesh=is_mesh)
@@ -961,6 +992,7 @@ def predict(graph_dict, dec_b=0.5, is_mesh=False):
 
 
 def c(k, sp_idxs, P):
+    # TODO can be deleted
     idxs = sp_idxs[k]
     sp = P[idxs]
     features = compute_mesh_features(cloud=sp)
@@ -968,7 +1000,7 @@ def c(k, sp_idxs, P):
 
 
 def compute_mesh_features(cloud, k_far=30, n_normal=30, bins=10, min_r=-0.5, max_r=0.5):
-    """Compute features from a point cloud P. The features of a point cloud are:
+    """Compute features from mesh cloud. The features of a point cloud are:
     - Mean color 
     - Median color
     - 25% Quantil of the color
@@ -1374,6 +1406,31 @@ def f(v_idx, knn, edges, direct_neigh_idxs, n_edges, distances, v, tree):
 
 
 def get_neigh(v, dv, edges, direct_neigh_idxs, n_edges, distances):
+    """Query the direct neighbours of the vertex v. The distance dv to the vertex v
+    will be added to the distances of the direct neigbours. 
+
+    Parameters
+    ----------
+    v : int
+        A vertex index
+    dv : float
+        Distances to the vertex v
+    edges : np.ndarray
+        Edges in the graph in a source target format
+    direct_neigh_idxs : np.ndarray
+        Array with the direct neighbours of the vertices in the graph.
+    n_edges : np.ndarray
+        Number of adjacent vertices per vertex
+    distances : np.ndarray
+        Array that containes the direct neigbours of a vertex
+
+    Returns
+    -------
+    neighs : np.ndarray
+        Direct neighbours (adjacent vertices) of the vertex v
+    dists : np.ndarray
+        The distances to the direct neighbourhood.
+    """
     start = direct_neigh_idxs[v]
     stop = start + n_edges[v]
     neighs = edges[1, start:stop]
@@ -1382,6 +1439,33 @@ def get_neigh(v, dv, edges, direct_neigh_idxs, n_edges, distances):
 
 
 def search_bfs(vi, edges, distances, direct_neigh_idxs, n_edges, k):
+    """Search k nearest neigbours of a vertex with index vi with a BFS.
+
+    Parameters
+    ----------
+    vi : int
+        A vertex index
+    edges : np.ndarray
+        The edges of the mesh stored as 2xN array where N is the number of edges.
+        The first row characterizes
+    distances : np.ndarray
+        distances of the edges in the graph.
+    direct_neigh_idxs : np.ndarray
+        Array that containes the direct neigbours of a vertex
+    n_edges : np.ndarray
+        Number of adjacent vertices per vertex
+    k : int
+        Number of neighbours that should be found
+
+    Returns
+    -------
+    fedges : np.ndarray
+        An array of size 3xk*|V| where |V| is the number of vertices.
+        The first two rows are the neighbourhood connections in a source,
+        target format. The last row stores the distances between the
+        nearest neighbours.
+
+    """
     # output structures
     fedges = np.zeros((3, k), dtype=np.float32)
     fedges[0, :] = vi
@@ -1536,10 +1620,32 @@ def geodesics(v_idx, direct_neigh_idxs, n_edges, edges, distances, target, node_
 
 
 def mesh_edges_distances(mesh_vertices, mesh_tris, adj_list, knn=45, respect_direct_neigh=False, use_cartesian=False, bidirectional=False, n_proc=1):
-    """ Extract the knn nearest neighbours according to the geodesic distance of the vertices.
+    """The function calculates a k-nearest neigbour (knn) graph over the surface of a mesh. 
 
-    adj_list: list()
-        The set adjacency_list[i] contains the indices of adjacent vertices of vertex i as a set.
+    Parameters
+    ----------
+    mesh_vertices : np.ndarray
+        Vertices of the mesh
+    mesh_tris : np.ndarray
+        Triangles of the mesh as triples of vertex indices
+    adj_list : list()
+        A list of neighbour vertex indices per vertex
+    knn : int
+        Number of neigbours that should be found
+    use_cartesian : bool
+        Use the cartesian product to link all superpoints.
+    bidirectional : bool
+        Make to nearest neighbour edges bidirectional.
+    respect_direct_neigh : bool
+        Keep the direct neighbours into the neighbourhood.
+    n_proc : int
+        How many processes should be used to calculate the nearest neighbours and superpoint features.
+
+    Returns
+    -------
+    dict(source : np.ndarray, target : np.ndarray, distances : np.ndarray)
+        Source and target are the edges in the knn-graph. The distances between
+        two vertices in the knn-graph are stored in the distances array.
     """
     if use_cartesian:
         # first, we calculate the edges of the mesh via a cartesian product
@@ -1879,7 +1985,7 @@ def superpoint_graph_mesh(mesh_vertices_xyz, mesh_vertices_rgb, mesh_tris, adj_l
         lambda_edge_weight=1, reg_strength=0.1, d_se_max=0, k_nn_adj=45, use_cartesian=True, 
         bidirectional=False, respect_direct_neigh=False, n_proc=1, move_vertices=False,
         g_dir="", g_filename=""):
-    """TODO
+    """Partitions a mesh.
 
     Parameters
     ----------
@@ -2113,25 +2219,25 @@ def graph_mesh(mesh, reg_strength=0.1, lambda_edge_weight=1.0, k_nn_adj=30, use_
     Parameters
     ----------
     mesh : o3d.geometry.TriangleMesh
-        TODO
-    reg_strength : flaot
-        TODO
+        The input mesh.
     lambda_edge_weight : float
-        TODO
+        Parameter determine the edge weight for minimal part.
+    reg_strength : float
+        Regularization strength for the minimal partition. Increase lambda for a coarser partition.
     k_nn_adj : int
-        TODO
+        Number of neighbours of the nearest neighbour graph.
     use_cartesian : bool
-        TODO
+        Use the cartesian product to link all superpoints.
     bidirectional : bool
-        TODO
+        Make to nearest neighbour edges bidirectional.
     respect_direct_neigh : bool
-        TODO
+        Keep the direct neighbours into the neighbourhood.
     n_proc : int
-        TODO
+        How many processes should be used to calculate the nearest neighbours and superpoint features.
     g_dir : str
-        TODO
+        Directory to store the temporary files.
     g_filename : str
-        TODO
+        Name of the temporary file
     
     Returns
     -------
