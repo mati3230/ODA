@@ -1401,13 +1401,13 @@ def search_bfs(vi, edges, distances, direct_neigh_idxs, n_edges, k):
     while len(paths_to_check) > 0:
         #print("iter")
         # ---------BFS--------------
-        tmp_paths_to_check = []
+        tmp_paths_to_check = {}
         # we empty all paths to check at each iteration and fill them up at the end of the outer while loop
         while len(paths_to_check) > 0:
             target, path_distance = paths_to_check.pop(0)
             # if path is too long, we do not need to consider it anymore
-            if path_distance >= bound:
-                continue
+            #if path_distance >= bound:
+            #    continue
             # get the adjacent vertices of the target (last) vertex of this path 
             ns, ds = get_neigh(
                 v=target,
@@ -1429,7 +1429,8 @@ def search_bfs(vi, edges, distances, direct_neigh_idxs, n_edges, k):
                         continue
                 all_p_lens[vn] = ds_z
                 # new path that to be considered in the next iteration
-                tmp_paths_to_check.append((vn, ds_z))
+                #tmp_paths_to_check.append((vn, ds_z))
+                tmp_paths_to_check[vn] = ds_z
         # end inner while loop
         # sort the paths according to the distances in ascending order
         all_p_lens = dict(sorted(all_p_lens.items(), key=lambda x: x[1], reverse=False))
@@ -1441,11 +1442,16 @@ def search_bfs(vi, edges, distances, direct_neigh_idxs, n_edges, k):
             #    raise Exception("Bound Error: {0}, {1}".format(bound, old_bound))
         
         # throw paths away that have a larger distance than the bound
-        for j in range(len(tmp_paths_to_check)):
+        """for j in range(len(tmp_paths_to_check)):
             target, path_distance = tmp_paths_to_check[j]
             if path_distance >= bound:
                 continue
-            paths_to_check.append((target, path_distance))
+            paths_to_check.append((target, path_distance))"""
+        for vert, dist in tmp_paths_to_check.items():
+            if dist >= bound:
+                continue
+            paths_to_check.append((vert, dist))
+
     # end outer while loop
     # finally, return thek nearest targets and distances
     added = 0
