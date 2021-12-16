@@ -52,10 +52,10 @@ def compute_graph_nn_2(xyz, k_nn1, k_nn2, voronoi = 0.0):
     """compute simulteneoulsy 2 knn structures
     only saves target for knn2
     assumption : knn1 <= knn2"""
-    assert k_nn1 <= k_nn2, "knn1 must be smaller than knn2"
     n_ver = xyz.shape[0]
     #compute nearest neighbors
     graph = dict([("is_nn", True)])
+    #assert k_nn1 <= k_nn2, "knn1 must be smaller than knn2"
     nn = NearestNeighbors(n_neighbors=k_nn2+1, algorithm='kd_tree').fit(xyz)
     # get the k nearest neighbours of every point in the point cloud.
     distances, neighbors = nn.kneighbors(xyz)
@@ -1460,7 +1460,7 @@ def search_bfs(vi, edges, distances, direct_neigh_idxs, n_edges, k):
     Returns
     -------
     fedges : np.ndarray
-        An array of size 3xk*|V| where |V| is the number of vertices.
+        An array of size 3xk.
         The first two rows are the neighbourhood connections in a source,
         target format. The last row stores the distances between the
         nearest neighbours.
@@ -1619,7 +1619,8 @@ def geodesics(v_idx, direct_neigh_idxs, n_edges, edges, distances, target, node_
         return tmp_distances, tmp_neighbours, depths
 
 
-def mesh_edges_distances(mesh_vertices, mesh_tris, adj_list, knn=45, respect_direct_neigh=False, use_cartesian=False, bidirectional=False, n_proc=1):
+def mesh_edges_distances(mesh_vertices, mesh_tris, adj_list, knn=45, respect_direct_neigh=False, 
+        use_cartesian=False, bidirectional=False, n_proc=1, ignore_knn=False):
     """The function calculates a k-nearest neigbour (knn) graph over the surface of a mesh. 
 
     Parameters
@@ -1699,6 +1700,9 @@ def mesh_edges_distances(mesh_vertices, mesh_tris, adj_list, knn=45, respect_dir
     # distances of the edges from a vertex v_i to v_j 
     distances = np.sqrt(np.sum((mesh_vertices[source] - mesh_vertices[target])**2, axis=1))
     
+    if ignore_knn:
+        return {"source": source, "target": target, "distances": distances}
+
     # unique vertices with the begin of each vertex (which is stored in 'direct_neigh_idxs') plus the number of neighbours 'n_edges'
     uni_verts, direct_neigh_idxs, n_edges = np.unique(edges[0, :], return_index=True, return_counts=True)
     # target number of edges
@@ -1870,7 +1874,7 @@ def mesh_edges_distances(mesh_vertices, mesh_tris, adj_list, knn=45, respect_dir
             f_distances = medges[2, :]
             print("Done in {0:.3f} seconds".format(t2-t1))
         else:
-            #"""
+            """
             for s in tqdm(range(uni_verts.shape[0]), desc="Check Bidirectionality"):
                 start = direct_neigh_idxs[s]
                 stop = start + n_edges[s]
@@ -1883,7 +1887,7 @@ def mesh_edges_distances(mesh_vertices, mesh_tris, adj_list, knn=45, respect_dir
                     if not bidirec:
                         print(s, t)
                         raise Exception("not bidirec")
-            #"""
+            """
 
             vi = 0
             f_edges = np.zeros((2, uni_verts.shape[0]*knn), dtype=np.uint32)
@@ -1984,7 +1988,7 @@ def calculate_stris(tris, partition_vec, sp_idxs):
 def superpoint_graph_mesh(mesh_vertices_xyz, mesh_vertices_rgb, mesh_tris, adj_list, 
         lambda_edge_weight=1, reg_strength=0.1, d_se_max=0, k_nn_adj=45, use_cartesian=True, 
         bidirectional=False, respect_direct_neigh=False, n_proc=1, move_vertices=False,
-        g_dir="", g_filename=""):
+        g_dir=None, g_filename=None, ignore_knn=False):
     """Partitions a mesh.
 
     Parameters
@@ -2054,9 +2058,13 @@ def superpoint_graph_mesh(mesh_vertices_xyz, mesh_vertices_rgb, mesh_tris, adj_l
             respect_direct_neigh=respect_direct_neigh,
             use_cartesian=use_cartesian,
             bidirectional=bidirectional,
-            n_proc=n_proc)
+            n_proc=n_proc,
+            ignore_knn=ignore_knn)
         d_mesh["edge_weight"] = np.array(1. / ( lambda_edge_weight + d_mesh["distances"] / np.mean(d_mesh["distances"])), dtype = "float32")
-        save_nn_file(fdir=g_dir, fname=g_filename, d_mesh=d_mesh, a=k_nn_adj)
+        try:
+            save_nn_file(fdir=g_dir, fname=g_filename, d_mesh=d_mesh, a=k_nn_adj)
+        except Exception as e:
+            print("Nearest neighbours not saved")
         print("Done")
     
     # TODO we could add geodesic features that leverage the mesh structure
@@ -2073,7 +2081,11 @@ def superpoint_graph_mesh(mesh_vertices_xyz, mesh_vertices_rgb, mesh_tris, adj_l
     # the number of components (superpoints) n_com
     n_com = max(in_component)+1
 
-    in_component = np.array(in_component)    
+    if n_com == 1:
+        return n_com, 0, components, None, None, None  
+
+    in_component = np.array(in_component)  
+
 
     landrieu_method = False
 
@@ -2213,7 +2225,7 @@ def superpoint_graph_mesh(mesh_vertices_xyz, mesh_vertices_rgb, mesh_tris, adj_l
 
 
 def graph_mesh(mesh, reg_strength=0.1, lambda_edge_weight=1.0, k_nn_adj=30, use_cartesian=False, 
-        bidirectional=False, respect_direct_neigh=False, n_proc=10, g_dir="", g_filename=""):
+        bidirectional=False, respect_direct_neigh=False, n_proc=10, g_dir=None, g_filename=None):
     """ This function creates a superpoint graph from a point cloud. 
 
     Parameters

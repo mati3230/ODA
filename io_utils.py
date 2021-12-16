@@ -373,6 +373,15 @@ def save_partition(partition, fdir, fname):
     print("Done")
 
 
+def save_partitions(partitions, fdir, fname):
+    print("Save partitions")
+    hf = h5py.File("{0}/partitions_{1}.h5".format(fdir, fname), "w")
+    for pname, partition in partitions:
+        hf.create_dataset(pname, data=partition)
+    hf.close()
+    print("Done")
+
+
 def load_cloud(file, r=255, g=0, b=0, p=1):
     """ Load a point cloud.
 
@@ -569,3 +578,14 @@ def save_meshes(meshes, fdir, filename="", ending="glb"):
 def load_mesh(file):
     mesh = o3d.io.read_triangle_mesh(file)
     return mesh
+
+
+def write_csv(filedir, filename, csv):
+    if filedir[-1] != "/":
+        filedir += "/"
+    if not filename.endswith(".csv"):
+        filename += ".csv"
+    out_filename = filedir + filename
+    file = open(out_filename, "w")
+    file.write(csv)
+    file.close()

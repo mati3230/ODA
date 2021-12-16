@@ -722,3 +722,11 @@ def simplify_mesh(mesh):
     n_tris_new = np.asarray(mesh.triangles).shape[0]
     print("Simplified mesh from {0} to {1} triangles.".format(n_tris_old, n_tris_new))
     return mesh
+
+
+def get_P(mesh):
+    # Create the point cloud from the mesh
+    vertices = np.asarray(mesh.vertices)
+    vertex_colors = np.asarray(mesh.vertex_colors)
+    P = np.hstack((vertices, vertex_colors))
+    return P, vertices, vertex_colors
