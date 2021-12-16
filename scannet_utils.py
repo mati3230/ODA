@@ -117,24 +117,6 @@ def get_object_idxs(seg_group, seg_indices):
 
 
 def get_ground_truth(scannet_dir, scene):
-    """Transforms scenes from the scannet data set into point clouds with a corresponding
-    ground truth partition. 
-
-    Parameters
-    ----------
-    pid : int
-        A process id.
-    scenes : list(str)
-        A list of scenes.
-    scannet_dir : str
-        Directory of the original scannet scenes.
-    upsampling : int
-        Upsampling factor n. A resulting point cloud will have n times #vertices of a mesh.
-    mscannet_dir : str
-        Directory where the point clouds will be stored.
-    special_objects : dict
-        Dictionary where some objects have special numbers such as the floor or ceiling.
-    """
     filepath = scannet_dir + "/" + scene + "/"
     seg_indices_file = filepath + scene + "_vh_clean_2.0.010000.segs.json"
     mesh_file = filepath + scene + "_vh_clean_2.ply"

@@ -21,7 +21,7 @@ from network import FFGraphNet
 from io_utils import load_nn_file, save_nn_file
 
 
-def compute_graph_nn_2(xyz, k_nn1, k_nn2, voronoi = 0.0):
+def compute_graph_nn_2(xyz, k_nn1, k_nn2, voronoi = 0.0, verbose=True):
     """ This function is developed by Landrieu et al. (see https://github.com/loicland/superpoint_graph). 
     Basically, it computes a nearest neighbour graph.  
 
@@ -48,7 +48,8 @@ def compute_graph_nn_2(xyz, k_nn1, k_nn2, voronoi = 0.0):
         Shape is (n_ver * k_nn1, ) and is the same as graph["target"] when voronoi = 0.0. 
         This does not hold if voronoi method is used.
     """
-    print("Compute Graph NN")
+    if verbose:
+        print("Compute Graph NN")
     """compute simulteneoulsy 2 knn structures
     only saves target for knn2
     assumption : knn1 <= knn2"""
@@ -122,11 +123,12 @@ def compute_graph_nn_2(xyz, k_nn1, k_nn2, voronoi = 0.0):
         # distances between the i-th point and a neighbour point
         graph["distances"] = distances.flatten().astype('float32')
     #save the graph
-    print("Done")
+    if verbose:
+        print("Done")
     return graph, target2
 
 
-def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0.1, d_se_max=0):
+def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0.1, d_se_max=0, verbose=True):
     """ This function is developed by Landrieu et al. 
     (see https://github.com/loicland/superpoint_graph). 
     We modified the output of the function to fit our use case. 
@@ -135,9 +137,10 @@ def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, 
     rgb = np.ascontiguousarray(rgb, dtype=np.uint8)
     #---compute 10 nn graph-------
     # target_fea are the indices of the k nearest neighbours of each point (a point itself is not considered as neighbour)
-    graph_nn, target_fea = compute_graph_nn_2(xyz, k_nn_adj, k_nn_geof)
+    graph_nn, target_fea = compute_graph_nn_2(xyz, k_nn_adj, k_nn_geof, verbose=verbose)
     #---compute geometric features-------
-    print("Compute geof")
+    if verbose:
+        print("Compute geof")
     geof = libply_c.compute_geof(xyz, target_fea, k_nn_geof).astype('float32')
     del target_fea
 
@@ -147,14 +150,16 @@ def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, 
                 
     graph_nn["edge_weight"] = np.array(1. / ( lambda_edge_weight + graph_nn["distances"] / np.mean(graph_nn["distances"])), dtype = "float32")
     #print("        minimal partition...")
-    print("Minimal Partition")
+    if verbose:
+        print("Minimal Partition")
     """
     components: the actual superpoint idxs which is a list of lists (where each list contains point indices)
     in_component: this is one list with the length of number of points - here we got a superpoint idx for each point
         this is just another representation of components.
     """
     components, in_component = libcp.cutpursuit(features, graph_nn["source"], graph_nn["target"], graph_nn["edge_weight"], reg_strength)
-    print("Done")
+    if verbose:
+        print("Done")
     #print(components)
     #print(in_component)
     # components represent the actual superpoints (partition) - now we need to compute the edges of the superpoints
@@ -262,7 +267,8 @@ def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, 
     senders = []
     receivers = []
     uni_edges = []
-    print("Total number of edges: {0}".format(n_sedg))
+    if verbose:
+        print("Total number of edges: {0}".format(n_sedg))
     n_filtered = 0
     #---compute the superedges features---
     for i_sedg in range(0, n_sedg):
@@ -288,7 +294,8 @@ def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, 
     receivers.extend(tmp_senders)
     senders = np.array(senders, dtype=np.uint32)
     receivers = np.array(receivers, dtype=np.uint32)
-    print("{0} edges filtered, {1} unique edges".format(n_filtered, len(uni_edges)))
+    if verbose:
+        print("{0} edges filtered, {1} unique edges".format(n_filtered, len(uni_edges)))
     return n_com, n_sedg, components, senders, receivers, len(uni_edges)
 
 
@@ -1620,7 +1627,7 @@ def geodesics(v_idx, direct_neigh_idxs, n_edges, edges, distances, target, node_
 
 
 def mesh_edges_distances(mesh_vertices, mesh_tris, adj_list, knn=45, respect_direct_neigh=False, 
-        use_cartesian=False, bidirectional=False, n_proc=1, ignore_knn=False):
+        use_cartesian=False, bidirectional=False, n_proc=1, ignore_knn=False, verbose=True):
     """The function calculates a k-nearest neigbour (knn) graph over the surface of a mesh. 
 
     Parameters
@@ -1893,7 +1900,7 @@ def mesh_edges_distances(mesh_vertices, mesh_tris, adj_list, knn=45, respect_dir
             f_edges = np.zeros((2, uni_verts.shape[0]*knn), dtype=np.uint32)
             f_distances = np.zeros((uni_verts.shape[0]*knn, ), dtype=np.float32)
             arr_idx = 0
-            for v_idx in tqdm(range(uni_verts.shape[0]), desc="Searching"):
+            for v_idx in tqdm(range(uni_verts.shape[0]), desc="Searching", disable=not verbose):
                 fedges = search_bfs(vi=v_idx, edges=edges, distances=distances,
                     direct_neigh_idxs=direct_neigh_idxs, n_edges=n_edges, k=knn)
                 f_edges[0, arr_idx:arr_idx+knn] = v_idx
@@ -1906,7 +1913,7 @@ def mesh_edges_distances(mesh_vertices, mesh_tris, adj_list, knn=45, respect_dir
     return {"source": source, "target": target, "distances": f_distances}
 
 
-def calculate_stris(tris, partition_vec, sp_idxs):
+def calculate_stris(tris, partition_vec, sp_idxs, verbose=True):
     """
     Calculate a partition of triangles, the so called supertriangles, and the 
     superedges that connect two superpoints.
@@ -1939,7 +1946,7 @@ def calculate_stris(tris, partition_vec, sp_idxs):
         stris.append(list())
         ssizes[i] = len(sp_idxs[i])
     v_to_move = []
-    for i in tqdm(range(tris.shape[0]), desc="Determine Supertriangles and -edges"):
+    for i in tqdm(range(tris.shape[0]), desc="Determine Supertriangles and -edges", disable=not verbose):
         tri = tris[i]
 
         # determine the vertices of a triangle
@@ -1988,7 +1995,7 @@ def calculate_stris(tris, partition_vec, sp_idxs):
 def superpoint_graph_mesh(mesh_vertices_xyz, mesh_vertices_rgb, mesh_tris, adj_list, 
         lambda_edge_weight=1, reg_strength=0.1, d_se_max=0, k_nn_adj=45, use_cartesian=True, 
         bidirectional=False, respect_direct_neigh=False, n_proc=1, move_vertices=False,
-        g_dir=None, g_filename=None, ignore_knn=False):
+        g_dir=None, g_filename=None, ignore_knn=False, verbose=True):
     """Partitions a mesh.
 
     Parameters
@@ -2049,7 +2056,8 @@ def superpoint_graph_mesh(mesh_vertices_xyz, mesh_vertices_rgb, mesh_tris, adj_l
     try:
         d_mesh = load_nn_file(fdir=g_dir, fname=g_filename, a=k_nn_adj)
     except:
-        print("Calculate geodesic nearest neighbours, {0} vertices, {1} triangles".format(xyz.shape[0], tris.shape[0]))
+        if verbose:
+            print("Calculate geodesic nearest neighbours, {0} vertices, {1} triangles".format(xyz.shape[0], tris.shape[0]))
         d_mesh = mesh_edges_distances(
             mesh_vertices=xyz,
             mesh_tris=tris,
@@ -2059,13 +2067,16 @@ def superpoint_graph_mesh(mesh_vertices_xyz, mesh_vertices_rgb, mesh_tris, adj_l
             use_cartesian=use_cartesian,
             bidirectional=bidirectional,
             n_proc=n_proc,
-            ignore_knn=ignore_knn)
+            ignore_knn=ignore_knn,
+            verbose=verbose)
         d_mesh["edge_weight"] = np.array(1. / ( lambda_edge_weight + d_mesh["distances"] / np.mean(d_mesh["distances"])), dtype = "float32")
         try:
             save_nn_file(fdir=g_dir, fname=g_filename, d_mesh=d_mesh, a=k_nn_adj)
         except Exception as e:
-            print("Nearest neighbours not saved")
-        print("Done")
+            if verbose:
+                print("Nearest neighbours not saved")
+        if verbose:
+            print("Done")
     
     # TODO we could add geodesic features that leverage the mesh structure
     geof = libply_c.compute_geof(xyz, d_mesh["target"], k_nn_adj).astype('float32')
@@ -2073,9 +2084,11 @@ def superpoint_graph_mesh(mesh_vertices_xyz, mesh_vertices_rgb, mesh_tris, adj_l
     features = np.hstack((geof, rgb/255.)).astype("float32")#add rgb as a feature for partitioning
     features[:,3] *= 2. #increase importance of verticality (heuristic)
     #print(features)
-    print("Compute cut pursuit")
+    if verbose:
+        print("Compute cut pursuit")
     components, in_component = libcp.cutpursuit(features, d_mesh["source"], d_mesh["target"], d_mesh["edge_weight"], reg_strength)
-    print("Done")
+    if verbose:
+        print("Done")
     # components represent the actual superpoints (partition) - now we need to compute the edges of the superpoints
     components = np.array(components, dtype = "object")
     # the number of components (superpoints) n_com
@@ -2181,7 +2194,7 @@ def superpoint_graph_mesh(mesh_vertices_xyz, mesh_vertices_rgb, mesh_tris, adj_l
         # calculate superedges and supertriangles
         stris, v_to_move, ssizes, sedges =\
             calculate_stris(
-                tris=tris, partition_vec=in_component, sp_idxs=components)
+                tris=tris, partition_vec=in_component, sp_idxs=components, verbose=verbose)
         
         if move_vertices:
             # move vertices from superpoint A to B if it is part of a triangle that is inbetween 2 or more superpoints

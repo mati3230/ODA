@@ -373,13 +373,15 @@ def save_partition(partition, fdir, fname):
     print("Done")
 
 
-def save_partitions(partitions, fdir, fname):
-    print("Save partitions")
+def save_partitions(partitions, fdir, fname, verbose=True):
+    if verbose:
+        print("Save partitions")
     hf = h5py.File("{0}/partitions_{1}.h5".format(fdir, fname), "w")
     for pname, partition in partitions:
         hf.create_dataset(pname, data=partition)
     hf.close()
-    print("Done")
+    if verbose:
+        print("Done")
 
 
 def load_cloud(file, r=255, g=0, b=0, p=1):

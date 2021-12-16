@@ -64,7 +64,8 @@ def compare(scene_id, scene_name, scannet_dir, reg_strength, k_nn_adj):
         k_nn_adj=k_nn_adj,
         use_cartesian=False,
         n_proc=1,
-        ignore_knn=False
+        ignore_knn=False,
+        verbose=False
         )
     par_v_M = initial_partition(P=mesh, sp_idxs=sp_idxs_M)
 
@@ -79,7 +80,8 @@ def compare(scene_id, scene_name, scannet_dir, reg_strength, k_nn_adj):
         k_nn_adj=k_nn_adj,
         use_cartesian=False,
         n_proc=1,
-        ignore_knn=True
+        ignore_knn=True,
+        verbose=False
         )
     par_v_M_k = initial_partition(P=mesh, sp_idxs=sp_idxs_M_k)
 
@@ -91,7 +93,8 @@ def compare(scene_id, scene_name, scannet_dir, reg_strength, k_nn_adj):
         k_nn_geof=k_nn_adj,
         lambda_edge_weight=lambda_edge_weight,
         reg_strength=reg_strength,
-        d_se_max=d_se_max)
+        d_se_max=d_se_max,
+        verbose=False)
     par_v_P = initial_partition(P=P, sp_idxs=sp_idxs_P)
 
     ooa_M, oaa_M_k, ooa_P = ooa(
@@ -105,7 +108,8 @@ def compare(scene_id, scene_name, scannet_dir, reg_strength, k_nn_adj):
         al = mesh.adjacency_list[i]
         n_per_v = len(al)
 
-    save_partitions(partitions=[("gt", par_v_gt), ("M", par_v_M), ("P", par_v_P), ("M_k", par_v_M_k)], fdir=args.partition_dir, fname=str(scene_id))
+    save_partitions(partitions=[("gt", par_v_gt), ("M", par_v_M), ("P", par_v_P), ("M_k", par_v_M_k)],
+        fdir=args.partition_dir, fname=str(scene_id) + "_" + str(reg_strength) + "_" + str(k_nn_adj), verbose=False)
 
     return scene_id, scene_name, P.shape[0], np.asarray(mesh.triangles).shape[0], reg_strength, k_nn_adj,\
         n_sps_M, n_sedg_M, ooa_M, n_sps_M_k, n_sedg_M_k, ooa_M_k, n_sps_P, n_sedg_P, ooa_P,\
