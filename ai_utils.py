@@ -134,18 +134,18 @@ def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, 
     We modified the output of the function to fit our use case. 
     """
     xyz = np.ascontiguousarray(xyz, dtype=np.float32)
-    rgb = np.ascontiguousarray(rgb, dtype=np.uint8)
+    rgb = np.ascontiguousarray(rgb, dtype=np.float32)
     #---compute 10 nn graph-------
     # target_fea are the indices of the k nearest neighbours of each point (a point itself is not considered as neighbour)
     graph_nn, target_fea = compute_graph_nn_2(xyz, k_nn_adj, k_nn_geof, verbose=verbose)
     #---compute geometric features-------
     if verbose:
         print("Compute geof")
-    geof = libply_c.compute_geof(xyz, target_fea, k_nn_geof).astype('float32')
+    geof = libply_c.compute_geof(xyz, target_fea, k_nn_geof, False).astype(np.float32)
     del target_fea
 
     #choose here which features to use for the partition (features vector for each point)
-    features = np.hstack((geof, rgb/255.)).astype("float32")#add rgb as a feature for partitioning
+    features = np.hstack((geof, rgb)).astype("float32")#add rgb as a feature for partitioning
     features[:,3] = 2. * features[:,3] #increase importance of verticality (heuristic)
                 
     graph_nn["edge_weight"] = np.array(1. / ( lambda_edge_weight + graph_nn["distances"] / np.mean(graph_nn["distances"])), dtype = "float32")
@@ -2054,7 +2054,7 @@ def superpoint_graph_mesh(mesh_vertices_xyz, mesh_vertices_rgb, mesh_tris, adj_l
     rgb = np.ascontiguousarray(rgb, dtype=np.float32)
     tris = np.array(np.asarray(mesh_tris), copy=True)
     try:
-        d_mesh = load_nn_file(fdir=g_dir, fname=g_filename, a=k_nn_adj)
+        d_mesh = load_nn_file(fdir=g_dir, fname=g_filename, a=k_nn_adj, verbose=verbose)
     except:
         if verbose:
             print("Calculate geodesic nearest neighbours, {0} vertices, {1} triangles".format(xyz.shape[0], tris.shape[0]))
@@ -2071,7 +2071,7 @@ def superpoint_graph_mesh(mesh_vertices_xyz, mesh_vertices_rgb, mesh_tris, adj_l
             verbose=verbose)
         d_mesh["edge_weight"] = np.array(1. / ( lambda_edge_weight + d_mesh["distances"] / np.mean(d_mesh["distances"])), dtype = "float32")
         try:
-            save_nn_file(fdir=g_dir, fname=g_filename, d_mesh=d_mesh, a=k_nn_adj)
+            save_nn_file(fdir=g_dir, fname=g_filename, d_mesh=d_mesh, a=k_nn_adj, verbose=verbose)
         except Exception as e:
             if verbose:
                 print("Nearest neighbours not saved")
@@ -2088,7 +2088,7 @@ def superpoint_graph_mesh(mesh_vertices_xyz, mesh_vertices_rgb, mesh_tris, adj_l
     else:
         geof = libply_c.compute_geof(xyz, d_mesh["target"], k_nn_adj, False).astype(np.float32)
     #choose here which features to use for the partition
-    features = np.hstack((geof, rgb/255.)).astype("float32")#add rgb as a feature for partitioning
+    features = np.hstack((geof, rgb)).astype("float32")#add rgb as a feature for partitioning
     features[:,3] *= 2. #increase importance of verticality (heuristic)
     #print(features)
     if verbose:

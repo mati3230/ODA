@@ -7,7 +7,8 @@ import open3d as o3d
 import numpy as np
 
 from io_utils import save_partitions,\
-                    write_csv
+                    write_csv,\
+                    mkdir
 from ai_utils import superpoint_graph_mesh,\
                     superpoint_graph
 from sp_utils import get_P,\
@@ -15,6 +16,7 @@ from sp_utils import get_P,\
 from scannet_utils import get_scenes, \
                     get_ground_truth
 from partition.partition import Partition
+from partition.density_utils import densities_np
 
 
 def ooa(par_v_gt, par_v_M, par_v_M_k, par_v_P):
@@ -24,7 +26,7 @@ def ooa(par_v_gt, par_v_M, par_v_M_k, par_v_P):
     par_v_M_k = par_v_M_k[sortation]
     par_v_P = par_v_P[sortation]
 
-    ugt, ugt_idxs, ugt_counts = np.unique(par_v_gt, return_indices=True, return_counts=True)
+    ugt, ugt_idxs, ugt_counts = np.unique(par_v_gt, return_index=True, return_counts=True)
 
     partition_gt = Partition(partition=par_v_gt, uni=ugt, idxs=ugt_idxs, counts=ugt_counts)
     partition_M = Partition(partition=par_v_M)
@@ -34,82 +36,85 @@ def ooa(par_v_gt, par_v_M, par_v_M_k, par_v_P):
     # nr of vertices/points
     max_density = partition_gt.partition.shape[0]
 
-    ooa_M, _ = partition_gt.overall_obj_acc(max_density=max_density, partition_B=partition_M)
-    ooa_M_k, _ = partition_gt.overall_obj_acc(max_density=max_density, partition_B=partition_M_k)
-    ooa_P, _ = partition_gt.overall_obj_acc(max_density=max_density, partition_B=partition_P)
+    ooa_M, _ = partition_gt.overall_obj_acc(max_density=max_density, partition_B=partition_M, density_function=densities_np)
+    ooa_M_k, _ = partition_gt.overall_obj_acc(max_density=max_density, partition_B=partition_M_k, density_function=densities_np)
+    ooa_P, _ = partition_gt.overall_obj_acc(max_density=max_density, partition_B=partition_P, density_function=densities_np)
 
     return ooa_M, ooa_M_k, ooa_P
 
 
-def compare(scene_id, scene_name, scannet_dir, reg_strength, k_nn_adj):
+def compare(scene_id, scene_name, scannet_dir, reg_strength, k_nn_adj, partition_dir):
     lambda_edge_weight = 1.
     d_se_max = 0
     k_nn_adj = int(k_nn_adj)
+    try:
+        mesh, par_v_gt, file_gt = get_ground_truth(scannet_dir=scannet_dir, scene=scene_name)
+        #mesh = o3d.geometry.TriangleMesh.create_sphere(radius=1.0, resolution=10)
+        #rgb = np.random.rand(np.asarray(mesh.vertices).shape[0],3)
+        #mesh.vertex_colors = o3d.utility.Vector3dVector(rgb)
+        mesh.compute_adjacency_list()
 
-    mesh, par_v_gt, file_gt = get_ground_truth(scannet_dir=scannet_dir, scene=scene_name)
-    #mesh = o3d.geometry.TriangleMesh.create_sphere(radius=1.0, resolution=10)
-    #rgb = np.random.rand(np.asarray(mesh.vertices).shape[0],3)
-    #mesh.vertex_colors = o3d.utility.Vector3dVector(rgb)
+        n_sps_M, n_sedg_M, sp_idxs_M, senders_M, receivers_M, stris_M = superpoint_graph_mesh(
+            mesh_vertices_xyz=mesh.vertices,
+            mesh_vertices_rgb=mesh.vertex_colors,
+            mesh_tris=mesh.triangles,
+            adj_list=mesh.adjacency_list,
+            lambda_edge_weight=lambda_edge_weight,
+            reg_strength=reg_strength,
+            d_se_max=d_se_max,
+            k_nn_adj=k_nn_adj,
+            use_cartesian=False,
+            n_proc=1,
+            ignore_knn=False,
+            verbose=False
+            )
+        par_v_M = initial_partition(P=mesh, sp_idxs=sp_idxs_M, verbose=False)
 
-    mesh.compute_adjacency_list()
+        n_sps_M_k, n_sedg_M_k, sp_idxs_M_k, senders_M_k, receivers_M_k, stris_M_k = superpoint_graph_mesh(
+            mesh_vertices_xyz=mesh.vertices,
+            mesh_vertices_rgb=mesh.vertex_colors,
+            mesh_tris=mesh.triangles,
+            adj_list=mesh.adjacency_list,
+            lambda_edge_weight=lambda_edge_weight,
+            reg_strength=reg_strength,
+            d_se_max=d_se_max,
+            k_nn_adj=k_nn_adj,
+            use_cartesian=False,
+            n_proc=1,
+            ignore_knn=True,
+            verbose=False
+            )
+        par_v_M_k = initial_partition(P=mesh, sp_idxs=sp_idxs_M_k, verbose=False)
 
-    n_sps_M, n_sedg_M, sp_idxs_M, senders_M, receivers_M, stris_M = superpoint_graph_mesh(
-        mesh_vertices_xyz=mesh.vertices,
-        mesh_vertices_rgb=mesh.vertex_colors,
-        mesh_tris=mesh.triangles,
-        adj_list=mesh.adjacency_list,
-        lambda_edge_weight=lambda_edge_weight,
-        reg_strength=reg_strength,
-        d_se_max=d_se_max,
-        k_nn_adj=k_nn_adj,
-        use_cartesian=False,
-        n_proc=1,
-        ignore_knn=False,
-        verbose=False
-        )
-    par_v_M = initial_partition(P=mesh, sp_idxs=sp_idxs_M)
+        P, xyz, rgb = get_P(mesh=mesh)
+        n_sps_P, n_sedg_P, sp_idxs_P, senders_P, receivers_P, _ = superpoint_graph(
+            xyz=P[:, :3],
+            rgb=P[:, 3:],
+            k_nn_adj=k_nn_adj,
+            k_nn_geof=k_nn_adj,
+            lambda_edge_weight=lambda_edge_weight,
+            reg_strength=reg_strength,
+            d_se_max=d_se_max,
+            verbose=False)
+        par_v_P = initial_partition(P=P, sp_idxs=sp_idxs_P, verbose=False)
 
-    n_sps_M_k, n_sedg_M_k, sp_idxs_M_k, senders_M_k, receivers_M_k, stris_M_k = superpoint_graph_mesh(
-        mesh_vertices_xyz=mesh.vertices,
-        mesh_vertices_rgb=mesh.vertex_colors,
-        mesh_tris=mesh.triangles,
-        adj_list=mesh.adjacency_list,
-        lambda_edge_weight=lambda_edge_weight,
-        reg_strength=reg_strength,
-        d_se_max=d_se_max,
-        k_nn_adj=k_nn_adj,
-        use_cartesian=False,
-        n_proc=1,
-        ignore_knn=True,
-        verbose=False
-        )
-    par_v_M_k = initial_partition(P=mesh, sp_idxs=sp_idxs_M_k)
+        ooa_M, ooa_M_k, ooa_P = ooa(
+            par_v_gt=np.array(par_v_gt, copy=True),
+            par_v_M=np.array(par_v_M, copy=True),
+            par_v_M_k=np.array(par_v_M_k, copy=True),
+            par_v_P=np.array(par_v_P, copy=True))
 
-    P, xyz, rgb = get_P(mesh=mesh)
-    n_sps_P, n_sedg_P, sp_idxs_P, senders_P, receivers_P, _ = superpoint_graph(
-        xyz=xyz,
-        rgb=rgb,
-        k_nn_adj=k_nn_adj,
-        k_nn_geof=k_nn_adj,
-        lambda_edge_weight=lambda_edge_weight,
-        reg_strength=reg_strength,
-        d_se_max=d_se_max,
-        verbose=False)
-    par_v_P = initial_partition(P=P, sp_idxs=sp_idxs_P)
+        adj_list_ = mesh.adjacency_list.copy()
+        n_per_v = np.zeros((len(adj_list_), ), np.uint32)
+        for i in range(len(adj_list_)):
+            al = adj_list_[i]
+            n_per_v[i] = len(al)
 
-    ooa_M, oaa_M_k, ooa_P = ooa(
-        par_v_gt=np.array(par_v_gt, copy=True),
-        par_v_M=np.array(par_v_M, copy=True),
-        par_v_M_k=np.array(par_v_M_k, copy=True),
-        par_v_P=np.array(par_v_P, copy=True))
-
-    n_per_v = np.zeros((len(mesh.adjacency_list), ), np.uint32)
-    for i in range(len(mesh.adjacency_list)):
-        al = mesh.adjacency_list[i]
-        n_per_v[i] = len(al)
-
-    save_partitions(partitions=[("gt", par_v_gt), ("M", par_v_M), ("P", par_v_P), ("M_k", par_v_M_k)],
-        fdir=args.partition_dir, fname=str(scene_id) + "_" + str(reg_strength) + "_" + str(k_nn_adj), verbose=False)
+        partition_file = str(scene_id) + "_" + str(reg_strength) + "_" + str(k_nn_adj)
+        save_partitions(partitions=[("gt", par_v_gt), ("M", par_v_M), ("P", par_v_P), ("M_k", par_v_M_k)],
+            fdir=partition_dir, fname=partition_file, verbose=False)
+    except:
+        return None
 
     return scene_id, scene_name, P.shape[0], np.asarray(mesh.triangles).shape[0], reg_strength, k_nn_adj,\
         n_sps_M, n_sedg_M, ooa_M, n_sps_M_k, n_sedg_M_k, ooa_M_k, n_sps_P, n_sedg_P, ooa_P,\
@@ -123,6 +128,7 @@ def main():
     parser.add_argument("--csv_name", default="mesh_cloud_results", type=str, help="filename of the csv.")
     parser.add_argument("--n_proc", default=1, type=int, help="Number of processes that will be used.")
     args = parser.parse_args()
+    mkdir(args.partition_dir)
 
     data_header = [
         "id", # integer that is mapped to the scene
@@ -149,7 +155,7 @@ def main():
     knns = [10, 25, 45]
     reg_strengths = [0.03, 0.07, 0.1, 0.3, 0.7]
 
-    cp_args = list(itertools.product(*[knns, reg_strengths]))
+    cp_args = list(itertools.product(*[reg_strengths, knns]))
     n_cp_args = len(cp_args)
 
     scenes, scannet_dir = get_scenes()
@@ -163,20 +169,23 @@ def main():
         for cp_id in range(n_cp_args):
             idx = n_cp_args * scene_id + cp_id
             cp_arg = cp_args[cp_id]
-            comp_args[idx] = (scene_id, scene_name, scannet_dir, cp_arg[0], cp_arg[1])
+            comp_args[idx] = (scene_id, scene_name, scannet_dir, cp_arg[0], cp_arg[1], args.partition_dir)
 
 
     if args.n_proc == 1:
         res = []
         for i in tqdm(range(len(comp_args)), desc="Compare"):
             comp_arg = comp_args[i] 
-            scene_id, scene_name, scannet_dir, reg_strength, k_nn_adj = comp_arg
+            scene_id, scene_name, scannet_dir, reg_strength, k_nn_adj, p_dir = comp_arg
             r = compare(scene_id=scene_id,
                 scene_name=scene_name,
                 scannet_dir=scannet_dir,
                 reg_strength=reg_strength,
-                k_nn_adj=k_nn_adj)
+                k_nn_adj=k_nn_adj,
+                partition_dir=p_dir)
             res.append(r)
+            if i == 3:
+                break
     elif args.n_proc > 1:
         print("Use {0} processes".format(args.n_proc))
         with Pool(processes=args.n_proc) as p:
@@ -188,6 +197,8 @@ def main():
     csv = csv[:-1] + "\n"
 
     for tup in res:
+        if tup is None:
+            continue
         for elem in tup:
             csv += str(elem) + ","
         csv = csv[:-1] + "\n"

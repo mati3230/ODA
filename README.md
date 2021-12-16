@@ -40,3 +40,14 @@ python oda_mesh.py --file ../sn000000.ply --g_filename sn000000 --n_proc 1 --loa
 Show the partitioned mesh:
 
 python oda_mesh.py --file ../sn000000.ply --g_filename sn000000 --n_proc 1 --save_init_g True --save_probs True --load_init_g True --load_probs True --load_unions True
+
+# Compile pcl_c
+
+Set CONDAENV to directory of the python interpreter
+
+cmake .. . -DPYTHON_LIBRARY="$CONDAENV/python36.dll" -DPYTHON_INCLUDE_DIR="$CONDAENV/include" -DBOOST_INCLUDEDIR="$CONDAENV/Library/include" -DEIGEN3_INCLUDE_DIR="$CONDAENV/Library/include"
+
+Check the include and linker directories in .vcxproj-file
+
+msbuild LIBGEOF.sln /p:Configuration=Release
+

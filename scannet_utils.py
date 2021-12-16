@@ -125,7 +125,7 @@ def get_ground_truth(scannet_dir, scene):
     mesh = load_mesh(filepath, scene + "_vh_clean_2.ply")
     seg_groups = load_seg_groups(filepath, scene + ".aggregation.json")
     n = len(seg_groups)
-    n_V = mesh.vertices.count
+    n_V = np.asarray(mesh.vertices).shape[0]
 
     partition_vec = np.zeros((n_V, ), dtype=np.int32)
     O = 1

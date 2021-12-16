@@ -452,8 +452,9 @@ def load_proc_mesh(fdir, fname):
     return mesh
 
 
-def load_nn_file(fdir, fname, a):
-    print("Load nearest neighbours")
+def load_nn_file(fdir, fname, a, verbose=True):
+    if verbose:
+        print("Load nearest neighbours")
     hf = h5py.File("{0}/nn_{1}_{2}.h5".format(fdir, fname, a), "r")
 
     distances = np.array(hf["distances"], copy=True)
@@ -467,19 +468,22 @@ def load_nn_file(fdir, fname, a):
         "source": source,
         "target": target
     }
-    print("Done")
+    if verbose:
+        print("Done")
     return d_mesh
 
 
-def save_nn_file(fdir, fname, a ,d_mesh):
-    print("Save nearest neighbours")
+def save_nn_file(fdir, fname, a ,d_mesh, verbose=True):
+    if verbose:
+        print("Save nearest neighbours")
     hf = h5py.File("{0}/nn_{1}_{2}.h5".format(fdir, fname, a), "w")
     hf.create_dataset("source", data=d_mesh["source"])
     hf.create_dataset("target", data=d_mesh["target"])
     hf.create_dataset("distances", data=d_mesh["distances"])
     hf.create_dataset("edge_weight", data=d_mesh["edge_weight"])
     hf.close()
-    print("Done")
+    if verbose:
+        print("Done")
 
 
 def save_cloud(P, fdir, fname):

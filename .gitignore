@@ -24,3 +24,7 @@ cp_ext.pyd
 ply_c_ext.pyd
 libcp.so
 libply_c.so
+
+partitions_files
+
+mesh_cloud_results.csv

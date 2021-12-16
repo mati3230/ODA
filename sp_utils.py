@@ -429,7 +429,7 @@ def reco(P, o_idxs, dims=150, radius=0.1, sample_size=15):
     return mesh
 
 
-def initial_partition(P, sp_idxs):
+def initial_partition(P, sp_idxs, verbose=True):
     if type(P) == o3d.geometry.TriangleMesh:
         vertices = np.asarray(P.vertices)
         n_P = vertices.shape[0]
@@ -438,7 +438,8 @@ def initial_partition(P, sp_idxs):
 
     par_v = np.zeros((n_P, ), dtype=np.uint32)
     n_sps = len(sp_idxs)
-    print("Number of superpoints: {0}".format(n_sps))
+    if verbose:
+        print("Number of superpoints: {0}".format(n_sps))
     for i in range(n_sps):
         idxs = sp_idxs[i]
         par_v[idxs] = i
