@@ -116,6 +116,7 @@ def main():
         reg_strength = args.reg_strength
         k_nn_adj = args.k_nn_adj
         lambda_edge_weight = args.lambda_edge_weight
+        ignore_knn = False
         calc = True
         while True:            
             if calc:
@@ -130,7 +131,8 @@ def main():
                         k_nn_adj=k_nn_adj,
                         n_proc=args.n_proc,
                         g_dir=args.g_dir,
-                        g_filename=args.g_filename)
+                        g_filename=args.g_filename,
+                        ignore_knn=ignore_knn)
                 # save the initial partition graph
                 if args.save_init_g:
                     save_init_graph(
@@ -142,7 +144,7 @@ def main():
                 init_p = initial_partition(P=mesh, sp_idxs=sp_idxs)
                 render_partition_o3d(mesh=mesh, sp_idxs=sp_idxs, colors=colors)
             calc = True
-            i = input("lambda [l] | k_nn_adj [a] | lambda_edge_weight [w] | Continue [-1] | Exit [e]: ")
+            i = input("lambda [l] | k_nn_adj [a] | lambda_edge_weight [w] | ignore knn[i] | Continue [-1] | Exit [e]: ")
             if i == "-1":
                 break
             elif i == "e":
@@ -164,6 +166,13 @@ def main():
             elif i == "w":
                 try:
                     lambda_edge_weight = float(input("lambda edge weight: "))
+                except Exception as e:
+                    print(e)
+                    calc = False
+                    continue
+            elif i == "i":
+                try:
+                    ignore_knn = bool(input("ignore knn [0, 1]: "))
                 except Exception as e:
                     print(e)
                     calc = False
