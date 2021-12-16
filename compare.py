@@ -100,11 +100,16 @@ def compare(scene_id, scene_name, scannet_dir, reg_strength, k_nn_adj):
         par_v_M_k=np.array(par_v_M_k, copy=True),
         par_v_P=np.array(par_v_P, copy=True))
 
+    n_per_v = np.zeros((len(mesh.adjacency_list), ), np.uint32)
+    for i in range(len(mesh.adjacency_list)):
+        al = mesh.adjacency_list[i]
+        n_per_v = len(al)
+
     save_partitions(partitions=[("gt", par_v_gt), ("M", par_v_M), ("P", par_v_P), ("M_k", par_v_M_k)], fdir=args.partition_dir, fname=str(scene_id))
 
     return scene_id, scene_name, P.shape[0], np.asarray(mesh.triangles).shape[0], reg_strength, k_nn_adj,\
         n_sps_M, n_sedg_M, ooa_M, n_sps_M_k, n_sedg_M_k, ooa_M_k, n_sps_P, n_sedg_P, ooa_P,\
-        file_gt, partition_file
+        np.mean(n_per_v), np.std(n_per_v), np.median(n_per_v), file_gt, partition_file
 
 
 def main():
@@ -131,6 +136,9 @@ def main():
         "|S_P|", # nr of superpoints in the point cloud partition
         "|E_P|", # nr of superedges in the point cloud superpoint graph
         "OOA_P", # overall object accuracy of the point cloud
+        "mean(n)", # average number of neighbours per vertex
+        "std(n)", # std of neighbours per vertex
+        "median(n)", # median of neighbours per vertex
         "file_gt", # path to the ground truth mesh
         "partitions_file" # path to a file where the partitions are stored
         ]
