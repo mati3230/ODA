@@ -2051,7 +2051,7 @@ def superpoint_graph_mesh(mesh_vertices_xyz, mesh_vertices_rgb, mesh_tris, adj_l
     xyz = np.array(np.asarray(mesh_vertices_xyz), copy=True)
     rgb = np.array(np.asarray(mesh_vertices_rgb), copy=True)
     xyz = np.ascontiguousarray(xyz, dtype=np.float32)
-    rgb = np.ascontiguousarray(rgb, dtype=np.uint8)
+    rgb = np.ascontiguousarray(rgb, dtype=np.float32)
     tris = np.array(np.asarray(mesh_tris), copy=True)
     try:
         d_mesh = load_nn_file(fdir=g_dir, fname=g_filename, a=k_nn_adj)
@@ -2079,7 +2079,14 @@ def superpoint_graph_mesh(mesh_vertices_xyz, mesh_vertices_rgb, mesh_tris, adj_l
             print("Done")
     
     # TODO we could add geodesic features that leverage the mesh structure
-    geof = libply_c.compute_geof(xyz, d_mesh["target"], k_nn_adj).astype('float32')
+    if ignore_knn:
+        n_per_v = np.zeros((len(adj_list_), ), np.uint32)
+        for i in range(len(adj_list_)):
+            al = adj_list_[i]
+            n_per_v[i] = len(al)
+        geof = libply_c.compute_geof_var(xyz, d_mesh["target"], n_per_v, False).astype(np.float32)
+    else:
+        geof = libply_c.compute_geof(xyz, d_mesh["target"], k_nn_adj, False).astype(np.float32)
     #choose here which features to use for the partition
     features = np.hstack((geof, rgb/255.)).astype("float32")#add rgb as a feature for partitioning
     features[:,3] *= 2. #increase importance of verticality (heuristic)
@@ -2238,7 +2245,8 @@ def superpoint_graph_mesh(mesh_vertices_xyz, mesh_vertices_rgb, mesh_tris, adj_l
 
 
 def graph_mesh(mesh, reg_strength=0.1, lambda_edge_weight=1.0, k_nn_adj=30, use_cartesian=False, 
-        bidirectional=False, respect_direct_neigh=False, n_proc=10, g_dir=None, g_filename=None):
+        bidirectional=False, respect_direct_neigh=False, n_proc=10, g_dir=None, g_filename=None,
+        ignore_knn=False):
     """ This function creates a superpoint graph from a point cloud. 
 
     Parameters
@@ -2300,7 +2308,8 @@ def graph_mesh(mesh, reg_strength=0.1, lambda_edge_weight=1.0, k_nn_adj=30, use_
             n_proc=n_proc,
             g_dir=g_dir,
             g_filename=g_filename,
-            move_vertices=False)
+            move_vertices=False,
+            ignore_knn=ignore_knn)
 
     """
     n_sps: Number of superpoints (vertices) in the graph

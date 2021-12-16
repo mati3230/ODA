@@ -106,7 +106,7 @@ def compare(scene_id, scene_name, scannet_dir, reg_strength, k_nn_adj):
     n_per_v = np.zeros((len(mesh.adjacency_list), ), np.uint32)
     for i in range(len(mesh.adjacency_list)):
         al = mesh.adjacency_list[i]
-        n_per_v = len(al)
+        n_per_v[i] = len(al)
 
     save_partitions(partitions=[("gt", par_v_gt), ("M", par_v_M), ("P", par_v_P), ("M_k", par_v_M_k)],
         fdir=args.partition_dir, fname=str(scene_id) + "_" + str(reg_strength) + "_" + str(k_nn_adj), verbose=False)
