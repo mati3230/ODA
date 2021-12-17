@@ -26,5 +26,6 @@ libcp.so
 libply_c.so
 
 partitions_files
+csvs
 
 mesh_cloud_results.csv

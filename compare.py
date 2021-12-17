@@ -2,6 +2,8 @@ import argparse
 import itertools
 from tqdm import tqdm
 from multiprocessing import Pool
+from p_tqdm import p_map
+from random import shuffle, seed
 
 import open3d as o3d
 import numpy as np
@@ -17,6 +19,21 @@ from scannet_utils import get_scenes, \
                     get_ground_truth
 from partition.partition import Partition
 from partition.density_utils import densities_np
+
+
+def save_csv(res, csv_dir, csv_name, data_header):
+    csv = ""
+    for header in data_header:
+        csv += header + ","
+    csv = csv[:-1] + "\n"
+
+    for tup in res:
+        if tup is None:
+            continue
+        for elem in tup:
+            csv += str(elem) + ","
+        csv = csv[:-1] + "\n"
+    write_csv(filedir=csv_dir, filename=csv_name, csv=csv)
 
 
 def ooa(par_v_gt, par_v_M, par_v_M_k, par_v_P):
@@ -43,7 +60,8 @@ def ooa(par_v_gt, par_v_M, par_v_M_k, par_v_P):
     return ooa_M, ooa_M_k, ooa_P
 
 
-def compare(scene_id, scene_name, scannet_dir, reg_strength, k_nn_adj, partition_dir):
+def compare(comp_args):
+    scene_id, scene_name, scannet_dir, reg_strength, k_nn_adj, partition_dir = comp_args
     lambda_edge_weight = 1.
     d_se_max = 0
     k_nn_adj = int(k_nn_adj)
@@ -124,11 +142,14 @@ def compare(scene_id, scene_name, scannet_dir, reg_strength, k_nn_adj, partition
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--partition_dir", default="./partitions_files", type=str, help="Directory where we save the partiton files.")
-    parser.add_argument("--csv_dir", default="./", type=str, help="Directory where we save the csv.")
+    parser.add_argument("--csv_dir", default="./csvs", type=str, help="Directory where we save the csv.")
     parser.add_argument("--csv_name", default="mesh_cloud_results", type=str, help="filename of the csv.")
     parser.add_argument("--n_proc", default=1, type=int, help="Number of processes that will be used.")
+    parser.add_argument("--pkg_size", default=100, type=int, help="Number of packages to save a csv")
     args = parser.parse_args()
     mkdir(args.partition_dir)
+    mkdir(args.csv_dir)
+    seed(42)
 
     data_header = [
         "id", # integer that is mapped to the scene
@@ -162,6 +183,8 @@ def main():
     #scenes = ["s1"]
     #scannet_dir = ""
     n_scenes = len(scenes)
+    #n_scenes=2
+    #n_cp_args=2
     comp_args = (n_cp_args*n_scenes) * [None]
 
     for scene_id in range(n_scenes):
@@ -171,7 +194,7 @@ def main():
             cp_arg = cp_args[cp_id]
             comp_args[idx] = (scene_id, scene_name, scannet_dir, cp_arg[0], cp_arg[1], args.partition_dir)
 
-
+    shuffle(comp_args)
     if args.n_proc == 1:
         res = []
         for i in tqdm(range(len(comp_args)), desc="Compare"):
@@ -187,22 +210,15 @@ def main():
             if i == 3:
                 break
     elif args.n_proc > 1:
-        print("Use {0} processes".format(args.n_proc))
+        """print("Use {0} processes".format(args.n_proc))
         with Pool(processes=args.n_proc) as p:
-            res = p.starmap(compare, comp_args)
+            res = p.starmap(compare, comp_args)"""
+        idxs = [i for i in range(0, len(comp_args), args.pkg_size)]
+        for i in idxs:
+            res = p_map(compare, comp_args[i:i+args.pkg_size], num_cpus=args.n_proc)
+            save_csv(res=res, csv_dir=args.csv_dir, csv_name=args.csv_name + "_" + str(i), data_header=data_header)
     
-    csv = ""
-    for header in data_header:
-        csv += header + ","
-    csv = csv[:-1] + "\n"
-
-    for tup in res:
-        if tup is None:
-            continue
-        for elem in tup:
-            csv += str(elem) + ","
-        csv = csv[:-1] + "\n"
-    write_csv(filedir=args.csv_dir, filename=args.csv_name, csv=csv)
+    
 
 
 if __name__ == "__main__":
