@@ -187,12 +187,14 @@ def main():
     #n_cp_args=2
     comp_args = (n_cp_args*n_scenes) * [None]
 
+    #partition_file = str(scene_id) + "_" + str(reg_strength) + "_" + str(k_nn_adj)
+
     for scene_id in range(n_scenes):
         scene_name = scenes[scene_id]
         for cp_id in range(n_cp_args):
             idx = n_cp_args * scene_id + cp_id
-            cp_arg = cp_args[cp_id]
-            comp_args[idx] = (scene_id, scene_name, scannet_dir, cp_arg[0], cp_arg[1], args.partition_dir)
+            reg_strength, k_nn_adj = cp_args[cp_id]
+            comp_args[idx] = (scene_id, scene_name, scannet_dir, reg_strength, k_nn_adj, args.partition_dir)
 
     shuffle(comp_args)
     if args.n_proc == 1:
