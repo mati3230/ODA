@@ -219,8 +219,6 @@ def main():
         for i in idxs:
             res = p_map(compare, comp_args[i:i+args.pkg_size], num_cpus=args.n_proc)
             save_csv(res=res, csv_dir=args.csv_dir, csv_name=args.csv_name + "_" + str(i), data_header=data_header)
-    
-    
 
 
 if __name__ == "__main__":
