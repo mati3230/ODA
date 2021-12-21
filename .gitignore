@@ -29,3 +29,5 @@ partitions_files
 csvs
 
 mesh_cloud_results.csv
+results.csv
+.ipynb_checkpoints
