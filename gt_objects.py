@@ -13,7 +13,7 @@ def work(wargs):
 
     gt = load_gt_partition(fpath=fpath)
     uni_gt = np.unique(gt)
-    return len(uni_gt)
+    return scene_id, len(uni_gt)
 
 
 def main():
@@ -26,15 +26,19 @@ def main():
 
     files = os.listdir(args.partition_dir)
     n_files = len(files)
-    workload = n_files * [None]
+    scenes = []
+    workload = []
     for i in range(n_files):
         file = files[i]
+        scene_id = int(file.split("_")[1])
+        if scene_id in scenes:
+            continue
         fpath = args.partition_dir + "/" + file
-        scene_id = int(file.split("_")[0])
-        workload[i] = (scene_id, fpath)
+        scenes.append(scene_id)
+        workload.append((scene_id, fpath))
     res = p_map(work, workload, num_cpus=args.n_proc)
     arr = np.array(res, dtype=np.uint32)
-    np.savetxt(fname=args.csv_name, arr=arr)
+    np.savetxt(fname=args.csv_dir + "/" + args.csv_name, X=arr)
 
 
 if __name__ == "__main__":
