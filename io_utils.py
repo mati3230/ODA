@@ -384,6 +384,13 @@ def save_partitions(partitions, fdir, fname, verbose=True):
         print("Done")
 
 
+def load_gt_partition(fpath):
+    hf = h5py.File(fpath, "r")
+    gt = np.array(hf["gt"], copy=True)
+    hf.close()
+    return gt
+
+
 def load_cloud(file, r=255, g=0, b=0, p=1):
     """ Load a point cloud.
 
