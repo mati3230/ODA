@@ -38,7 +38,7 @@ def main():
         workload.append((scene_id, fpath))
     res = p_map(work, workload, num_cpus=args.n_proc)
     arr = np.array(res, dtype=np.uint32)
-    np.savetxt(fname=args.csv_dir + "/" + args.csv_name, X=arr)
+    np.savetxt(fname=args.csv_dir + "/" + args.csv_name, X=arr, delimiter=",")
 
 
 if __name__ == "__main__":
