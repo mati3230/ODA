@@ -27,6 +27,8 @@ libply_c.so
 
 partitions_files
 csvs
+csvs.zip
+number_gtos.csv
 
 mesh_cloud_results.csv
 results.csv

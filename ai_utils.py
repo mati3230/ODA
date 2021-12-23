@@ -2093,7 +2093,7 @@ def superpoint_graph_mesh(mesh_vertices_xyz, mesh_vertices_rgb, mesh_tris, adj_l
     #print(features)
     if verbose:
         print("Compute cut pursuit")
-    components, in_component = libcp.cutpursuit(features, d_mesh["source"], d_mesh["target"], d_mesh["edge_weight"], reg_strength)
+    components, in_component = libcp.cutpursuit(features, d_mesh["source"], d_mesh["target"], d_mesh["edge_weight"], reg_strength, 0, 2, 1)
     if verbose:
         print("Done")
     # components represent the actual superpoints (partition) - now we need to compute the edges of the superpoints
