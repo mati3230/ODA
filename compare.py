@@ -31,16 +31,20 @@ def save_csv(res, csv_dir, csv_name, data_header):
         if tup is None:
             continue
         for elem in tup:
-            csv += str(elem) + ","
+            if type(elem) == list:
+                csv += str(elem)[1:-1].replace(" ", "") + ","
+            else:
+                csv += str(elem) + ","
         csv = csv[:-1] + "\n"
     write_csv(filedir=csv_dir, filename=csv_name, csv=csv)
 
 
-def ooa(par_v_gt, par_v_M, par_v_M_k, par_v_P):
+def ooa(par_v_gt, par_v_M, par_v_M_k, par_v_M_ks, par_v_P):
     sortation = np.argsort(par_v_gt)
     par_v_gt = par_v_gt[sortation]
     par_v_M = par_v_M[sortation]
     par_v_M_k = par_v_M_k[sortation]
+    par_v_M_ks = par_v_M_ks[sortation]
     par_v_P = par_v_P[sortation]
 
     ugt, ugt_idxs, ugt_counts = np.unique(par_v_gt, return_index=True, return_counts=True)
@@ -48,6 +52,7 @@ def ooa(par_v_gt, par_v_M, par_v_M_k, par_v_P):
     partition_gt = Partition(partition=par_v_gt, uni=ugt, idxs=ugt_idxs, counts=ugt_counts)
     partition_M = Partition(partition=par_v_M)
     partition_M_k = Partition(partition=par_v_M_k)
+    partition_M_ks = Partition(partition=par_v_M_ks)
     partition_P = Partition(partition=par_v_P)
 
     # nr of vertices/points
@@ -55,9 +60,10 @@ def ooa(par_v_gt, par_v_M, par_v_M_k, par_v_P):
 
     ooa_M, _ = partition_gt.overall_obj_acc(max_density=max_density, partition_B=partition_M, density_function=densities_np)
     ooa_M_k, _ = partition_gt.overall_obj_acc(max_density=max_density, partition_B=partition_M_k, density_function=densities_np)
+    ooa_M_ks, _ = partition_gt.overall_obj_acc(max_density=max_density, partition_B=partition_M_ks, density_function=densities_np)
     ooa_P, _ = partition_gt.overall_obj_acc(max_density=max_density, partition_B=partition_P, density_function=densities_np)
 
-    return ooa_M, ooa_M_k, ooa_P
+    return ooa_M, ooa_M_k, ooa_M_ks, ooa_P
 
 
 def compare(comp_args):
@@ -72,7 +78,7 @@ def compare(comp_args):
         #mesh.vertex_colors = o3d.utility.Vector3dVector(rgb)
         mesh.compute_adjacency_list()
 
-        n_sps_M, n_sedg_M, sp_idxs_M, senders_M, receivers_M, stris_M = superpoint_graph_mesh(
+        n_sps_M, n_sedg_M, sp_idxs_M, senders_M, receivers_M, stris_M, stats_M = superpoint_graph_mesh(
             mesh_vertices_xyz=mesh.vertices,
             mesh_vertices_rgb=mesh.vertex_colors,
             mesh_tris=mesh.triangles,
@@ -88,7 +94,7 @@ def compare(comp_args):
             )
         par_v_M = initial_partition(P=mesh, sp_idxs=sp_idxs_M, verbose=False)
 
-        n_sps_M_k, n_sedg_M_k, sp_idxs_M_k, senders_M_k, receivers_M_k, stris_M_k = superpoint_graph_mesh(
+        n_sps_M_k, n_sedg_M_k, sp_idxs_M_k, senders_M_k, receivers_M_k, stris_M_k, stats_M_k = superpoint_graph_mesh(
             mesh_vertices_xyz=mesh.vertices,
             mesh_vertices_rgb=mesh.vertex_colors,
             mesh_tris=mesh.triangles,
@@ -100,12 +106,30 @@ def compare(comp_args):
             use_cartesian=False,
             n_proc=1,
             ignore_knn=True,
+            smooth=False,
             verbose=False
             )
         par_v_M_k = initial_partition(P=mesh, sp_idxs=sp_idxs_M_k, verbose=False)
+        
+        n_sps_M_ks, n_sedg_M_ks, sp_idxs_M_ks, senders_M_ks, receivers_M_ks, stris_M_ks, stats_M_ks = superpoint_graph_mesh(
+            mesh_vertices_xyz=mesh.vertices,
+            mesh_vertices_rgb=mesh.vertex_colors,
+            mesh_tris=mesh.triangles,
+            adj_list=mesh.adjacency_list,
+            lambda_edge_weight=lambda_edge_weight,
+            reg_strength=reg_strength,
+            d_se_max=d_se_max,
+            k_nn_adj=k_nn_adj,
+            use_cartesian=False,
+            n_proc=1,
+            ignore_knn=True,
+            smooth=True,
+            verbose=False
+            )
+        par_v_M_ks = initial_partition(P=mesh, sp_idxs=sp_idxs_M_ks, verbose=False)
 
         P, xyz, rgb = get_P(mesh=mesh)
-        n_sps_P, n_sedg_P, sp_idxs_P, senders_P, receivers_P, _ = superpoint_graph(
+        n_sps_P, n_sedg_P, sp_idxs_P, senders_P, receivers_P, _, stats_P = superpoint_graph(
             xyz=P[:, :3],
             rgb=P[:, 3:],
             k_nn_adj=k_nn_adj,
@@ -116,10 +140,11 @@ def compare(comp_args):
             verbose=False)
         par_v_P = initial_partition(P=P, sp_idxs=sp_idxs_P, verbose=False)
 
-        ooa_M, ooa_M_k, ooa_P = ooa(
+        ooa_M, ooa_M_k, ooa_M_ks, ooa_P = ooa(
             par_v_gt=np.array(par_v_gt, copy=True),
             par_v_M=np.array(par_v_M, copy=True),
             par_v_M_k=np.array(par_v_M_k, copy=True),
+            par_v_M_ks=np.array(par_v_M_ks, copy=True),
             par_v_P=np.array(par_v_P, copy=True))
 
         adj_list_ = mesh.adjacency_list.copy()
@@ -135,8 +160,8 @@ def compare(comp_args):
         return None
 
     return scene_id, scene_name, P.shape[0], np.asarray(mesh.triangles).shape[0], reg_strength, k_nn_adj,\
-        n_sps_M, n_sedg_M, ooa_M, n_sps_M_k, n_sedg_M_k, ooa_M_k, n_sps_P, n_sedg_P, ooa_P,\
-        np.mean(n_per_v), np.std(n_per_v), np.median(n_per_v), file_gt, partition_file
+        n_sps_M, n_sedg_M, ooa_M, n_sps_M_k, n_sedg_M_k, ooa_M_k, n_sps_M_ks, n_sedg_M_ks, ooa_M_ks, n_sps_P, n_sedg_P, ooa_P,\
+        np.mean(n_per_v), np.std(n_per_v), np.median(n_per_v), file_gt, partition_file, stats_M, stats_M_k, stats_M_ks, stats_P
 
 
 def main():
@@ -164,6 +189,9 @@ def main():
         "|S_M_k|", # nr of superpoints in the mesh partition
         "|E_M_k|", # nr of superedges in the mesh superpoint graph
         "OOA_M_k", # overall object accuracy of the mesh
+        "|S_M_ks|", # nr of superpoints in the mesh partition
+        "|E_M_ks|", # nr of superedges in the mesh superpoint graph
+        "OOA_M_ks", # overall object accuracy of the mesh
         "|S_P|", # nr of superpoints in the point cloud partition
         "|E_P|", # nr of superedges in the point cloud superpoint graph
         "OOA_P", # overall object accuracy of the point cloud
@@ -173,8 +201,31 @@ def main():
         "file_gt", # path to the ground truth mesh
         "partitions_file" # path to a file where the partitions are stored
         ]
-    knns = [10, 25, 45]
-    reg_strengths = [0.03, 0.07, 0.1, 0.3, 0.7]
+
+    for post in ["_M", "_M_k", "_M_ks", "_P"]:
+        data_header.append("max_ite" + post)
+        data_header.append("n_ite" + post)
+        data_header.append("exit_code" + post)
+
+        data_header.append("s1" + post)
+        data_header.append("s2" + post)
+        data_header.append("s3" + post)
+        data_header.append("s4" + post)
+        data_header.append("s5" + post)
+
+        data_header.append("e1_1" + post)
+        data_header.append("e1_2" + post)
+        data_header.append("e1_3" + post)
+        data_header.append("e1_4" + post)
+        data_header.append("e1_5" + post)
+
+        data_header.append("e2_1" + post)
+        data_header.append("e2_2" + post)
+        data_header.append("e2_3" + post)
+        data_header.append("e2_4" + post)
+        data_header.append("e2_5" + post)
+    knns = [30, 60]
+    reg_strengths = [0.0001, 0.01]
 
     cp_args = list(itertools.product(*[reg_strengths, knns]))
     n_cp_args = len(cp_args)

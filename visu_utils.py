@@ -105,7 +105,7 @@ def render_partition_vec_o3d(mesh, partition, colors):
     render_o3d(pmesh)
     return pmesh
 
-def render_partition_o3d(mesh, sp_idxs, colors):
+def render_partition_o3d(mesh, sp_idxs, colors, w_co=False):
     vertices = np.asarray(mesh.vertices)
     n_vert = vertices.shape[0]
     rgb = np.zeros((n_vert, 3), dtype=np.float32)
@@ -117,7 +117,7 @@ def render_partition_o3d(mesh, sp_idxs, colors):
         vertices=mesh.vertices,
         triangles=mesh.triangles)
     pmesh.vertex_colors = o3d.utility.Vector3dVector(rgb)
-    render_o3d(pmesh)
+    render_o3d(pmesh, w_co=w_co)
     return pmesh
 
 

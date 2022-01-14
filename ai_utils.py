@@ -138,17 +138,20 @@ def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, 
     #---compute 10 nn graph-------
     # target_fea are the indices of the k nearest neighbours of each point (a point itself is not considered as neighbour)
     graph_nn, target_fea = compute_graph_nn_2(xyz, k_nn_adj, k_nn_geof, verbose=verbose)
+
+    graph_nn = clean_edges(d_mesh=graph_nn)
+
     #---compute geometric features-------
     if verbose:
         print("Compute geof")
-    geof = libply_c.compute_geof(xyz, target_fea, k_nn_geof, False).astype(np.float32)
+    geof = libply_c.compute_geof(xyz, graph_nn["c_target"], k_nn_geof, False).astype(np.float32)
     del target_fea
 
     #choose here which features to use for the partition (features vector for each point)
     features = np.hstack((geof, rgb)).astype("float32")#add rgb as a feature for partitioning
     features[:,3] = 2. * features[:,3] #increase importance of verticality (heuristic)
                 
-    graph_nn["edge_weight"] = np.array(1. / ( lambda_edge_weight + graph_nn["distances"] / np.mean(graph_nn["distances"])), dtype = "float32")
+    graph_nn["edge_weight"] = np.array(1. / ( lambda_edge_weight + graph_nn["c_distances"] / np.mean(graph_nn["c_distances"])), dtype = "float32")
     #print("        minimal partition...")
     if verbose:
         print("Minimal Partition")
@@ -157,7 +160,7 @@ def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, 
     in_component: this is one list with the length of number of points - here we got a superpoint idx for each point
         this is just another representation of components.
     """
-    components, in_component = libcp.cutpursuit(features, graph_nn["source"], graph_nn["target"], graph_nn["edge_weight"], reg_strength)
+    components, in_component, stats = libcp.cutpursuit(features, graph_nn["c_source"], graph_nn["c_target"], graph_nn["edge_weight"], reg_strength)
     if verbose:
         print("Done")
     #print(components)
@@ -296,7 +299,7 @@ def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, 
     receivers = np.array(receivers, dtype=np.uint32)
     if verbose:
         print("{0} edges filtered, {1} unique edges".format(n_filtered, len(uni_edges)))
-    return n_com, n_sedg, components, senders, receivers, len(uni_edges)
+    return n_com, n_sedg, components, senders, receivers, len(uni_edges), stats
 
 
 def get_characteristic_points(P, center, k, far_points=True):
@@ -1699,6 +1702,7 @@ def mesh_edges_distances(mesh_vertices, mesh_tris, adj_list, knn=45, respect_dir
         # sort the source vertices
         sortation = np.argsort(edges[0])
         edges = edges[:, sortation]
+        #print(edges[:, :100])
     
     # edges in source, target layout
     source = edges[0]
@@ -1992,10 +1996,87 @@ def calculate_stris(tris, partition_vec, sp_idxs, verbose=True):
     return stris, v_to_move, ssizes, sedges
 
 
+def clean_edges(d_mesh):
+    source = d_mesh["source"]
+    target = d_mesh["target"]
+    distances = d_mesh["distances"]
+
+    uni_source, uni_index, uni_counts = np.unique(source, return_index=True, return_counts=True)
+    mask = np.ones((source.shape[0], ), dtype=np.bool)
+    checked = np.zeros((uni_source.shape[0], ), dtype=np.bool)
+
+    for i in tqdm(range(uni_source.shape[0]), desc="Remove bidirectional edges"):
+        start = uni_index[i]
+        stop = start + uni_counts[i]
+        u_s = uni_source[i]
+        for j in range(start, stop):
+            u_t = target[j]
+            t_idx = np.where(uni_source == u_t)[0][0]
+            if checked[t_idx]:
+                #print("check")
+                continue
+            t_start = uni_index[t_idx]
+            t_stop = t_start + uni_counts[t_idx]
+            #print(t_idx, t_start, t_stop)
+            reverse_idxs = np.where(target[t_start:t_stop] == u_s)[0]
+            if reverse_idxs.shape[0] == 0:
+                continue
+            reverse_idxs += t_start
+            mask[reverse_idxs] = False
+        checked[i] = True
+        
+    #print("Delete {0} reverse edges".format(np.sum(mask)))
+    c_source = np.array(source[mask], copy=True)
+    c_target = np.array(target[mask], copy=True)
+    c_distances = np.array(distances[mask], copy=True)
+
+    return {
+        "source": source,
+        "target": target,
+        "c_source": c_source,
+        "c_target": c_target,
+        "distances": distances,
+        "c_distances": c_distances
+    }
+
+
+def get_d_mesh(xyz, tris, adj_list_, k_nn_adj, respect_direct_neigh, use_cartesian, bidirectional,
+        n_proc, ignore_knn, verbose, g_dir, g_filename):
+    try:
+        #if ignore_knn:
+        #    raise Exception()
+        d_mesh = load_nn_file(fdir=g_dir, fname=g_filename, a=k_nn_adj, verbose=verbose, ignore_knn=ignore_knn)
+    except:
+        if verbose:
+            print("Calculate geodesic nearest neighbours, {0} vertices, {1} triangles".format(xyz.shape[0], tris.shape[0]))
+        d_mesh = mesh_edges_distances(
+            mesh_vertices=xyz,
+            mesh_tris=tris,
+            adj_list=adj_list_,
+            knn=k_nn_adj,
+            respect_direct_neigh=respect_direct_neigh,
+            use_cartesian=use_cartesian,
+            bidirectional=bidirectional,
+            n_proc=n_proc,
+            ignore_knn=ignore_knn,
+            verbose=verbose)
+        d_mesh = clean_edges(d_mesh=d_mesh)
+        try:
+            #if ignore_knn:
+            #    raise Exception()
+            save_nn_file(fdir=g_dir, fname=g_filename, d_mesh=d_mesh, a=k_nn_adj, verbose=verbose, ignore_knn=ignore_knn)
+        except Exception as e:
+            if verbose:
+                print("Nearest neighbours not saved")
+        if verbose:
+            print("Done")
+    return d_mesh
+
+
 def superpoint_graph_mesh(mesh_vertices_xyz, mesh_vertices_rgb, mesh_tris, adj_list, 
         lambda_edge_weight=1, reg_strength=0.1, d_se_max=0, k_nn_adj=45, use_cartesian=True, 
         bidirectional=False, respect_direct_neigh=False, n_proc=1, move_vertices=False,
-        g_dir=None, g_filename=None, ignore_knn=False, verbose=True):
+        g_dir=None, g_filename=None, ignore_knn=False, verbose=True, smooth=True):
     """Partitions a mesh.
 
     Parameters
@@ -2031,6 +2112,10 @@ def superpoint_graph_mesh(mesh_vertices_xyz, mesh_vertices_rgb, mesh_tris, adj_l
         Directory to store the temporary files.
     g_filename : str
         Name of the temporary file
+    ignore_knn : bool
+        Use the triangular structure of the mesh to compute the features which are used as input for the l0-CP
+    smooth : bool
+        Use geodesic nearest neighbour features as input for the l0-CP
 
     Returns
     -------
@@ -2053,49 +2138,47 @@ def superpoint_graph_mesh(mesh_vertices_xyz, mesh_vertices_rgb, mesh_tris, adj_l
     xyz = np.ascontiguousarray(xyz, dtype=np.float32)
     rgb = np.ascontiguousarray(rgb, dtype=np.float32)
     tris = np.array(np.asarray(mesh_tris), copy=True)
-    try:
-        d_mesh = load_nn_file(fdir=g_dir, fname=g_filename, a=k_nn_adj, verbose=verbose)
-    except:
-        if verbose:
-            print("Calculate geodesic nearest neighbours, {0} vertices, {1} triangles".format(xyz.shape[0], tris.shape[0]))
-        d_mesh = mesh_edges_distances(
-            mesh_vertices=xyz,
-            mesh_tris=tris,
-            adj_list=adj_list_,
-            knn=k_nn_adj,
-            respect_direct_neigh=respect_direct_neigh,
-            use_cartesian=use_cartesian,
-            bidirectional=bidirectional,
-            n_proc=n_proc,
-            ignore_knn=ignore_knn,
-            verbose=verbose)
-        d_mesh["edge_weight"] = np.array(1. / ( lambda_edge_weight + d_mesh["distances"] / np.mean(d_mesh["distances"])), dtype = "float32")
-        try:
-            save_nn_file(fdir=g_dir, fname=g_filename, d_mesh=d_mesh, a=k_nn_adj, verbose=verbose)
-        except Exception as e:
-            if verbose:
-                print("Nearest neighbours not saved")
-        if verbose:
-            print("Done")
-    
+
+    d_mesh = get_d_mesh(xyz=xyz, tris=tris, adj_list_=adj_list_, k_nn_adj=k_nn_adj, respect_direct_neigh=respect_direct_neigh,
+        use_cartesian=use_cartesian, bidirectional=bidirectional, n_proc=n_proc, ignore_knn=ignore_knn, verbose=verbose,
+        g_dir=g_dir, g_filename=g_filename)
+
     # TODO we could add geodesic features that leverage the mesh structure
     if ignore_knn:
-        n_per_v = np.zeros((len(adj_list_), ), np.uint32)
-        for i in range(len(adj_list_)):
-            al = adj_list_[i]
-            n_per_v[i] = len(al)
-        geof = libply_c.compute_geof_var(xyz, d_mesh["target"], n_per_v, False).astype(np.float32)
+        if smooth:
+            d_mesh_ = get_d_mesh(xyz=xyz, tris=tris, adj_list_=adj_list_, k_nn_adj=k_nn_adj, respect_direct_neigh=respect_direct_neigh,
+                use_cartesian=use_cartesian, bidirectional=bidirectional, n_proc=n_proc, ignore_knn=False, verbose=verbose,
+                g_dir=g_dir, g_filename=g_filename)
+            geof = libply_c.compute_geof(xyz, d_mesh_["target"], k_nn_adj, False).astype(np.float32)
+        else:
+            n_per_v = np.zeros((len(adj_list_), ), np.uint32)
+            for i in range(len(adj_list_)):
+                al = adj_list_[i]
+                #print(i, al)
+                n_per_v[i] = len(al)
+            geof = libply_c.compute_geof_var(xyz, d_mesh["target"], n_per_v, False).astype(np.float32)
     else:
         geof = libply_c.compute_geof(xyz, d_mesh["target"], k_nn_adj, False).astype(np.float32)
     #choose here which features to use for the partition
     features = np.hstack((geof, rgb)).astype("float32")#add rgb as a feature for partitioning
     features[:,3] *= 2. #increase importance of verticality (heuristic)
     #print(features)
+    verbosity_level = 0.0
+    speed = 2.0
+    #"""
+    #"""
+    if verbose:
+        print("eIndex (python)", len(d_mesh["c_source"]))
+    d_mesh["edge_weight"] = np.array(1. / ( lambda_edge_weight + d_mesh["c_distances"] / np.mean(d_mesh["c_distances"])), dtype = "float32")
     if verbose:
         print("Compute cut pursuit")
-    components, in_component = libcp.cutpursuit(features, d_mesh["source"], d_mesh["target"], d_mesh["edge_weight"], reg_strength, 0, 2, 1)
+    components, in_component, stats = libcp.cutpursuit(features, d_mesh["c_source"], d_mesh["c_target"], d_mesh["edge_weight"], reg_strength, 0, 0, 1, verbosity_level, speed)
+    stats[0] = int(stats[0]) # n ite main
+    stats[1] = int(stats[1]) # iterations
+    stats[2] = int(stats[2]) # exit code
     if verbose:
         print("Done")
+        print("Python stats:", stats)
     # components represent the actual superpoints (partition) - now we need to compute the edges of the superpoints
     components = np.array(components, dtype = "object")
     # the number of components (superpoints) n_com
@@ -2241,12 +2324,12 @@ def superpoint_graph_mesh(mesh_vertices_xyz, mesh_vertices_rgb, mesh_tris, adj_l
     receivers.extend(tmp_senders)
     senders = np.array(senders, dtype=np.uint32)
     receivers = np.array(receivers, dtype=np.uint32)
-    return n_com, n_sedg, components, senders, receivers, stris
+    return n_com, n_sedg, components, senders, receivers, stris, stats
 
 
 def graph_mesh(mesh, reg_strength=0.1, lambda_edge_weight=1.0, k_nn_adj=30, use_cartesian=False, 
         bidirectional=False, respect_direct_neigh=False, n_proc=10, g_dir=None, g_filename=None,
-        ignore_knn=False):
+        ignore_knn=False, smooth=True):
     """ This function creates a superpoint graph from a point cloud. 
 
     Parameters
@@ -2293,7 +2376,7 @@ def graph_mesh(mesh, reg_strength=0.1, lambda_edge_weight=1.0, k_nn_adj=30, use_
 
     mesh.compute_adjacency_list()
 
-    n_sps, n_sedg, sp_idxs, senders, receivers, stris = \
+    n_sps, n_sedg, sp_idxs, senders, receivers, stris, _ = \
         superpoint_graph_mesh(
             mesh_vertices_xyz=mesh.vertices,
             mesh_vertices_rgb=mesh.vertex_colors,
@@ -2309,7 +2392,8 @@ def graph_mesh(mesh, reg_strength=0.1, lambda_edge_weight=1.0, k_nn_adj=30, use_
             g_dir=g_dir,
             g_filename=g_filename,
             move_vertices=False,
-            ignore_knn=ignore_knn)
+            ignore_knn=ignore_knn,
+            smooth=smooth)
 
     """
     n_sps: Number of superpoints (vertices) in the graph
@@ -2335,6 +2419,7 @@ def graph_mesh(mesh, reg_strength=0.1, lambda_edge_weight=1.0, k_nn_adj=30, use_
     for i in range(n_sps):
         idxs = np.unique(sp_idxs[i])
         sp_idxs[i] = idxs
+        #print(idxs)
         sp_size = idxs.shape[0]
         sps_sizes.append(sp_size)
     print("Average superpoint size: {0:.2f} ({1:.2f})".format(np.mean(sps_sizes), np.std(sps_sizes)))
@@ -2342,8 +2427,17 @@ def graph_mesh(mesh, reg_strength=0.1, lambda_edge_weight=1.0, k_nn_adj=30, use_
     normals = np.asarray(mesh.vertex_normals)
     P = np.hstack((P, normals))
 
+    if n_sps == 1:
+        n_sps = 2
+        all_idxs = np.arange(P.shape[0])
+        remaining_idxs = np.delete(all_idxs, sp_idxs[0])
+        sp_idxs = sp_idxs.tolist()
+        sp_idxs.append(remaining_idxs)
+        sp_idxs = np.array(sp_idxs, dtype="object")
+
     args = [(k, sp_idxs, P) for k in range(n_sps)]
     print("Use {0} processes".format(n_proc))
+    
     with Pool(processes=n_proc) as p:
         res = p.starmap(c, args)
     node_features = np.hstack(res)

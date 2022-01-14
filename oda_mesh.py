@@ -64,10 +64,19 @@ def main():
     parser.add_argument("--load_unions", default=False, type=bool, help="Load the unions from g_dir.")
     parser.add_argument("--load_proc_cloud", default=False, type=bool, help="Load the preprocessed point cloud from g_dir.")
     parser.add_argument("--ending", default="glb", type=str, help="File format of the meshes (glb, obj, ...)")
+    parser.add_argument("--ignore_knn", default=False, type=bool, help="Ignore the nearest neighbour calculations to execute the l0-CP")
+    parser.add_argument("--smooth", default=False, type=bool, help="Use the nearest neighbour calculations to execute the l0-CP with only the triangular graph")
     args = parser.parse_args()
     # load the colors for the parititon rendering
     colors = load_colors()
     colors = colors/255.
+    """
+    colors[0, :] = np.zeros((3,))
+    colors[1, :] = np.array([1, 0, 0])
+    colors[2, :] = np.array([0, 1, 0])
+    colors[3, :] = np.array([0, 0, 1])
+    colors[4, :] = np.array([0, 1, 1])
+    """
 
     # Disable the tensorflow gpu computations
     if not args.gpu:
@@ -116,7 +125,8 @@ def main():
         reg_strength = args.reg_strength
         k_nn_adj = args.k_nn_adj
         lambda_edge_weight = args.lambda_edge_weight
-        ignore_knn = False
+        ignore_knn = args.ignore_knn
+        smooth = args.smooth
         calc = True
         while True:            
             if calc:
@@ -132,7 +142,8 @@ def main():
                         n_proc=args.n_proc,
                         g_dir=args.g_dir,
                         g_filename=args.g_filename,
-                        ignore_knn=ignore_knn)
+                        ignore_knn=ignore_knn,
+                        smooth=smooth)
                 # save the initial partition graph
                 if args.save_init_g:
                     save_init_graph(
@@ -142,9 +153,9 @@ def main():
                         filename=args.g_filename,
                         stris=stris)
                 init_p = initial_partition(P=mesh, sp_idxs=sp_idxs)
-                render_partition_o3d(mesh=mesh, sp_idxs=sp_idxs, colors=colors)
+                render_partition_o3d(mesh=mesh, sp_idxs=sp_idxs, colors=colors, w_co=True)
             calc = True
-            i = input("lambda [l] | k_nn_adj [a] | lambda_edge_weight [w] | ignore knn[i] | Continue [-1] | Exit [e]: ")
+            i = input("lambda [l] | k_nn_adj [a] | lambda_edge_weight [w] | ignore knn [i] | smooth [s] | Continue [-1] | Exit [e]: ")
             if i == "-1":
                 break
             elif i == "e":
@@ -173,6 +184,13 @@ def main():
             elif i == "i":
                 try:
                     ignore_knn = bool(input("ignore knn [0, 1]: "))
+                except Exception as e:
+                    print(e)
+                    calc = False
+                    continue
+            elif i == "s":
+                try:
+                    smooth = bool(input("smooth [0, 1]: "))
                 except Exception as e:
                     print(e)
                     calc = False

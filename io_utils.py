@@ -459,35 +459,51 @@ def load_proc_mesh(fdir, fname):
     return mesh
 
 
-def load_nn_file(fdir, fname, a, verbose=True):
+def load_nn_file(fdir, fname, a, verbose=True, ignore_knn=False):
     if verbose:
         print("Load nearest neighbours")
-    hf = h5py.File("{0}/nn_{1}_{2}.h5".format(fdir, fname, a), "r")
+    post = "geo"
+    if ignore_knn:
+        post = "tri"
+    hf = h5py.File("{0}/nn_{1}_{2}_{3}.h5".format(fdir, fname, a, post), "r")
 
     distances = np.array(hf["distances"], copy=True)
-    edge_weight = np.array(hf["edge_weight"], copy=True)
+    #edge_weight = np.array(hf["edge_weight"], copy=True)
     source = np.array(hf["source"], copy=True)
     target = np.array(hf["target"], copy=True)
+    c_distances = np.array(hf["c_distances"], copy=True)
+    #edge_weight = np.array(hf["edge_weight"], copy=True)
+    c_source = np.array(hf["c_source"], copy=True)
+    c_target = np.array(hf["c_target"], copy=True)
 
     d_mesh = {
         "distances": distances,
-        "edge_weight": edge_weight,
+        #"edge_weight": edge_weight,
         "source": source,
-        "target": target
+        "target": target,
+        "c_distances": c_distances,
+        "c_source": c_source,
+        "c_target": c_target
     }
     if verbose:
         print("Done")
     return d_mesh
 
 
-def save_nn_file(fdir, fname, a ,d_mesh, verbose=True):
+def save_nn_file(fdir, fname, a ,d_mesh, verbose=True, ignore_knn=False):
     if verbose:
         print("Save nearest neighbours")
-    hf = h5py.File("{0}/nn_{1}_{2}.h5".format(fdir, fname, a), "w")
+    post = "geo"
+    if ignore_knn:
+        post = "tri"
+    hf = h5py.File("{0}/nn_{1}_{2}_{3}.h5".format(fdir, fname, a, post), "w")
     hf.create_dataset("source", data=d_mesh["source"])
     hf.create_dataset("target", data=d_mesh["target"])
     hf.create_dataset("distances", data=d_mesh["distances"])
-    hf.create_dataset("edge_weight", data=d_mesh["edge_weight"])
+    hf.create_dataset("c_source", data=d_mesh["c_source"])
+    hf.create_dataset("c_target", data=d_mesh["c_target"])
+    hf.create_dataset("c_distances", data=d_mesh["c_distances"])
+    #hf.create_dataset("edge_weight", data=d_mesh["edge_weight"])
     hf.close()
     if verbose:
         print("Done")
