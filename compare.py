@@ -78,6 +78,8 @@ def compare(comp_args):
         #mesh.vertex_colors = o3d.utility.Vector3dVector(rgb)
         mesh.compute_adjacency_list()
 
+        #print("")
+        #print("1")
         n_sps_M, n_sedg_M, sp_idxs_M, senders_M, receivers_M, stris_M, stats_M = superpoint_graph_mesh(
             mesh_vertices_xyz=mesh.vertices,
             mesh_vertices_rgb=mesh.vertex_colors,
@@ -90,10 +92,13 @@ def compare(comp_args):
             use_cartesian=False,
             n_proc=1,
             ignore_knn=False,
-            verbose=False
+            verbose=False,
+            g_dir="./tmp",
+            g_filename=scene_name
             )
         par_v_M = initial_partition(P=mesh, sp_idxs=sp_idxs_M, verbose=False)
 
+        #print("2")
         n_sps_M_k, n_sedg_M_k, sp_idxs_M_k, senders_M_k, receivers_M_k, stris_M_k, stats_M_k = superpoint_graph_mesh(
             mesh_vertices_xyz=mesh.vertices,
             mesh_vertices_rgb=mesh.vertex_colors,
@@ -107,10 +112,13 @@ def compare(comp_args):
             n_proc=1,
             ignore_knn=True,
             smooth=False,
-            verbose=False
+            verbose=False,
+            g_dir="./tmp",
+            g_filename=scene_name
             )
         par_v_M_k = initial_partition(P=mesh, sp_idxs=sp_idxs_M_k, verbose=False)
         
+        #print("3")
         n_sps_M_ks, n_sedg_M_ks, sp_idxs_M_ks, senders_M_ks, receivers_M_ks, stris_M_ks, stats_M_ks = superpoint_graph_mesh(
             mesh_vertices_xyz=mesh.vertices,
             mesh_vertices_rgb=mesh.vertex_colors,
@@ -124,10 +132,13 @@ def compare(comp_args):
             n_proc=1,
             ignore_knn=True,
             smooth=True,
-            verbose=False
+            verbose=False,
+            g_dir="./tmp",
+            g_filename=scene_name
             )
         par_v_M_ks = initial_partition(P=mesh, sp_idxs=sp_idxs_M_ks, verbose=False)
 
+        #print("4")
         P, xyz, rgb = get_P(mesh=mesh)
         n_sps_P, n_sedg_P, sp_idxs_P, senders_P, receivers_P, _, stats_P = superpoint_graph(
             xyz=P[:, :3],
@@ -156,7 +167,8 @@ def compare(comp_args):
         partition_file = str(scene_id) + "_" + str(reg_strength) + "_" + str(k_nn_adj)
         save_partitions(partitions=[("gt", par_v_gt), ("M", par_v_M), ("P", par_v_P), ("M_k", par_v_M_k)],
             fdir=partition_dir, fname=partition_file, verbose=False)
-    except:
+    except Exception as e:
+        print(e)
         return None
 
     return scene_id, scene_name, P.shape[0], np.asarray(mesh.triangles).shape[0], reg_strength, k_nn_adj,\
@@ -253,15 +265,14 @@ def main():
         for i in tqdm(range(len(comp_args)), desc="Compare"):
             comp_arg = comp_args[i] 
             scene_id, scene_name, scannet_dir, reg_strength, k_nn_adj, p_dir = comp_arg
-            r = compare(scene_id=scene_id,
-                scene_name=scene_name,
-                scannet_dir=scannet_dir,
-                reg_strength=reg_strength,
-                k_nn_adj=k_nn_adj,
-                partition_dir=p_dir)
+            r = compare(comp_args=comp_arg)
+            #print("result:", r)
+            if r is None:
+                continue
             res.append(r)
-            if i == 3:
-                break
+            if i % args.pkg_size == 0:
+                save_csv(res=res, csv_dir=args.csv_dir, csv_name=args.csv_name + "_" + str(i), data_header=data_header)
+                res = []
     elif args.n_proc > 1:
         """print("Use {0} processes".format(args.n_proc))
         with Pool(processes=args.n_proc) as p:
