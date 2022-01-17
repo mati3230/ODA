@@ -144,7 +144,8 @@ def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, 
     #---compute geometric features-------
     if verbose:
         print("Compute geof")
-    geof = libply_c.compute_geof(xyz, graph_nn["c_target"], k_nn_geof, False).astype(np.float32)
+    #geof = libply_c.compute_geof(xyz, graph_nn["c_target"], k_nn_geof, False).astype(np.float32)
+    geof = libply_c.compute_geof(xyz, graph_nn["target"], k_nn_adj, False).astype(np.float32)
     del target_fea
 
     #choose here which features to use for the partition (features vector for each point)
@@ -160,9 +161,18 @@ def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, 
     in_component: this is one list with the length of number of points - here we got a superpoint idx for each point
         this is just another representation of components.
     """
-    components, in_component, stats = libcp.cutpursuit(features, graph_nn["c_source"], graph_nn["c_target"], graph_nn["edge_weight"], reg_strength)
+
+    verbosity_level = 0.0
+    speed = 2.0
+    components, in_component, stats = libcp.cutpursuit(features, graph_nn["c_source"], graph_nn["c_target"], 
+        graph_nn["edge_weight"], reg_strength, 0, 0, 1, verbosity_level, speed)
+    stats = stats.tolist()
+    stats[0] = int(stats[0]) # n ite main
+    stats[1] = int(stats[1]) # iterations
+    stats[2] = int(stats[2]) # exit code
     if verbose:
         print("Done")
+        print("Python stats:", stats)
     #print(components)
     #print(in_component)
     # components represent the actual superpoints (partition) - now we need to compute the edges of the superpoints
@@ -1996,7 +2006,7 @@ def calculate_stris(tris, partition_vec, sp_idxs, verbose=True):
     return stris, v_to_move, ssizes, sedges
 
 
-def clean_edges(d_mesh):
+def clean_edges(d_mesh, verbose=False):
     source = d_mesh["source"]
     target = d_mesh["target"]
     distances = d_mesh["distances"]
@@ -2005,7 +2015,7 @@ def clean_edges(d_mesh):
     mask = np.ones((source.shape[0], ), dtype=np.bool)
     checked = np.zeros((uni_source.shape[0], ), dtype=np.bool)
 
-    for i in tqdm(range(uni_source.shape[0]), desc="Remove bidirectional edges"):
+    for i in tqdm(range(uni_source.shape[0]), desc="Remove bidirectional edges", disable=not verbose):
         start = uni_index[i]
         stop = start + uni_counts[i]
         u_s = uni_source[i]
@@ -2173,6 +2183,7 @@ def superpoint_graph_mesh(mesh_vertices_xyz, mesh_vertices_rgb, mesh_tris, adj_l
     if verbose:
         print("Compute cut pursuit")
     components, in_component, stats = libcp.cutpursuit(features, d_mesh["c_source"], d_mesh["c_target"], d_mesh["edge_weight"], reg_strength, 0, 0, 1, verbosity_level, speed)
+    stats = stats.tolist()
     stats[0] = int(stats[0]) # n ite main
     stats[1] = int(stats[1]) # iterations
     stats[2] = int(stats[2]) # exit code
