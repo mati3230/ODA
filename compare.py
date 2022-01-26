@@ -183,6 +183,7 @@ def main():
     parser.add_argument("--csv_name", default="mesh_cloud_results", type=str, help="filename of the csv.")
     parser.add_argument("--n_proc", default=1, type=int, help="Number of processes that will be used.")
     parser.add_argument("--pkg_size", default=100, type=int, help="Number of packages to save a csv")
+    parser.add_argument("--offset", default=0, type=int, help="Offset for the name of the csv file.")
     args = parser.parse_args()
     mkdir(args.partition_dir)
     mkdir(args.csv_dir)
@@ -237,7 +238,7 @@ def main():
         data_header.append("e2_4" + post)
         data_header.append("e2_5" + post)
     knns = [30, 60]
-    reg_strengths = [0.0001, 0.01]
+    reg_strengths = [0.1]
 
     cp_args = list(itertools.product(*[reg_strengths, knns]))
     n_cp_args = len(cp_args)
@@ -271,7 +272,7 @@ def main():
                 continue
             res.append(r)
             if i % args.pkg_size == 0:
-                save_csv(res=res, csv_dir=args.csv_dir, csv_name=args.csv_name + "_" + str(i), data_header=data_header)
+                save_csv(res=res, csv_dir=args.csv_dir, csv_name=args.csv_name + "_" + str(i+args.offset), data_header=data_header)
                 res = []
     elif args.n_proc > 1:
         """print("Use {0} processes".format(args.n_proc))
@@ -280,7 +281,7 @@ def main():
         idxs = [i for i in range(0, len(comp_args), args.pkg_size)]
         for i in idxs:
             res = p_map(compare, comp_args[i:i+args.pkg_size], num_cpus=args.n_proc)
-            save_csv(res=res, csv_dir=args.csv_dir, csv_name=args.csv_name + "_" + str(i), data_header=data_header)
+            save_csv(res=res, csv_dir=args.csv_dir, csv_name=args.csv_name + "_" + str(i+args.offset), data_header=data_header)
 
 
 if __name__ == "__main__":
