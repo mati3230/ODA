@@ -283,6 +283,8 @@ def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, 
     if verbose:
         print("Total number of edges: {0}".format(n_sedg))
     n_filtered = 0
+    if edge_comp.shape[1] == 0:
+        raise Exception("Zero edge comp")
     #---compute the superedges features---
     for i_sedg in range(0, n_sedg):
         i_edg_begin = jump_edg[i_sedg]
