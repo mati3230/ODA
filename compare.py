@@ -4,6 +4,7 @@ from tqdm import tqdm
 from multiprocessing import Pool
 from p_tqdm import p_map
 from random import shuffle, seed
+import traceback
 
 import open3d as o3d
 import numpy as np
@@ -169,6 +170,7 @@ def compare(comp_args):
             fdir=partition_dir, fname=partition_file, verbose=False)
     except Exception as e:
         print(e)
+        traceback.print_exc()
         return None
 
     return scene_id, scene_name, P.shape[0], np.asarray(mesh.triangles).shape[0], reg_strength, k_nn_adj,\
