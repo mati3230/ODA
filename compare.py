@@ -69,6 +69,7 @@ def ooa(par_v_gt, par_v_M, par_v_M_k, par_v_M_ks, par_v_P):
 
 def compare(comp_args):
     scene_id, scene_name, scannet_dir, reg_strength, k_nn_adj, partition_dir = comp_args
+    #scene_name = "scene0085_01"
     lambda_edge_weight = 1.
     d_se_max = 0
     k_nn_adj = int(k_nn_adj)
@@ -97,6 +98,7 @@ def compare(comp_args):
             g_dir="./tmp",
             g_filename=scene_name
             )
+        #return None
         par_v_M = initial_partition(P=mesh, sp_idxs=sp_idxs_M, verbose=False)
 
         #print("2")
@@ -255,14 +257,17 @@ def main():
 
     #partition_file = str(scene_id) + "_" + str(reg_strength) + "_" + str(k_nn_adj)
 
-    for scene_id in range(n_scenes):
-        scene_name = scenes[scene_id]
+    scenes_ids = list(zip(scenes, list(range(len(scenes)))))
+
+    shuffle(scenes_ids)
+
+    idx = 0
+    for (scene_name, scene_id) in scenes_ids:
         for cp_id in range(n_cp_args):
-            idx = n_cp_args * scene_id + cp_id
+            #idx = n_cp_args * scene_id + cp_id
             reg_strength, k_nn_adj = cp_args[cp_id]
             comp_args[idx] = (scene_id, scene_name, scannet_dir, reg_strength, k_nn_adj, args.partition_dir)
-
-    shuffle(comp_args)
+            idx += 1
     if args.n_proc == 1:
         res = []
         for i in tqdm(range(len(comp_args)), desc="Compare"):

@@ -1727,7 +1727,7 @@ def mesh_edges_distances(mesh_vertices, mesh_tris, adj_list, knn=45, respect_dir
     # unique vertices with the begin of each vertex (which is stored in 'direct_neigh_idxs') plus the number of neighbours 'n_edges'
     uni_verts, direct_neigh_idxs, n_edges = np.unique(edges[0, :], return_index=True, return_counts=True)
     max_idx = int(uni_verts.max())
-    if uni_verts.shape[0] == (max_idx + 1):
+    if uni_verts.shape[0] != (max_idx + 1):
         raise Exception("Max idx {0} with shape {1}".format(max_idx, uni_verts.shape[0]))
     # target number of edges
     f_target = knn*mesh_vertices.shape[0]
