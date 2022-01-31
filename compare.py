@@ -242,7 +242,7 @@ def main():
         data_header.append("e2_4" + post)
         data_header.append("e2_5" + post)
     knns = [30, 60]
-    reg_strengths = [1]
+    reg_strengths = [0.0001, 0.01, 0.1]
 
     cp_args = list(itertools.product(*[reg_strengths, knns]))
     n_cp_args = len(cp_args)
