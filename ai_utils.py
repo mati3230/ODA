@@ -2329,6 +2329,8 @@ def superpoint_graph_mesh(mesh_vertices_xyz, mesh_vertices_rgb, mesh_tris, adj_l
 
         # store the superedges
         sedges = np.array(sedges, dtype=np.uint32)
+        if len(sedges) == 0:
+            raise Exception("No superedges found")
         uni_edges = np.unique(sedges, axis=0)
         senders = uni_edges[:, 0].tolist()
         receivers = uni_edges[:, 1].tolist()
