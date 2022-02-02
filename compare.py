@@ -73,7 +73,7 @@ def ooa(par_v_gt, par_v_M, par_v_M_k, par_v_M_ks, par_v_P, nn_only):
     ooa_P, _ = partition_gt.overall_obj_acc(max_density=max_density, partition_B=partition_P, density_function=densities_np)
 
     if nn_only:
-        return ooa_M, None, None, ooa_P
+        return ooa_M, ooa_P
     else:
         return ooa_M, ooa_M_k, ooa_M_ks, ooa_P
 
@@ -166,13 +166,23 @@ def compare(comp_args):
             verbose=False)
         par_v_P = initial_partition(P=P, sp_idxs=sp_idxs_P, verbose=False)
 
-        ooa_M, ooa_M_k, ooa_M_ks, ooa_P = ooa(
-            par_v_gt=np.array(par_v_gt, copy=True),
-            par_v_M=np.array(par_v_M, copy=True),
-            par_v_M_k=np.array(par_v_M_k, copy=True),
-            par_v_M_ks=np.array(par_v_M_ks, copy=True),
-            par_v_P=np.array(par_v_P, copy=True),
-            nn_only=nn_only)
+        if nn_only:
+            ooa_M, ooa_P = ooa(
+                par_v_gt=np.array(par_v_gt, copy=True),
+                par_v_M=np.array(par_v_M, copy=True),
+                par_v_M_k=None,
+                par_v_M_ks=None,
+                par_v_P=np.array(par_v_P, copy=True),
+                nn_only=nn_only)
+        else:
+            ooa_M, ooa_M_k, ooa_M_ks, ooa_P = ooa(
+                par_v_gt=np.array(par_v_gt, copy=True),
+                par_v_M=np.array(par_v_M, copy=True),
+                par_v_M_k=np.array(par_v_M_k, copy=True),
+                par_v_M_ks=np.array(par_v_M_ks, copy=True),
+                par_v_P=np.array(par_v_P, copy=True),
+                nn_only=nn_only)
+
 
         adj_list_ = mesh.adjacency_list.copy()
         n_per_v = np.zeros((len(adj_list_), ), np.uint32)
@@ -211,6 +221,7 @@ def main():
     parser.add_argument("--pkg_size", default=100, type=int, help="Number of packages to save a csv")
     parser.add_argument("--offset", default=0, type=int, help="Offset for the name of the csv file.")
     parser.add_argument("--nn_only", default=False, type=bool, help="If True, only geodesic and euclidean nearest neighbours will be calculated.")
+    parser.add_argument("--m_ids", default=False, type=bool, help="Use special scene ids.")
     args = parser.parse_args()
     mkdir(args.partition_dir)
     mkdir(args.csv_dir)
@@ -286,8 +297,8 @@ def main():
         data_header.append("|SR3|" + post)
         data_header.append("|SR4|" + post)
         data_header.append("|SR5|" + post)
-    knns = [30, 60]
-    reg_strengths = [0.0001, 0.01, 0.1]
+    knns = [30]
+    reg_strengths = [0.1]
 
     cp_args = list(itertools.product(*[reg_strengths, knns]))
     n_cp_args = len(cp_args)
@@ -298,21 +309,47 @@ def main():
     n_scenes = len(scenes)
     #n_scenes=2
     #n_cp_args=2
-    comp_args = (n_cp_args*n_scenes) * [None]
 
-    #partition_file = str(scene_id) + "_" + str(reg_strength) + "_" + str(k_nn_adj)
+    if args.m_ids:
+        m_scene_ids = [1456, 510, 618, 1453, 1455, 1507, 325, 1240, 1260, 515,
+            1323, 687, 1282, 1390, 1439, 550, 1296, 593, 373, 1418, 353, 549,
+            731, 1329, 400, 759, 1065, 1265, 782, 1057, 1352, 718, 886, 1387,
+            483, 1249, 428, 547, 964, 463, 1297, 1412, 1095, 182, 293, 385,
+            1151, 969, 111, 926, 1322, 1174, 1434, 386, 1053, 482, 1305, 215, 857,
+            794, 961, 207, 132, 1015, 1241, 288, 887, 68, 297, 580, 1041, 787,
+            932, 1420, 1435, 413, 1359, 1345, 1298, 626, 715]
+        comp_args = (n_cp_args*len(m_scene_ids)) * [None]
 
-    scenes_ids = list(zip(scenes, list(range(len(scenes)))))
+        scenes_ids = list(zip(scenes, list(range(len(scenes)))))
 
-    shuffle(scenes_ids)
+        shuffle(scenes_ids)
 
-    idx = 0
-    for (scene_name, scene_id) in scenes_ids:
-        for cp_id in range(n_cp_args):
-            #idx = n_cp_args * scene_id + cp_id
-            reg_strength, k_nn_adj = cp_args[cp_id]
-            comp_args[idx] = (scene_id, scene_name, scannet_dir, reg_strength, k_nn_adj, args.partition_dir, args.nn_only)
-            idx += 1
+        idx = 0
+        for (scene_name, scene_id) in scenes_ids:
+            if scene_id not in m_scene_ids:
+                continue
+            for cp_id in range(n_cp_args):
+                #idx = n_cp_args * scene_id + cp_id
+                reg_strength, k_nn_adj = cp_args[cp_id]
+                comp_args[idx] = (scene_id, scene_name, scannet_dir, reg_strength, k_nn_adj, args.partition_dir, args.nn_only)
+                idx += 1
+    else:
+        comp_args = (n_cp_args*n_scenes) * [None]
+
+        #partition_file = str(scene_id) + "_" + str(reg_strength) + "_" + str(k_nn_adj)
+
+        scenes_ids = list(zip(scenes, list(range(len(scenes)))))
+
+        shuffle(scenes_ids)
+
+        idx = 0
+        for (scene_name, scene_id) in scenes_ids:
+            for cp_id in range(n_cp_args):
+                #idx = n_cp_args * scene_id + cp_id
+                reg_strength, k_nn_adj = cp_args[cp_id]
+                comp_args[idx] = (scene_id, scene_name, scannet_dir, reg_strength, k_nn_adj, args.partition_dir, args.nn_only)
+                idx += 1
+
     if args.n_proc == 1:
         res = []
         for i in tqdm(range(len(comp_args)), desc="Compare"):

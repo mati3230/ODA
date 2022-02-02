@@ -286,6 +286,55 @@ def save_init_graph(fdir, P, graph_dict, sp_idxs, filename="", half="", stris=No
     print("Done")
 
 
+def load_init_graph(fdir, filename="", half=""):
+    """ Load the probabilities of the link predictions.
+
+    Parameters
+    ----------
+    fdir : str
+        Relative or absolute directory of the file.
+    filename : str
+        Name of the file.
+    half : str
+        TODO
+    
+    Returns
+    -------
+    np.ndarray, dict, list[np.ndarray], np.ndarray, np.ndarray
+        The point cloud.
+        Dictionary where the superpoint graph is stored.
+        List of the point indices for each superpoint.
+
+    """
+    print("Load initial graph...")
+    file = "{0}/init_graph{1}_{2}.h5".format(fdir, half, filename)
+    if not file_exists(filepath=file):
+        #print(file)
+        return None, None, None
+    hf = h5py.File(file, "r")
+    nodes = np.array(hf["nodes"], copy=True)
+    senders = np.array(hf["senders"], copy=True)
+    receivers = np.array(hf["receivers"], copy=True)
+    graph_dict = {
+        "nodes": nodes,
+        "senders": senders,
+        "receivers": receivers,
+        "edges": None,
+        "globals": None
+    }
+    P = np.array(hf["P"], copy=True)
+    print("Point cloud size: {0} points".format(P.shape[0]))
+    n_sps = int(hf["n_sps"][0])
+    sp_idxs = n_sps * [None]
+    for i in range(n_sps):
+        idxs = np.array(hf[str(i)], copy=True)
+        sp_idxs[i] = idxs
+    sp_idxs = np.array(sp_idxs, dtype = "object")
+    hf.close()
+    print("Done")
+    return P, graph_dict, sp_idxs
+
+
 def load_init_graph_mesh(fdir, filename="", half=""):
     """ Load the probabilities of the link predictions.
 
@@ -596,12 +645,25 @@ def save_mesh(mesh, fdir, filename, o_id, ending="glb"):
     o3d.io.write_triangle_mesh(file, mesh)
     print("Done")
 
+
 def save_meshes(meshes, fdir, filename="", ending="glb"):
     print("Save meshes")
     mkdir(fdir)
     for i in range(len(meshes)):
         mesh = meshes[i]
         save_mesh(mesh=mesh, fdir=fdir, filename=filename, o_id=i, ending=ending)
+
+
+def save_ply(P, fdir, filename, o_id):
+    ending="ply"
+    mkdir(fdir)
+    file = "{0}/P_{1}_{2}.{3}".format(fdir, filename, o_id, ending)
+    print("Save cloud: {0}".format(file))
+    P3d = o3d.geometry.PointCloud()
+    P3d.points = o3d.utility.Vector3dVector(P[:, :3])
+    P3d.colors = o3d.utility.Vector3dVector(P[:, 3:])
+    o3d.io.write_point_cloud(file, P3d)
+    print("Done")
 
 
 def load_mesh(file):
