@@ -135,8 +135,7 @@ def compare(comp_args):
                 igraph_nn=graph_nn
                 )
             return scene_id, scene_name, P.shape[0], np.asarray(mesh.triangles).shape[0], reg_strength, k_nn_adj,\
-                n_sps_P0, n_sedg_P0, n_sps_P1, n_sedg_P1, np.mean(n_per_v), np.std(n_per_v), np.median(n_per_v),
-                file_gt, partition_file, stats_P0, stats_P1
+                n_sps_P0, n_sedg_P0, n_sps_P1, n_sedg_P1, file_gt, stats_P0, stats_P1
     
 
 
@@ -335,12 +334,13 @@ def main():
     ])
     if with_ooa:
         data_header.append("OOA_P") # overall object accuracy of the point cloud
-    data_header.extend([
-        "mean(n)", # average number of neighbours per vertex
-        "std(n)", # std of neighbours per vertex
-        "median(n)", # median of neighbours per vertex
-        "file_gt" # path to the ground truth mesh
-    ])
+    if not args.cross_only:
+        data_header.extend([
+            "mean(n)", # average number of neighbours per vertex
+            "std(n)", # std of neighbours per vertex
+            "median(n)"# median of neighbours per vertex
+        ])
+    data_header.append("file_gt")# path to the ground truth mesh
     if not args.cross_only:
         data_header.append("partitions_file") # path to a file where the partitions are stored
 

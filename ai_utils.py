@@ -144,6 +144,8 @@ def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, 
     if igraph_nn is None:
         graph_nn, target_fea = compute_graph_nn_2(xyz, k_nn_adj, k_nn_geof, verbose=verbose)
         graph_nn = clean_edges_threads(d_mesh=graph_nn)
+    else:
+        graph_nn = igraph_nn
     #graph_nn = clean_edges(d_mesh=graph_nn)
 
     #---compute geometric features-------
@@ -153,12 +155,10 @@ def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, 
     # TODO we could add geodesic features that leverage the mesh structure
 
     """
-    adj_list_ = adj_list.copy()
     xyz = np.array(np.asarray(mesh_vertices_xyz), copy=True)
     rgb = np.array(np.asarray(mesh_vertices_rgb), copy=True)
     xyz = np.ascontiguousarray(xyz, dtype=np.float32)
     rgb = np.ascontiguousarray(rgb, dtype=np.float32)
-    tris = np.array(np.asarray(mesh_tris), copy=True)
 
     mesh_vertices_xyz, mesh_vertices_rgb, mesh_tris, adj_list, 
         lambda_edge_weight=1, reg_strength=0.1, d_se_max=0, k_nn_adj=45, use_cartesian=True, 
@@ -166,10 +166,12 @@ def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, 
         g_dir=None, g_filename=None, ignore_knn=False, verbose=True, smooth=True, with_graph_stats=False
     """
     if use_mesh_feat or use_mesh_graph:
+        adj_list_ = adj_list.copy()
+        tris = np.array(np.asarray(mesh_tris), copy=True)
         d_mesh = get_d_mesh(xyz=xyz, tris=tris, adj_list_=adj_list_, k_nn_adj=k_nn_adj, respect_direct_neigh=False,
             use_cartesian=False, bidirectional=False, n_proc=n_proc, ignore_knn=False, verbose=verbose,
             g_dir=g_dir, g_filename=g_filename)
-    if use_mesh_feat
+    if use_mesh_feat:
         geof = libply_c.compute_geof(xyz, d_mesh["target"], k_nn_adj, False).astype(np.float32)
     else:
         #geof = libply_c.compute_geof(xyz, graph_nn["c_target"], k_nn_geof, False).astype(np.float32)
