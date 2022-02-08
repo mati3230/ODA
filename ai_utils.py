@@ -15,6 +15,7 @@ from tqdm import tqdm
 from multiprocessing import Pool
 import time
 import sys
+from multiprocessing.pool import ThreadPool
 
 from network import FFGraphNet
 
@@ -139,7 +140,8 @@ def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, 
     # target_fea are the indices of the k nearest neighbours of each point (a point itself is not considered as neighbour)
     graph_nn, target_fea = compute_graph_nn_2(xyz, k_nn_adj, k_nn_geof, verbose=verbose)
 
-    graph_nn = clean_edges(d_mesh=graph_nn)
+    graph_nn = clean_edges_threads(d_mesh=graph_nn)
+    #graph_nn = clean_edges(d_mesh=graph_nn)
 
     #---compute geometric features-------
     if verbose:
@@ -179,11 +181,11 @@ def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, 
         g_med = np.median(geof, axis=0)
         stats.extend(g_med.tolist())
         w_mean = np.mean(graph_nn["edge_weight"])
-        stats.extend(w_mean.tolist())
+        stats.append(w_mean)
         w_std = np.std(graph_nn["edge_weight"])
-        stats.extend(w_std.tolist())
+        stats.append(w_std)
         w_median = np.median(graph_nn["edge_weight"])
-        stats.extend(w_median.tolist())
+        stats.append(w_median)
     if verbose:
         print("Done")
         print("Python stats:", stats)
@@ -2025,6 +2027,117 @@ def calculate_stris(tris, partition_vec, sp_idxs, verbose=True):
     return stris, v_to_move, ssizes, sedges
 
 
+def binary_search(arr, low, high, x):
+    # Check base case
+    if high >= low:
+ 
+        mid = (high + low) // 2
+ 
+        # If element is present at the middle itself
+        if arr[mid] == x:
+            return mid
+ 
+        # If element is smaller than mid, then it can only
+        # be present in left subarray
+        elif arr[mid] > x:
+            return binary_search(arr, low, mid - 1, x)
+ 
+        # Else the element can only be present in right subarray
+        else:
+            return binary_search(arr, mid + 1, high, x)
+ 
+    else:
+        # Element is not present in the array
+        return -1
+
+
+def clean_edges_helper(i, uni_source, uni_index, uni_counts, target):
+    start = uni_index[i]
+    stop = start + uni_counts[i]
+    u_s = uni_source[i]
+    res = []
+    for j in range(start, stop):
+        res.append([i, j, -1])
+        u_t = target[j]
+        if u_t > u_s: # search right
+            # search index of u_t in the source array
+            t_idx = binary_search(arr=uni_source, low=i, high=uni_source.shape[0], x=u_t)
+        else: # search left
+            t_idx = binary_search(arr=uni_source, low=0, high=i, x=u_t)
+        if t_idx == -1:
+            raise Exception("Index not found")
+
+        t_start = uni_index[t_idx]
+        t_stop = t_start + uni_counts[t_idx]
+        r_idx = -1
+        for r_i in range(t_start, t_stop): # iterate through source/target idxs of u_t
+            if target[r_i] == u_s: # find the target u_s, i.e. the reverse edge (u_t, u_s) according to the edge (u_s, u_t)
+                r_idx = r_i # we do not need this edge anymore
+                break
+        if r_idx == -1:
+            continue
+        res[-1][-1] = r_idx
+    return res
+
+
+def clean_edges_threads(d_mesh, verbose=False):
+    t1 = time.time()
+    source = d_mesh["source"]
+    target = d_mesh["target"]
+    distances = d_mesh["distances"]
+
+    uni_source, uni_index, uni_counts = np.unique(source, return_index=True, return_counts=True)
+    mask = np.ones((source.shape[0], ), dtype=np.bool)
+    checked = np.zeros((source.shape[0], ), dtype=np.bool)
+    if verbose:
+        print("start threads")
+        print("process {0} unique edges".format(uni_source.shape[0]))
+    #"""
+    tpool = ThreadPool(1000)
+    w_args = []
+    #for i in range(1000):
+    for i in range(uni_source.shape[0]):
+        #w_args.append((i, np.array(uni_source, copy=True), np.array(uni_index, copy=True), np.array(uni_counts, copy=True), np.array(target, copy=True)))
+        w_args.append((i, uni_source, uni_index, uni_counts, target))
+
+    results = tpool.starmap(clean_edges_helper, w_args)
+    #"""
+    t2 = time.time()
+    if verbose:
+        print("threads finished in {0:.3f} seconds".format(t2-t1))
+    #print(results)
+
+    t1 = time.time()
+    for i in range(len(results)):
+        result = results[i]
+        for j in range(len(result)):
+            res = result[j]
+            r_idx = res[2] # the reverse index in the source, target array
+            ui = res[0] # source idx in uni_source
+            uj = res[1] # target idx in source, target array
+            if checked[ui]:
+                continue
+            if r_idx == -1:
+                continue
+            checked[uj] = True
+            mask[r_idx] = False
+    t2 = time.time()
+    c_source = np.array(source[mask], copy=True)
+    c_target = np.array(target[mask], copy=True)
+    c_distances = np.array(distances[mask], copy=True)
+    if verbose:
+        print("post processed edges in {0:.3f} seconds ".format(t2-t1))
+    return {
+        "source": source,
+        "target": target,
+        "c_source": c_source,
+        "c_target": c_target,
+        "distances": distances,
+        "c_distances": c_distances
+    }
+
+
+
 def clean_edges(d_mesh, verbose=False):
     source = d_mesh["source"]
     target = d_mesh["target"]
@@ -2089,7 +2202,8 @@ def get_d_mesh(xyz, tris, adj_list_, k_nn_adj, respect_direct_neigh, use_cartesi
             n_proc=n_proc,
             ignore_knn=ignore_knn,
             verbose=verbose)
-        d_mesh = clean_edges(d_mesh=d_mesh)
+        #d_mesh = clean_edges(d_mesh=d_mesh)
+        d_mesh = clean_edges_threads(d_mesh=d_mesh)
         try:
             #if ignore_knn:
             #    raise Exception()
@@ -2216,11 +2330,11 @@ def superpoint_graph_mesh(mesh_vertices_xyz, mesh_vertices_rgb, mesh_tris, adj_l
         g_med = np.median(geof, axis=0)
         stats.extend(g_med.tolist())
         w_mean = np.mean(d_mesh["edge_weight"])
-        stats.extend(w_mean.tolist())
+        stats.append(w_mean)
         w_std = np.std(d_mesh["edge_weight"])
-        stats.extend(w_std.tolist())
+        stats.append(w_std)
         w_median = np.median(d_mesh["edge_weight"])
-        stats.extend(w_median.tolist())
+        stats.append(w_median)
 
 
     if verbose:

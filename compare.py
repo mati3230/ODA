@@ -93,6 +93,7 @@ def compare(comp_args):
 
         #print("")
         #print("1")
+        #"""
         n_sps_M, n_sedg_M, sp_idxs_M, senders_M, receivers_M, stris_M, stats_M = superpoint_graph_mesh(
             mesh_vertices_xyz=mesh.vertices,
             mesh_vertices_rgb=mesh.vertex_colors,
@@ -112,7 +113,7 @@ def compare(comp_args):
             )
         #return None
         par_v_M = initial_partition(P=mesh, sp_idxs=sp_idxs_M, verbose=False)
-
+        #"""
         if not nn_only:
             #print("2")
             n_sps_M_k, n_sedg_M_k, sp_idxs_M_k, senders_M_k, receivers_M_k, stris_M_k, stats_M_k = superpoint_graph_mesh(
@@ -241,6 +242,7 @@ def main():
     parser.add_argument("--without_ooa", default=False, type=bool, help="Disable the OOA calculation")
     parser.add_argument("--with_graph_stats", default=False, type=bool, help="Enable the computation of mean features, weights, ...")
     args = parser.parse_args()
+    print(args)
     mkdir(args.partition_dir)
     mkdir(args.csv_dir)
     seed(42)
@@ -327,11 +329,11 @@ def main():
         data_header.append("|SR4|" + post)
         data_header.append("|SR5|" + post)
         if args.with_graph_stats:
-            for feat in ["L", "P", "S", "V"]
+            for feat in ["L", "P", "S", "V"]:
                 data_header.append("mean({0}){1}".format(feat, post))
-            for feat in ["L", "P", "S", "V"]
+            for feat in ["L", "P", "S", "V"]:
                 data_header.append("std({0}){1}".format(feat, post))
-            for feat in ["L", "P", "S", "V"]
+            for feat in ["L", "P", "S", "V"]:
                 data_header.append("median({0}){1}".format(feat, post))
             data_header.append("mean(w){0}".format(post))
             data_header.append("std(w){0}".format(post))
@@ -390,7 +392,10 @@ def main():
                 reg_strength, k_nn_adj = cp_args[cp_id]
                 comp_args[idx] = (scene_id, scene_name, scannet_dir, reg_strength, k_nn_adj, args.partition_dir, args.nn_only)
                 idx += 1
-
+    print("")
+    print(data_header)
+    print("")
+    print(scenes_ids[:10])
     if args.n_proc == 1:
         res = []
         for i in tqdm(range(len(comp_args)), desc="Compare"):
