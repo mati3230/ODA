@@ -79,7 +79,7 @@ def ooa(par_v_gt, par_v_M, par_v_M_k, par_v_M_ks, par_v_P, nn_only):
 
 
 def compare(comp_args):
-    scene_id, scene_name, scannet_dir, reg_strength, k_nn_adj, partition_dir, nn_only, with_ooa, with_graph_stats = comp_args
+    scene_id, scene_name, scannet_dir, reg_strength, k_nn_adj, partition_dir, nn_only, with_ooa, with_graph_stats, cross_only = comp_args
     #scene_name = "scene0085_01"
     lambda_edge_weight = 1.
     d_se_max = 0
@@ -94,6 +94,53 @@ def compare(comp_args):
         #print("")
         #print("1")
         #"""
+        if cross_only:
+            P, xyz, rgb = get_P(mesh=mesh)
+            n_sps_P0, n_sedg_P0, sp_idxs_P0, senders_P0, receivers_P0, _, stats_P0, graph_nn = superpoint_graph(
+                xyz=P[:, :3],
+                rgb=P[:, 3:],
+                k_nn_adj=k_nn_adj,
+                k_nn_geof=k_nn_adj,
+                lambda_edge_weight=lambda_edge_weight,
+                reg_strength=reg_strength,
+                d_se_max=d_se_max,
+                verbose=False,
+                with_graph_stats=with_graph_stats,
+                use_mesh_feat=True,
+                use_mesh_graph=False,
+                mesh_tris=mesh.triangles,
+                adj_list=mesh.adjacency_list,
+                g_dir="./tmp",
+                g_filename=scene_name,
+                n_proc=1,
+                return_graph_nn=True
+                )
+            n_sps_P1, n_sedg_P1, sp_idxs_P1, senders_P1, receivers_P1, _, stats_P1 = superpoint_graph(
+                xyz=P[:, :3],
+                rgb=P[:, 3:],
+                k_nn_adj=k_nn_adj,
+                k_nn_geof=k_nn_adj,
+                lambda_edge_weight=lambda_edge_weight,
+                reg_strength=reg_strength,
+                d_se_max=d_se_max,
+                verbose=False,
+                with_graph_stats=with_graph_stats,
+                use_mesh_feat=False,
+                use_mesh_graph=True,
+                mesh_tris=mesh.triangles,
+                adj_list=mesh.adjacency_list,
+                g_dir="./tmp",
+                g_filename=scene_name,
+                n_proc=1,
+                igraph_nn=graph_nn
+                )
+            return scene_id, scene_name, P.shape[0], np.asarray(mesh.triangles).shape[0], reg_strength, k_nn_adj,\
+                n_sps_P0, n_sedg_P0, n_sps_P1, n_sedg_P1, np.mean(n_per_v), np.std(n_per_v), np.median(n_per_v),
+                file_gt, partition_file, stats_P0, stats_P1
+    
+
+
+
         n_sps_M, n_sedg_M, sp_idxs_M, senders_M, receivers_M, stris_M, stats_M = superpoint_graph_mesh(
             mesh_vertices_xyz=mesh.vertices,
             mesh_vertices_rgb=mesh.vertex_colors,
@@ -241,6 +288,7 @@ def main():
     parser.add_argument("--m_ids", default=False, type=bool, help="Use special scene ids.")
     parser.add_argument("--without_ooa", default=False, type=bool, help="Disable the OOA calculation")
     parser.add_argument("--with_graph_stats", default=False, type=bool, help="Enable the computation of mean features, weights, ...")
+    parser.add_argument("--cross_only", default=False, type=bool, help="Calculate graph e with features of g and vice versa")
     args = parser.parse_args()
     print(args)
     mkdir(args.partition_dir)
@@ -248,6 +296,12 @@ def main():
     seed(42)
 
     with_ooa = not args.without_ooa
+
+    """
+    scene_id, scene_name, P.shape[0], np.asarray(mesh.triangles).shape[0], reg_strength, k_nn_adj,\
+                    n_sps_P0, n_sedg_P0, n_sps_P1, n_sedg_P1, np.mean(n_per_v), np.std(n_per_v), np.median(n_per_v),
+                    file_gt, stats_P0, stats_P1
+    """
 
     data_header = [
         "id", # integer that is mapped to the scene
@@ -285,14 +339,18 @@ def main():
         "mean(n)", # average number of neighbours per vertex
         "std(n)", # std of neighbours per vertex
         "median(n)", # median of neighbours per vertex
-        "file_gt", # path to the ground truth mesh
-        "partitions_file" # path to a file where the partitions are stored
+        "file_gt" # path to the ground truth mesh
     ])
+    if not args.cross_only:
+        data_header.append("partitions_file") # path to a file where the partitions are stored
 
     if args.nn_only:
         posts = ["_M", "_P"]
     else:
         posts = ["_M", "_M_k", "_M_ks", "_P"]
+
+    if args.cross_only:
+        posts = ["_P0", "_P1"]
 
     for post in posts:
         data_header.append("max_ite" + post)
@@ -374,7 +432,7 @@ def main():
                 #idx = n_cp_args * scene_id + cp_id
                 reg_strength, k_nn_adj = cp_args[cp_id]
                 comp_args[idx] = (scene_id, scene_name, scannet_dir, reg_strength,\
-                    k_nn_adj, args.partition_dir, args.nn_only, with_ooa, args.with_graph_stats)
+                    k_nn_adj, args.partition_dir, args.nn_only, with_ooa, args.with_graph_stats, args.cross_only)
                 idx += 1
     else:
         comp_args = (n_cp_args*n_scenes) * [None]

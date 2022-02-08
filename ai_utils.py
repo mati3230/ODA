@@ -129,7 +129,10 @@ def compute_graph_nn_2(xyz, k_nn1, k_nn2, voronoi = 0.0, verbose=True):
     return graph, target2
 
 
-def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0.1, d_se_max=0, verbose=True, with_graph_stats=False):
+def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0.1, d_se_max=0, 
+        verbose=True, with_graph_stats=False,
+        use_mesh_feat=False, mesh_tris=None, adj_list=None, g_dir=None, g_filename=None, n_proc=1,
+        use_mesh_graph=False, return_graph_nn=False, igraph_nn=None):
     """ This function is developed by Landrieu et al. 
     (see https://github.com/loicland/superpoint_graph). 
     We modified the output of the function to fit our use case. 
@@ -138,36 +141,71 @@ def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, 
     rgb = np.ascontiguousarray(rgb, dtype=np.float32)
     #---compute 10 nn graph-------
     # target_fea are the indices of the k nearest neighbours of each point (a point itself is not considered as neighbour)
-    graph_nn, target_fea = compute_graph_nn_2(xyz, k_nn_adj, k_nn_geof, verbose=verbose)
-
-    graph_nn = clean_edges_threads(d_mesh=graph_nn)
+    if igraph_nn is None:
+        graph_nn, target_fea = compute_graph_nn_2(xyz, k_nn_adj, k_nn_geof, verbose=verbose)
+        graph_nn = clean_edges_threads(d_mesh=graph_nn)
     #graph_nn = clean_edges(d_mesh=graph_nn)
 
     #---compute geometric features-------
     if verbose:
         print("Compute geof")
-    #geof = libply_c.compute_geof(xyz, graph_nn["c_target"], k_nn_geof, False).astype(np.float32)
-    geof = libply_c.compute_geof(xyz, graph_nn["target"], k_nn_adj, False).astype(np.float32)
-    del target_fea
+    
+    # TODO we could add geodesic features that leverage the mesh structure
+
+    """
+    adj_list_ = adj_list.copy()
+    xyz = np.array(np.asarray(mesh_vertices_xyz), copy=True)
+    rgb = np.array(np.asarray(mesh_vertices_rgb), copy=True)
+    xyz = np.ascontiguousarray(xyz, dtype=np.float32)
+    rgb = np.ascontiguousarray(rgb, dtype=np.float32)
+    tris = np.array(np.asarray(mesh_tris), copy=True)
+
+    mesh_vertices_xyz, mesh_vertices_rgb, mesh_tris, adj_list, 
+        lambda_edge_weight=1, reg_strength=0.1, d_se_max=0, k_nn_adj=45, use_cartesian=True, 
+        bidirectional=False, respect_direct_neigh=False, n_proc=1, move_vertices=False,
+        g_dir=None, g_filename=None, ignore_knn=False, verbose=True, smooth=True, with_graph_stats=False
+    """
+    if use_mesh_feat or use_mesh_graph:
+        d_mesh = get_d_mesh(xyz=xyz, tris=tris, adj_list_=adj_list_, k_nn_adj=k_nn_adj, respect_direct_neigh=False,
+            use_cartesian=False, bidirectional=False, n_proc=n_proc, ignore_knn=False, verbose=verbose,
+            g_dir=g_dir, g_filename=g_filename)
+    if use_mesh_feat
+        geof = libply_c.compute_geof(xyz, d_mesh["target"], k_nn_adj, False).astype(np.float32)
+    else:
+        #geof = libply_c.compute_geof(xyz, graph_nn["c_target"], k_nn_geof, False).astype(np.float32)
+        geof = libply_c.compute_geof(xyz, graph_nn["target"], k_nn_adj, False).astype(np.float32)
+    if igraph_nn is None:
+        del target_fea
 
     #choose here which features to use for the partition (features vector for each point)
     features = np.hstack((geof, rgb)).astype("float32")#add rgb as a feature for partitioning
     features[:,3] = 2. * features[:,3] #increase importance of verticality (heuristic)
-                
-    graph_nn["edge_weight"] = np.array(1. / ( lambda_edge_weight + graph_nn["c_distances"] / np.mean(graph_nn["c_distances"])), dtype = "float32")
-    #print("        minimal partition...")
-    if verbose:
-        print("Minimal Partition")
-    """
-    components: the actual superpoint idxs which is a list of lists (where each list contains point indices)
-    in_component: this is one list with the length of number of points - here we got a superpoint idx for each point
-        this is just another representation of components.
-    """
-
+            
     verbosity_level = 0.0
     speed = 2.0
-    components, in_component, stats = libcp.cutpursuit(features, graph_nn["c_source"], graph_nn["c_target"], 
-        graph_nn["edge_weight"], reg_strength, 0, 0, 1, verbosity_level, speed)
+    if use_mesh_graph:
+        d_mesh["edge_weight"] = np.array(1. / ( lambda_edge_weight + d_mesh["c_distances"] / np.mean(d_mesh["c_distances"])), dtype = "float32")
+        if verbose:
+            print("Compute cut pursuit")
+        components, in_component, stats = libcp.cutpursuit(features, d_mesh["c_source"], d_mesh["c_target"],
+            d_mesh["edge_weight"], reg_strength, 0, 0, 1, verbosity_level, speed)
+    else:
+        if igraph_nn is None:
+            graph_nn["edge_weight"] = np.array(1. / ( lambda_edge_weight + graph_nn["c_distances"] / np.mean(graph_nn["c_distances"])), dtype = "float32")
+        #print("        minimal partition...")
+        if verbose:
+            print("Minimal Partition")
+        """
+        components: the actual superpoint idxs which is a list of lists (where each list contains point indices)
+        in_component: this is one list with the length of number of points - here we got a superpoint idx for each point
+            this is just another representation of components.
+        """
+        components, in_component, stats = libcp.cutpursuit(features, graph_nn["c_source"], graph_nn["c_target"], 
+            graph_nn["edge_weight"], reg_strength, 0, 0, 1, verbosity_level, speed)
+
+
+
+
     stats = stats.tolist()
     stats[0] = int(stats[0]) # n ite main
     stats[1] = int(stats[1]) # iterations
@@ -327,7 +365,10 @@ def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, 
     receivers = np.array(receivers, dtype=np.uint32)
     if verbose:
         print("{0} edges filtered, {1} unique edges".format(n_filtered, len(uni_edges)))
-    return n_com, n_sedg, components, senders, receivers, len(uni_edges), stats
+    if return_graph_nn:
+        return n_com, n_sedg, components, senders, receivers, len(uni_edges), stats, graph_nn
+    else:
+        return n_com, n_sedg, components, senders, receivers, len(uni_edges), stats
 
 
 def get_characteristic_points(P, center, k, far_points=True):
