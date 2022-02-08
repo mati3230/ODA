@@ -79,7 +79,7 @@ def ooa(par_v_gt, par_v_M, par_v_M_k, par_v_M_ks, par_v_P, nn_only):
 
 
 def compare(comp_args):
-    scene_id, scene_name, scannet_dir, reg_strength, k_nn_adj, partition_dir, nn_only = comp_args
+    scene_id, scene_name, scannet_dir, reg_strength, k_nn_adj, partition_dir, nn_only, with_ooa, with_graph_stats = comp_args
     #scene_name = "scene0085_01"
     lambda_edge_weight = 1.
     d_se_max = 0
@@ -107,7 +107,8 @@ def compare(comp_args):
             ignore_knn=False,
             verbose=False,
             g_dir="./tmp",
-            g_filename=scene_name
+            g_filename=scene_name,
+            with_graph_stats=with_graph_stats
             )
         #return None
         par_v_M = initial_partition(P=mesh, sp_idxs=sp_idxs_M, verbose=False)
@@ -129,7 +130,8 @@ def compare(comp_args):
                 smooth=False,
                 verbose=False,
                 g_dir="./tmp",
-                g_filename=scene_name
+                g_filename=scene_name,
+                with_graph_stats=with_graph_stats
                 )
             par_v_M_k = initial_partition(P=mesh, sp_idxs=sp_idxs_M_k, verbose=False)
             
@@ -149,7 +151,8 @@ def compare(comp_args):
                 smooth=True,
                 verbose=False,
                 g_dir="./tmp",
-                g_filename=scene_name
+                g_filename=scene_name,
+                with_graph_stats=with_graph_stats
                 )
             par_v_M_ks = initial_partition(P=mesh, sp_idxs=sp_idxs_M_ks, verbose=False)
 
@@ -163,25 +166,28 @@ def compare(comp_args):
             lambda_edge_weight=lambda_edge_weight,
             reg_strength=reg_strength,
             d_se_max=d_se_max,
-            verbose=False)
+            verbose=False,
+            with_graph_stats=with_graph_stats)
         par_v_P = initial_partition(P=P, sp_idxs=sp_idxs_P, verbose=False)
 
-        if nn_only:
-            ooa_M, ooa_P = ooa(
-                par_v_gt=np.array(par_v_gt, copy=True),
-                par_v_M=np.array(par_v_M, copy=True),
-                par_v_M_k=None,
-                par_v_M_ks=None,
-                par_v_P=np.array(par_v_P, copy=True),
-                nn_only=nn_only)
-        else:
-            ooa_M, ooa_M_k, ooa_M_ks, ooa_P = ooa(
-                par_v_gt=np.array(par_v_gt, copy=True),
-                par_v_M=np.array(par_v_M, copy=True),
-                par_v_M_k=np.array(par_v_M_k, copy=True),
-                par_v_M_ks=np.array(par_v_M_ks, copy=True),
-                par_v_P=np.array(par_v_P, copy=True),
-                nn_only=nn_only)
+
+        if with_ooa:
+            if nn_only:
+                ooa_M, ooa_P = ooa(
+                    par_v_gt=np.array(par_v_gt, copy=True),
+                    par_v_M=np.array(par_v_M, copy=True),
+                    par_v_M_k=None,
+                    par_v_M_ks=None,
+                    par_v_P=np.array(par_v_P, copy=True),
+                    nn_only=nn_only)
+            else:
+                ooa_M, ooa_M_k, ooa_M_ks, ooa_P = ooa(
+                    par_v_gt=np.array(par_v_gt, copy=True),
+                    par_v_M=np.array(par_v_M, copy=True),
+                    par_v_M_k=np.array(par_v_M_k, copy=True),
+                    par_v_M_ks=np.array(par_v_M_ks, copy=True),
+                    par_v_P=np.array(par_v_P, copy=True),
+                    nn_only=nn_only)
 
 
         adj_list_ = mesh.adjacency_list.copy()
@@ -201,14 +207,24 @@ def compare(comp_args):
         traceback.print_exc()
         return None
 
-    if nn_only:
-        return scene_id, scene_name, P.shape[0], np.asarray(mesh.triangles).shape[0], reg_strength, k_nn_adj,\
-            n_sps_M, n_sedg_M, ooa_M, n_sps_P, n_sedg_P, ooa_P,\
-            np.mean(n_per_v), np.std(n_per_v), np.median(n_per_v), file_gt, partition_file, stats_M, stats_P
+    if with_ooa:
+        if nn_only:
+            return scene_id, scene_name, P.shape[0], np.asarray(mesh.triangles).shape[0], reg_strength, k_nn_adj,\
+                n_sps_M, n_sedg_M, ooa_M, n_sps_P, n_sedg_P, ooa_P,\
+                np.mean(n_per_v), np.std(n_per_v), np.median(n_per_v), file_gt, partition_file, stats_M, stats_P
+        else:
+            return scene_id, scene_name, P.shape[0], np.asarray(mesh.triangles).shape[0], reg_strength, k_nn_adj,\
+                n_sps_M, n_sedg_M, ooa_M, n_sps_M_k, n_sedg_M_k, ooa_M_k, n_sps_M_ks, n_sedg_M_ks, ooa_M_ks, n_sps_P, n_sedg_P, ooa_P,\
+                np.mean(n_per_v), np.std(n_per_v), np.median(n_per_v), file_gt, partition_file, stats_M, stats_M_k, stats_M_ks, stats_P
     else:
-        return scene_id, scene_name, P.shape[0], np.asarray(mesh.triangles).shape[0], reg_strength, k_nn_adj,\
-            n_sps_M, n_sedg_M, ooa_M, n_sps_M_k, n_sedg_M_k, ooa_M_k, n_sps_M_ks, n_sedg_M_ks, ooa_M_ks, n_sps_P, n_sedg_P, ooa_P,\
-            np.mean(n_per_v), np.std(n_per_v), np.median(n_per_v), file_gt, partition_file, stats_M, stats_M_k, stats_M_ks, stats_P
+        if nn_only:
+            return scene_id, scene_name, P.shape[0], np.asarray(mesh.triangles).shape[0], reg_strength, k_nn_adj,\
+                n_sps_M, n_sedg_M, n_sps_P, n_sedg_P,\
+                np.mean(n_per_v), np.std(n_per_v), np.median(n_per_v), file_gt, partition_file, stats_M, stats_P
+        else:
+            return scene_id, scene_name, P.shape[0], np.asarray(mesh.triangles).shape[0], reg_strength, k_nn_adj,\
+                n_sps_M, n_sedg_M, n_sps_M_k, n_sedg_M_k, n_sps_M_ks, n_sedg_M_ks, n_sps_P, n_sedg_P,\
+                np.mean(n_per_v), np.std(n_per_v), np.median(n_per_v), file_gt, partition_file, stats_M, stats_M_k, stats_M_ks, stats_P
     
 
 
@@ -222,10 +238,14 @@ def main():
     parser.add_argument("--offset", default=0, type=int, help="Offset for the name of the csv file.")
     parser.add_argument("--nn_only", default=False, type=bool, help="If True, only geodesic and euclidean nearest neighbours will be calculated.")
     parser.add_argument("--m_ids", default=False, type=bool, help="Use special scene ids.")
+    parser.add_argument("--without_ooa", default=False, type=bool, help="Disable the OOA calculation")
+    parser.add_argument("--with_graph_stats", default=False, type=bool, help="Enable the computation of mean features, weights, ...")
     args = parser.parse_args()
     mkdir(args.partition_dir)
     mkdir(args.csv_dir)
     seed(42)
+
+    with_ooa = not args.without_ooa
 
     data_header = [
         "id", # integer that is mapped to the scene
@@ -235,22 +255,31 @@ def main():
         "lambda", # regularization strength of cp
         "knn", # neighbourhood size which is considered in the CP
         "|S_M|", # nr of superpoints in the mesh partition
-        "|E_M|", # nr of superedges in the mesh superpoint graph
-        "OOA_M" # overall object accuracy of the mesh
+        "|E_M|" # nr of superedges in the mesh superpoint graph
     ]
+    if with_ooa:
+        data_header.append("OOA_M") # overall object accuracy of the mesh
+
     if not args.nn_only:
         data_header.extend([
             "|S_M_k|", # nr of superpoints in the mesh partition
-            "|E_M_k|", # nr of superedges in the mesh superpoint graph
-            "OOA_M_k", # overall object accuracy of the mesh
-            "|S_M_ks|", # nr of superpoints in the mesh partition
-            "|E_M_ks|", # nr of superedges in the mesh superpoint graph
-            "OOA_M_ks", # overall object accuracy of the mesh
+            "|E_M_k|" # nr of superedges in the mesh superpoint graph
         ])
+        if with_ooa:
+            data_header.append("OOA_M_k") # overall object accuracy of the mesh
+        data_header.extend([
+            "|S_M_ks|", # nr of superpoints in the mesh partition
+            "|E_M_ks|" # nr of superedges in the mesh superpoint graph
+        ])
+        if with_ooa:
+            data_header.append("OOA_M_ks") # overall object accuracy of the mesh
     data_header.extend([
         "|S_P|", # nr of superpoints in the point cloud partition
-        "|E_P|", # nr of superedges in the point cloud superpoint graph
-        "OOA_P", # overall object accuracy of the point cloud
+        "|E_P|" # nr of superedges in the point cloud superpoint graph
+    ])
+    if with_ooa:
+        data_header.append("OOA_P") # overall object accuracy of the point cloud
+    data_header.extend([
         "mean(n)", # average number of neighbours per vertex
         "std(n)", # std of neighbours per vertex
         "median(n)", # median of neighbours per vertex
@@ -297,6 +326,17 @@ def main():
         data_header.append("|SR3|" + post)
         data_header.append("|SR4|" + post)
         data_header.append("|SR5|" + post)
+        if args.with_graph_stats:
+            for feat in ["L", "P", "S", "V"]
+                data_header.append("mean({0}){1}".format(feat, post))
+            for feat in ["L", "P", "S", "V"]
+                data_header.append("std({0}){1}".format(feat, post))
+            for feat in ["L", "P", "S", "V"]
+                data_header.append("median({0}){1}".format(feat, post))
+            data_header.append("mean(w){0}".format(post))
+            data_header.append("std(w){0}".format(post))
+            data_header.append("median(w){0}".format(post))
+
     knns = [30]
     reg_strengths = [0.1]
 
@@ -331,7 +371,8 @@ def main():
             for cp_id in range(n_cp_args):
                 #idx = n_cp_args * scene_id + cp_id
                 reg_strength, k_nn_adj = cp_args[cp_id]
-                comp_args[idx] = (scene_id, scene_name, scannet_dir, reg_strength, k_nn_adj, args.partition_dir, args.nn_only)
+                comp_args[idx] = (scene_id, scene_name, scannet_dir, reg_strength,\
+                    k_nn_adj, args.partition_dir, args.nn_only, with_ooa, args.with_graph_stats)
                 idx += 1
     else:
         comp_args = (n_cp_args*n_scenes) * [None]
@@ -354,7 +395,7 @@ def main():
         res = []
         for i in tqdm(range(len(comp_args)), desc="Compare"):
             comp_arg = comp_args[i] 
-            scene_id, scene_name, scannet_dir, reg_strength, k_nn_adj, p_dir, nn_only = comp_arg
+            #scene_id, scene_name, scannet_dir, reg_strength, k_nn_adj, p_dir, nn_only = comp_arg
             r = compare(comp_args=comp_arg)
             #print("result:", r)
             if r is None:

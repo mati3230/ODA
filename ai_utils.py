@@ -128,7 +128,7 @@ def compute_graph_nn_2(xyz, k_nn1, k_nn2, voronoi = 0.0, verbose=True):
     return graph, target2
 
 
-def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0.1, d_se_max=0, verbose=True):
+def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0.1, d_se_max=0, verbose=True, with_graph_stats=False):
     """ This function is developed by Landrieu et al. 
     (see https://github.com/loicland/superpoint_graph). 
     We modified the output of the function to fit our use case. 
@@ -170,6 +170,20 @@ def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, 
     stats[0] = int(stats[0]) # n ite main
     stats[1] = int(stats[1]) # iterations
     stats[2] = int(stats[2]) # exit code
+    if with_graph_stats:
+        geof = features[:, :4] # geometric features
+        g_mean = np.mean(geof, axis=0)
+        stats.extend(g_mean.tolist())
+        g_std = np.std(geof, axis=0)
+        stats.extend(g_std.tolist())
+        g_med = np.median(geof, axis=0)
+        stats.extend(g_med.tolist())
+        w_mean = np.mean(graph_nn["edge_weight"])
+        stats.extend(w_mean.tolist())
+        w_std = np.std(graph_nn["edge_weight"])
+        stats.extend(w_std.tolist())
+        w_median = np.median(graph_nn["edge_weight"])
+        stats.extend(w_median.tolist())
     if verbose:
         print("Done")
         print("Python stats:", stats)
@@ -2091,7 +2105,7 @@ def get_d_mesh(xyz, tris, adj_list_, k_nn_adj, respect_direct_neigh, use_cartesi
 def superpoint_graph_mesh(mesh_vertices_xyz, mesh_vertices_rgb, mesh_tris, adj_list, 
         lambda_edge_weight=1, reg_strength=0.1, d_se_max=0, k_nn_adj=45, use_cartesian=True, 
         bidirectional=False, respect_direct_neigh=False, n_proc=1, move_vertices=False,
-        g_dir=None, g_filename=None, ignore_knn=False, verbose=True, smooth=True):
+        g_dir=None, g_filename=None, ignore_knn=False, verbose=True, smooth=True, with_graph_stats=False):
     """Partitions a mesh.
 
     Parameters
@@ -2187,11 +2201,28 @@ def superpoint_graph_mesh(mesh_vertices_xyz, mesh_vertices_rgb, mesh_tris, adj_l
     d_mesh["edge_weight"] = np.array(1. / ( lambda_edge_weight + d_mesh["c_distances"] / np.mean(d_mesh["c_distances"])), dtype = "float32")
     if verbose:
         print("Compute cut pursuit")
+
     components, in_component, stats = libcp.cutpursuit(features, d_mesh["c_source"], d_mesh["c_target"], d_mesh["edge_weight"], reg_strength, 0, 0, 1, verbosity_level, speed)
     stats = stats.tolist()
     stats[0] = int(stats[0]) # n ite main
     stats[1] = int(stats[1]) # iterations
     stats[2] = int(stats[2]) # exit code
+    if with_graph_stats:
+        geof = features[:, :4] # geometric features
+        g_mean = np.mean(geof, axis=0)
+        stats.extend(g_mean.tolist())
+        g_std = np.std(geof, axis=0)
+        stats.extend(g_std.tolist())
+        g_med = np.median(geof, axis=0)
+        stats.extend(g_med.tolist())
+        w_mean = np.mean(d_mesh["edge_weight"])
+        stats.extend(w_mean.tolist())
+        w_std = np.std(d_mesh["edge_weight"])
+        stats.extend(w_std.tolist())
+        w_median = np.median(d_mesh["edge_weight"])
+        stats.extend(w_median.tolist())
+
+
     if verbose:
         print("Done")
         print("Python stats:", stats)
