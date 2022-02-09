@@ -295,6 +295,15 @@ def main():
     seed(42)
 
     with_ooa = not args.without_ooa
+    cross_only = args.cross_only
+    nn_only = args.nn_only
+    with_graph_stats = args.with_graph_stats
+
+    if cross_only:
+        with_ooa = False
+        nn_only = False
+        with_graph_stats = True
+
 
     """
     scene_id, scene_name, P.shape[0], np.asarray(mesh.triangles).shape[0], reg_strength, k_nn_adj,\
@@ -308,14 +317,23 @@ def main():
         "|V|", # nr of vertices
         "|T|", # nr of triangles
         "lambda", # regularization strength of cp
-        "knn", # neighbourhood size which is considered in the CP
-        "|S_M|", # nr of superpoints in the mesh partition
-        "|E_M|" # nr of superedges in the mesh superpoint graph
+        "knn" # neighbourhood size which is considered in the CP
     ]
+    if cross_only:
+        data_header.extend([
+            "|S_M|", # nr of superpoints in the mesh partition
+            "|E_M|" # nr of superedges in the mesh superpoint graph
+        ])
+    else:
+        data_header.extend([
+            "|P0_M|", # nr of superpoints in the mesh partition
+            "|P0_M|" # nr of superedges in the mesh superpoint graph
+        ])
+
     if with_ooa:
         data_header.append("OOA_M") # overall object accuracy of the mesh
 
-    if not args.nn_only:
+    if not nn_only:
         data_header.extend([
             "|S_M_k|", # nr of superpoints in the mesh partition
             "|E_M_k|" # nr of superedges in the mesh superpoint graph
@@ -328,28 +346,34 @@ def main():
         ])
         if with_ooa:
             data_header.append("OOA_M_ks") # overall object accuracy of the mesh
-    data_header.extend([
-        "|S_P|", # nr of superpoints in the point cloud partition
-        "|E_P|" # nr of superedges in the point cloud superpoint graph
-    ])
+    if cross_only:
+        data_header.extend([
+            "|S_P1|", # nr of superpoints in the point cloud partition
+            "|E_P1|" # nr of superedges in the point cloud superpoint graph
+        ])
+    else:
+        data_header.extend([
+            "|S_P|", # nr of superpoints in the point cloud partition
+            "|E_P|" # nr of superedges in the point cloud superpoint graph
+        ])
     if with_ooa:
         data_header.append("OOA_P") # overall object accuracy of the point cloud
-    if not args.cross_only:
+    if not cross_only:
         data_header.extend([
             "mean(n)", # average number of neighbours per vertex
             "std(n)", # std of neighbours per vertex
             "median(n)"# median of neighbours per vertex
         ])
     data_header.append("file_gt")# path to the ground truth mesh
-    if not args.cross_only:
+    if not cross_only:
         data_header.append("partitions_file") # path to a file where the partitions are stored
 
-    if args.nn_only:
+    if nn_only:
         posts = ["_M", "_P"]
     else:
         posts = ["_M", "_M_k", "_M_ks", "_P"]
 
-    if args.cross_only:
+    if cross_only:
         posts = ["_P0", "_P1"]
 
     for post in posts:
@@ -386,7 +410,7 @@ def main():
         data_header.append("|SR3|" + post)
         data_header.append("|SR4|" + post)
         data_header.append("|SR5|" + post)
-        if args.with_graph_stats:
+        if with_graph_stats:
             for feat in ["L", "P", "S", "V"]:
                 data_header.append("mean({0}){1}".format(feat, post))
             for feat in ["L", "P", "S", "V"]:
@@ -432,7 +456,7 @@ def main():
                 #idx = n_cp_args * scene_id + cp_id
                 reg_strength, k_nn_adj = cp_args[cp_id]
                 comp_args[idx] = (scene_id, scene_name, scannet_dir, reg_strength,\
-                    k_nn_adj, args.partition_dir, args.nn_only, with_ooa, args.with_graph_stats, args.cross_only)
+                    k_nn_adj, args.partition_dir, nn_only, with_ooa, with_graph_stats, cross_only)
                 idx += 1
     else:
         comp_args = (n_cp_args*n_scenes) * [None]
@@ -448,7 +472,7 @@ def main():
             for cp_id in range(n_cp_args):
                 #idx = n_cp_args * scene_id + cp_id
                 reg_strength, k_nn_adj = cp_args[cp_id]
-                comp_args[idx] = (scene_id, scene_name, scannet_dir, reg_strength, k_nn_adj, args.partition_dir, args.nn_only)
+                comp_args[idx] = (scene_id, scene_name, scannet_dir, reg_strength, k_nn_adj, args.partition_dir, nn_only, with_ooa, with_graph_stats, cross_only)
                 idx += 1
     print("")
     print(data_header)
@@ -467,6 +491,8 @@ def main():
             if i % args.pkg_size == 0:
                 save_csv(res=res, csv_dir=args.csv_dir, csv_name=args.csv_name + "_" + str(i+args.offset), data_header=data_header)
                 res = []
+            ###################################DELETE#######################################################
+            return
     elif args.n_proc > 1:
         """print("Use {0} processes".format(args.n_proc))
         with Pool(processes=args.n_proc) as p:

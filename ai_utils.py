@@ -129,6 +129,28 @@ def compute_graph_nn_2(xyz, k_nn1, k_nn2, voronoi = 0.0, verbose=True):
     return graph, target2
 
 
+def save_file(fname, data_str):
+    f = open(fname, "w")
+    f.write(data_str)
+    f.close()
+
+
+def save_features(features, name):
+    l = str(features[0, 0])
+    p = str(features[0, 1])
+    s = str(features[0, 2])
+    v = str(features[0, 3])
+    for i in range(1, features.shape[0]):
+        l += "," + str(features[i, 0])
+        p += "," + str(features[i, 1])
+        s += "," + str(features[i, 2])
+        v += "," + str(features[i, 3])
+    save_file(fname="./0_{0}_lin_features.csv".format(name), data_str=l)
+    save_file(fname="./0_{0}_plan_features.csv".format(name), data_str=p)
+    save_file(fname="./0_{0}_scat_features.csv".format(name), data_str=s)
+    save_file(fname="./0_{0}_vert_features.csv".format(name), data_str=v)
+
+
 def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0.1, d_se_max=0, 
         verbose=True, with_graph_stats=False,
         use_mesh_feat=False, mesh_tris=None, adj_list=None, g_dir=None, g_filename=None, n_proc=1,
@@ -182,7 +204,10 @@ def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, 
     #choose here which features to use for the partition (features vector for each point)
     features = np.hstack((geof, rgb)).astype("float32")#add rgb as a feature for partitioning
     features[:,3] = 2. * features[:,3] #increase importance of verticality (heuristic)
-            
+
+    save_features(features=features, name="P")
+
+
     verbosity_level = 0.0
     speed = 2.0
     if use_mesh_graph:
@@ -2349,6 +2374,9 @@ def superpoint_graph_mesh(mesh_vertices_xyz, mesh_vertices_rgb, mesh_tris, adj_l
     features = np.hstack((geof, rgb)).astype("float32")#add rgb as a feature for partitioning
     features[:,3] *= 2. #increase importance of verticality (heuristic)
     #print(features)
+
+    save_features(features=features, name="M")
+
     verbosity_level = 0.0
     speed = 2.0
     #"""
