@@ -5,6 +5,27 @@ import os
 import h5py
 
 
+def load_binary_labels(directory):
+    files = os.listdir(directory)
+    binary_labels = []
+    bin_files = []
+    for file in files:
+        is_label_file = file.endswith("features.csv")
+        if not is_label_file:
+            continue
+        fname = directory + "/" + file
+        bin_files.append(fname)
+    bin_files.sort()
+    for fname in bin_files:
+        print(fname)
+        labels = np.loadtxt(fname, delimiter=",")
+        binary_labels.append(labels)
+        #print(labels.shape)
+        #if len(binary_labels) == 2:
+        #    break
+    return binary_labels
+
+
 def mkdir(directory):
     """Method to create a new directory.
 

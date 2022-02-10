@@ -20,6 +20,37 @@ from multiprocessing.pool import ThreadPool
 from network import FFGraphNet
 
 from io_utils import load_nn_file, save_nn_file
+import open3d as o3d
+
+
+def get_delaunay_mesh(mesh):
+    xyz = np.asarray(mesh.vertices)
+    tri = Delaunay(xyz)
+    mtris = np.asarray(mesh.triangles)
+    print("Original mesh has {0} triangles".format(mtris.shape[0]))
+    s = tri.simplices
+    """
+    #print(s.shape)
+    tri1 = np.hstack((s[:, 0][:, None], s[:, 1][:, None], s[:, 2][:, None]))
+    #print(tri1.shape)
+    tri2 = np.hstack((s[:, 0][:, None], s[:, 1][:, None], s[:, 3][:, None]))
+    tri3 = np.hstack((s[:, 1][:, None], s[:, 2][:, None], s[:, 3][:, None]))
+    tri4 = np.hstack((s[:, 0][:, None], s[:, 2][:, None], s[:, 3][:, None]))
+    dtris = np.vstack((tri1, tri2, tri3, tri4))
+    dtris = np.unique(dtris, axis=0)
+    print("Delaunay triangulation over the vertices of the mesh produces {0} triangles".format(dtris.shape[0]))
+    """
+    """
+    md = o3d.geometry.TriangleMesh()
+    md.vertices = o3d.utility.Vector3dVector(xyz)
+    md.triangles = o3d.utility.Vector3iVector(dtris)
+    md.vertex_colors = o3d.utility.Vector3dVector(np.asarray(mesh.vertex_colors))
+    return md
+    """
+    md = o3d.geometry.TetraMesh(o3d.utility.Vector3dVector(xyz), o3d.utility.Vector4iVector(s))
+    md.vertex_colors = o3d.utility.Vector3dVector(np.asarray(mesh.vertex_colors))
+    return md
+
 
 
 def compute_graph_nn_2(xyz, k_nn1, k_nn2, voronoi = 0.0, verbose=True):
@@ -315,7 +346,7 @@ def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, 
     edg6r = np.vstack((tri.vertices[interface, 3], tri.vertices[interface, 2]))
     
     del tri, interface
-    # edges of points where one end point lies in a superpoint a und another end point in the superpoint b != a
+    # edges of points where one end point lies in a superpoint and another end point in the superpoint b != a
     edges = np.hstack((edg1, edg2, edg3, edg4 ,edg5, edg6, edg1r, edg2r,
                        edg3r, edg4r ,edg5r, edg6r))
     del edg1, edg2, edg3, edg4 ,edg5, edg6, edg1r, edg2r, edg3r, edg4r, edg5r, edg6r    
@@ -351,7 +382,7 @@ def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, 
     will be filtered so that we only have one edge from S_1 to S_2.  
     """
     idxs_comp_change = np.argwhere(np.diff(edge_comp_index)) + 1
-    #marks where the edges change components iot compting them by blocks
+    #marks where the edges change components in order to compute them by blocks
     jump_edg = np.vstack((0, idxs_comp_change, n_edg)).flatten()
     n_sedg = len(jump_edg) - 1
 
@@ -2375,7 +2406,10 @@ def superpoint_graph_mesh(mesh_vertices_xyz, mesh_vertices_rgb, mesh_tris, adj_l
     features[:,3] *= 2. #increase importance of verticality (heuristic)
     #print(features)
 
-    save_features(features=features, name="M")
+    if ignore_knn:
+        save_features(features=features, name="M_k")
+    else:
+        save_features(features=features, name="M")
 
     verbosity_level = 0.0
     speed = 2.0

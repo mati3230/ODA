@@ -8,7 +8,8 @@ from visu_utils import\
     render_partition_vec_o3d,\
     render_partition_o3d,\
     pick_sp_points_o3d,\
-    visu_dec_bs
+    visu_dec_bs,\
+    render_pptk_feat
 from io_utils import\
     save_init_graph,\
     load_init_graph_mesh,\
@@ -22,8 +23,9 @@ from io_utils import\
     load_colors,\
     save_partition,\
     mkdir,\
-    save_meshes
-from ai_utils import graph_mesh, predict, calculate_stris
+    save_meshes,\
+    load_binary_labels
+from ai_utils import graph_mesh, predict, calculate_stris, get_delaunay_mesh
 from sp_utils import\
     unify,\
     extend_superpoint,\
@@ -66,10 +68,27 @@ def main():
     parser.add_argument("--ending", default="glb", type=str, help="File format of the meshes (glb, obj, ...)")
     parser.add_argument("--ignore_knn", default=False, type=bool, help="Ignore the nearest neighbour calculations to execute the l0-CP")
     parser.add_argument("--smooth", default=False, type=bool, help="Use the nearest neighbour calculations to execute the l0-CP with only the triangular graph")
+    parser.add_argument("--vis_feats", default=False, type=bool, help="Only visualize the point features")
+    parser.add_argument("--vis_tris", default=False, type=bool, help="Only visualize mesh and delaunay triangulation")
     args = parser.parse_args()
+    if args.vis_feats:
+        mesh = load_mesh(file=args.file)
+        binary_labels = load_binary_labels(directory=".")
+        P = np.hstack((np.asarray(mesh.vertices), np.asarray(mesh.vertex_colors)))
+        render_pptk_feat(P=P, feats=binary_labels, point_size=0.01)
+        return
+    if args.vis_tris:
+        mesh = load_mesh(file=args.file)
+        render_o3d(mesh, w_co=True)
+        md = get_delaunay_mesh(mesh=mesh)
+        render_o3d(md, w_co=True)
+        return
+    
     # load the colors for the parititon rendering
     colors = load_colors()
     colors = colors/255.
+
+
     """
     colors[0, :] = np.zeros((3,))
     colors[1, :] = np.array([1, 0, 0])
@@ -153,6 +172,10 @@ def main():
                         filename=args.g_filename,
                         stris=stris)
                 init_p = initial_partition(P=mesh, sp_idxs=sp_idxs)
+
+                binary_labels = load_binary_labels(directory=".")
+                render_pptk_feat(P=np.asarray(mesh.vertices), feats=binary_labels)
+
                 render_partition_o3d(mesh=mesh, sp_idxs=sp_idxs, colors=colors, w_co=True)
             calc = True
             i = input("lambda [l] | k_nn_adj [a] | lambda_edge_weight [w] | ignore knn [i] | smooth [s] | Continue [-1] | Exit [e]: ")
@@ -238,6 +261,8 @@ def main():
 
     init_p = initial_partition(P=mesh, sp_idxs=sp_idxs)
     render_partition_o3d(mesh=mesh, sp_idxs=sp_idxs, colors=colors)
+    # TODO render binary labels
+
     #init_p = initial_partition(P=mesh, sp_idxs=sp_idxs)
     part, meshes = partition(
         graph_dict=graph_dict,

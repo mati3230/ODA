@@ -57,7 +57,6 @@ def render_pptk_(P, partition=None, initial_partition=None, point_size=-1, v=Non
     if max_c.shape[0] > 0:
         #print("Normalize colors.")
         rgb /= 255.
-    persp = None
     if v is None:
         v = pptk.viewer(xyz)
     else:
@@ -68,7 +67,6 @@ def render_pptk_(P, partition=None, initial_partition=None, point_size=-1, v=Non
         v.color_map(c=colors)
     if point_size > 0:
         v.set(point_size=point_size)
-    colors = P[:, 3:]
     if partition is None and initial_partition is None:
         v.attributes(rgb)
     elif initial_partition is not None and partition is None:
@@ -77,6 +75,34 @@ def render_pptk_(P, partition=None, initial_partition=None, point_size=-1, v=Non
         v.attributes(rgb, partition)
     else:
         v.attributes(rgb, initial_partition, partition)
+    print("Press Return in the 3D windows to continue.")
+    #set_perspective(viewer=v, p=persp)
+    v.wait()
+    return v
+
+
+def render_pptk_feat(P, point_size=-1, v=None, feats=None):
+    if P is None:
+        return None
+    if feats is None:
+        return None
+    xyz = P[:, :3]
+    rgb = np.array(P[:, 3:], copy=True)
+    max_c = np.max(rgb, axis=0)
+    max_c = max_c[max_c > 1]
+    if max_c.shape[0] > 0:
+        #print("Normalize colors.")
+        rgb /= 255.
+    if v is None:
+        v = pptk.viewer(xyz)
+    else:
+        #persp = get_perspective(viewer=v)
+        v.clear()
+        v.load(xyz)
+    if point_size > 0:
+        v.set(point_size=point_size)
+    #feats.append(rgb)
+    v.attributes(rgb, *feats)
     print("Press Return in the 3D windows to continue.")
     #set_perspective(viewer=v, p=persp)
     v.wait()
