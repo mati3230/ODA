@@ -113,7 +113,8 @@ def compare(comp_args):
                 g_dir="./tmp",
                 g_filename=scene_name,
                 n_proc=1,
-                return_graph_nn=True
+                return_graph_nn=True,
+                ignore_knn=True
                 )
             n_sps_P1, n_sedg_P1, sp_idxs_P1, senders_P1, receivers_P1, _, stats_P1 = superpoint_graph(
                 xyz=P[:, :3],
@@ -132,7 +133,8 @@ def compare(comp_args):
                 g_dir="./tmp",
                 g_filename=scene_name,
                 n_proc=1,
-                igraph_nn=graph_nn
+                igraph_nn=graph_nn,
+                ignore_knn=True
                 )
             return scene_id, scene_name, P.shape[0], np.asarray(mesh.triangles).shape[0], reg_strength, k_nn_adj,\
                 n_sps_P0, n_sedg_P0, n_sps_P1, n_sedg_P1, file_gt, stats_P0, stats_P1
@@ -159,6 +161,7 @@ def compare(comp_args):
             )
         #return None
         par_v_M = initial_partition(P=mesh, sp_idxs=sp_idxs_M, verbose=False)
+
         #"""
         if not nn_only:
             #print("2")

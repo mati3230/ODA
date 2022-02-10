@@ -185,7 +185,7 @@ def save_features(features, name):
 def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0.1, d_se_max=0, 
         verbose=True, with_graph_stats=False,
         use_mesh_feat=False, mesh_tris=None, adj_list=None, g_dir=None, g_filename=None, n_proc=1,
-        use_mesh_graph=False, return_graph_nn=False, igraph_nn=None):
+        use_mesh_graph=False, return_graph_nn=False, igraph_nn=None, ignore_knn=False):
     """ This function is developed by Landrieu et al. 
     (see https://github.com/loicland/superpoint_graph). 
     We modified the output of the function to fit our use case. 
@@ -222,10 +222,18 @@ def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, 
         adj_list_ = adj_list.copy()
         tris = np.array(np.asarray(mesh_tris), copy=True)
         d_mesh = get_d_mesh(xyz=xyz, tris=tris, adj_list_=adj_list_, k_nn_adj=k_nn_adj, respect_direct_neigh=False,
-            use_cartesian=False, bidirectional=False, n_proc=n_proc, ignore_knn=False, verbose=verbose,
+            use_cartesian=False, bidirectional=False, n_proc=n_proc, ignore_knn=ignore_knn, verbose=verbose,
             g_dir=g_dir, g_filename=g_filename)
     if use_mesh_feat:
-        geof = libply_c.compute_geof(xyz, d_mesh["target"], k_nn_adj, False).astype(np.float32)
+        if ignore_knn:
+            n_per_v = np.zeros((len(adj_list_), ), np.uint32)
+            for i in range(len(adj_list_)):
+                al = adj_list_[i]
+                #print(i, al)
+                n_per_v[i] = len(al)
+            geof = libply_c.compute_geof_var(xyz, d_mesh["target"], n_per_v, False).astype(np.float32)
+        else:
+            geof = libply_c.compute_geof(xyz, d_mesh["target"], k_nn_adj, False).astype(np.float32)
     else:
         #geof = libply_c.compute_geof(xyz, graph_nn["c_target"], k_nn_geof, False).astype(np.float32)
         geof = libply_c.compute_geof(xyz, graph_nn["target"], k_nn_adj, False).astype(np.float32)
