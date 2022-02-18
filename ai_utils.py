@@ -2309,8 +2309,8 @@ def get_d_mesh(xyz, tris, adj_list_, k_nn_adj, respect_direct_neigh, use_cartesi
             n_proc=n_proc,
             ignore_knn=ignore_knn,
             verbose=verbose)
-        #d_mesh = clean_edges(d_mesh=d_mesh)
-        d_mesh = clean_edges_threads(d_mesh=d_mesh)
+        d_mesh = clean_edges(d_mesh=d_mesh)
+        #d_mesh = clean_edges_threads(d_mesh=d_mesh)
         try:
             #if ignore_knn:
             #    raise Exception()

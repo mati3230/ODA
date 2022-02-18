@@ -173,8 +173,8 @@ def main():
                         stris=stris)
                 init_p = initial_partition(P=mesh, sp_idxs=sp_idxs)
 
-                binary_labels = load_binary_labels(directory=".")
-                render_pptk_feat(P=np.asarray(mesh.vertices), feats=binary_labels)
+                #binary_labels = load_binary_labels(directory=".")
+                #render_pptk_feat(P=np.asarray(mesh.vertices), feats=binary_labels)
 
                 render_partition_o3d(mesh=mesh, sp_idxs=sp_idxs, colors=colors, w_co=True)
             calc = True
