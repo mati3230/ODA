@@ -23,6 +23,7 @@ from partition.density_utils import densities_np
 
 
 def save_csv(res, csv_dir, csv_name, data_header):
+    # write results of the cut pursuit calculations as csv
     csv = ""
     for header in data_header:
         csv += header + ","
@@ -41,6 +42,7 @@ def save_csv(res, csv_dir, csv_name, data_header):
 
 
 def ooa(par_v_gt, par_v_M, par_v_M_k, par_v_M_ks, par_v_P, nn_only):
+    # calculate the OOA of multiple partitions
     sortation = np.argsort(par_v_gt)
     par_v_gt = par_v_gt[sortation]
     par_v_M = par_v_M[sortation]
@@ -79,22 +81,28 @@ def ooa(par_v_gt, par_v_M, par_v_M_k, par_v_M_ks, par_v_P, nn_only):
 
 
 def compare(comp_args):
+    """ Method that executes the cut pursuit with different input graphs.
+    
+    Returns
+    -------
+    Statistics of the cut pursuit calculations. 
+
+    """
     scene_id, scene_name, scannet_dir, reg_strength, k_nn_adj, partition_dir, nn_only, with_ooa, with_graph_stats, cross_only = comp_args
     #scene_name = "scene0085_01"
     lambda_edge_weight = 1.
     d_se_max = 0
     k_nn_adj = int(k_nn_adj)
     try:
+        # Load the ground truth data (vertices, triangles, \Omega) 
         mesh, par_v_gt, file_gt = get_ground_truth(scannet_dir=scannet_dir, scene=scene_name)
-        #mesh = o3d.geometry.TriangleMesh.create_sphere(radius=1.0, resolution=10)
-        #rgb = np.random.rand(np.asarray(mesh.vertices).shape[0],3)
-        #mesh.vertex_colors = o3d.utility.Vector3dVector(rgb)
         mesh.compute_adjacency_list()
 
         #print("")
         #print("1")
         #"""
         if cross_only:
+            # calculate e_g
             P, xyz, rgb = get_P(mesh=mesh)
             n_sps_P0, n_sedg_P0, sp_idxs_P0, senders_P0, receivers_P0, _, stats_P0, graph_nn = superpoint_graph(
                 xyz=P[:, :3],
@@ -116,6 +124,7 @@ def compare(comp_args):
                 return_graph_nn=True,
                 ignore_knn=True
                 )
+            # calculate g_e
             n_sps_P1, n_sedg_P1, sp_idxs_P1, senders_P1, receivers_P1, _, stats_P1 = superpoint_graph(
                 xyz=P[:, :3],
                 rgb=P[:, 3:],
@@ -136,12 +145,11 @@ def compare(comp_args):
                 igraph_nn=graph_nn,
                 ignore_knn=True
                 )
+            # return the result
             return scene_id, scene_name, P.shape[0], np.asarray(mesh.triangles).shape[0], reg_strength, k_nn_adj,\
                 n_sps_P0, n_sedg_P0, n_sps_P1, n_sedg_P1, file_gt, stats_P0, stats_P1
     
-
-
-
+        # calculate g
         n_sps_M, n_sedg_M, sp_idxs_M, senders_M, receivers_M, stris_M, stats_M = superpoint_graph_mesh(
             mesh_vertices_xyz=mesh.vertices,
             mesh_vertices_rgb=mesh.vertex_colors,
@@ -165,6 +173,7 @@ def compare(comp_args):
         #"""
         if not nn_only:
             #print("2")
+            # calculate M
             n_sps_M_k, n_sedg_M_k, sp_idxs_M_k, senders_M_k, receivers_M_k, stris_M_k, stats_M_k = superpoint_graph_mesh(
                 mesh_vertices_xyz=mesh.vertices,
                 mesh_vertices_rgb=mesh.vertex_colors,
@@ -185,7 +194,7 @@ def compare(comp_args):
                 )
             par_v_M_k = initial_partition(P=mesh, sp_idxs=sp_idxs_M_k, verbose=False)
             
-            #print("3")
+            # calculate M with feature of g (experimental)
             n_sps_M_ks, n_sedg_M_ks, sp_idxs_M_ks, senders_M_ks, receivers_M_ks, stris_M_ks, stats_M_ks = superpoint_graph_mesh(
                 mesh_vertices_xyz=mesh.vertices,
                 mesh_vertices_rgb=mesh.vertex_colors,
@@ -207,6 +216,7 @@ def compare(comp_args):
             par_v_M_ks = initial_partition(P=mesh, sp_idxs=sp_idxs_M_ks, verbose=False)
 
         #print("4")
+        # calculate e
         P, xyz, rgb = get_P(mesh=mesh)
         n_sps_P, n_sedg_P, sp_idxs_P, senders_P, receivers_P, _, stats_P = superpoint_graph(
             xyz=P[:, :3],
@@ -220,7 +230,7 @@ def compare(comp_args):
             with_graph_stats=with_graph_stats)
         par_v_P = initial_partition(P=P, sp_idxs=sp_idxs_P, verbose=False)
 
-
+        # calculate the OOA (caution: slow!)
         if with_ooa:
             if nn_only:
                 ooa_M, ooa_P = ooa(
@@ -239,13 +249,14 @@ def compare(comp_args):
                     par_v_P=np.array(par_v_P, copy=True),
                     nn_only=nn_only)
 
-
+        # how many outgoing edges do we have in M per vertex
         adj_list_ = mesh.adjacency_list.copy()
         n_per_v = np.zeros((len(adj_list_), ), np.uint32)
         for i in range(len(adj_list_)):
             al = adj_list_[i]
             n_per_v[i] = len(al)
 
+        # save the partitions for later use
         partition_file = str(scene_id) + "_" + str(reg_strength) + "_" + str(k_nn_adj)
         if nn_only:
             partitions = [("gt", par_v_gt), ("M", par_v_M), ("P", par_v_P)]
@@ -257,6 +268,7 @@ def compare(comp_args):
         traceback.print_exc()
         return None
 
+    # return the stats depending on the configuration
     if with_ooa:
         if nn_only:
             return scene_id, scene_name, P.shape[0], np.asarray(mesh.triangles).shape[0], reg_strength, k_nn_adj,\
@@ -287,10 +299,10 @@ def main():
     parser.add_argument("--pkg_size", default=100, type=int, help="Number of packages to save a csv")
     parser.add_argument("--offset", default=0, type=int, help="Offset for the name of the csv file.")
     parser.add_argument("--nn_only", default=False, type=bool, help="If True, only geodesic and euclidean nearest neighbours will be calculated.")
-    parser.add_argument("--m_ids", default=False, type=bool, help="Use special scene ids.")
+    parser.add_argument("--m_ids", default=False, type=bool, help="Use user defined scene ids (see Line 455 in this script).")
     parser.add_argument("--without_ooa", default=False, type=bool, help="Disable the OOA calculation")
     parser.add_argument("--with_graph_stats", default=False, type=bool, help="Enable the computation of mean features, weights, ...")
-    parser.add_argument("--cross_only", default=False, type=bool, help="Calculate graph e with features of g and vice versa")
+    parser.add_argument("--cross_only", default=False, type=bool, help="Calculate graph e with features of g (e_g) and vice versa (g_e)")
     args = parser.parse_args()
     print(args)
     mkdir(args.partition_dir)
@@ -302,17 +314,11 @@ def main():
     nn_only = args.nn_only
     with_graph_stats = args.with_graph_stats
 
+    # setup of the header
     if cross_only:
         with_ooa = False
         nn_only = False
         with_graph_stats = True
-
-
-    """
-    scene_id, scene_name, P.shape[0], np.asarray(mesh.triangles).shape[0], reg_strength, k_nn_adj,\
-                    n_sps_P0, n_sedg_P0, n_sps_P1, n_sedg_P1, np.mean(n_per_v), np.std(n_per_v), np.median(n_per_v),
-                    file_gt, stats_P0, stats_P1
-    """
 
     data_header = [
         "id", # integer that is mapped to the scene
@@ -424,12 +430,15 @@ def main():
             data_header.append("std(w){0}".format(post))
             data_header.append("median(w){0}".format(post))
 
+    # lists with parameter configurations
     knns = [30]
     reg_strengths = [0.1]
 
+    # create tuple with parameter configurations
     cp_args = list(itertools.product(*[reg_strengths, knns]))
     n_cp_args = len(cp_args)
 
+    # get the list of scannet scenes
     scenes, scannet_dir = get_scenes()
     #scenes = ["s1"]
     #scannet_dir = ""
@@ -437,7 +446,8 @@ def main():
     #n_scenes=2
     #n_cp_args=2
 
-    if args.m_ids:
+    if args.m_ids: # if using user defined scenes in contrast to all scenes that are randomized
+        # user defined scenes
         m_scene_ids = [1456, 510, 618, 1453, 1455, 1507, 325, 1240, 1260, 515,
             1323, 687, 1282, 1390, 1439, 550, 1296, 593, 373, 1418, 353, 549,
             731, 1329, 400, 759, 1065, 1265, 782, 1057, 1352, 718, 886, 1387,
@@ -445,12 +455,14 @@ def main():
             1151, 969, 111, 926, 1322, 1174, 1434, 386, 1053, 482, 1305, 215, 857,
             794, 961, 207, 132, 1015, 1241, 288, 887, 68, 297, 580, 1041, 787,
             932, 1420, 1435, 413, 1359, 1345, 1298, 626, 715]
+        # list where each element is a job that should be computed
         comp_args = (n_cp_args*len(m_scene_ids)) * [None]
 
         scenes_ids = list(zip(scenes, list(range(len(scenes)))))
 
         shuffle(scenes_ids)
 
+        # fill the list of jobs
         idx = 0
         for (scene_name, scene_id) in scenes_ids:
             if scene_id not in m_scene_ids:
@@ -485,7 +497,7 @@ def main():
         res = []
         for i in tqdm(range(len(comp_args)), desc="Compare"):
             comp_arg = comp_args[i] 
-            #scene_id, scene_name, scannet_dir, reg_strength, k_nn_adj, p_dir, nn_only = comp_arg
+            # this method computes a configuration
             r = compare(comp_args=comp_arg)
             #print("result:", r)
             if r is None:
@@ -494,9 +506,7 @@ def main():
             if i % args.pkg_size == 0:
                 save_csv(res=res, csv_dir=args.csv_dir, csv_name=args.csv_name + "_" + str(i+args.offset), data_header=data_header)
                 res = []
-            ###################################DELETE#######################################################
-            return
-    elif args.n_proc > 1:
+    elif args.n_proc > 1: # compute multiple configuration at once
         """print("Use {0} processes".format(args.n_proc))
         with Pool(processes=args.n_proc) as p:
             res = p.starmap(compare, comp_args)"""

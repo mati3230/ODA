@@ -682,7 +682,7 @@ def save_ply(P, fdir, filename, o_id):
     print("Save cloud: {0}".format(file))
     P3d = o3d.geometry.PointCloud()
     P3d.points = o3d.utility.Vector3dVector(P[:, :3])
-    P3d.colors = o3d.utility.Vector3dVector(P[:, 3:])
+    P3d.colors = o3d.utility.Vector3dVector(P[:, 3:]/255)
     o3d.io.write_point_cloud(file, P3d)
     print("Done")
 
