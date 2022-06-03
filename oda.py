@@ -22,6 +22,8 @@ from io_utils import\
     save_partition,\
     mkdir
 from ai_utils import graph, predict
+# TODO test!
+#from partition.felzenswalb import partition_from_probs
 from sp_utils import\
     unify,\
     extend_superpoint,\
@@ -287,6 +289,8 @@ def main():
         graph_dict["receivers"] = receivers
 
     init_p = initial_partition(P=P, sp_idxs=sp_idxs)
+    # TODO include partition of felzenswalb
+    # part = partition_from_probs(graph_dict=graph_dict, sim_probs=probs, k=100)
     part = partition(
         graph_dict=graph_dict,
         unions=unions,
@@ -320,6 +324,8 @@ def main():
                 P=P,
                 sp_idxs=sp_idxs,
                 half=False)
+            # TODO include partition of felzenswalb
+            # part = partition_from_probs(graph_dict=graph_dict, sim_probs=probs, k=100)
             save_partition(partition=part, fdir=args.g_dir, fname=args.g_filename)
             viewer = render_pptk(P=P, initial_partition=init_p, partition=part, point_size=point_size, v=viewer, colors=colors)
         save_unions(

@@ -80,7 +80,28 @@ def partition(G, k):
         S = merge(G_, w, C1, C2, S, e, k)
     return S
 
+def partition_from_probs(graph_dict, sim_probs, k):
+    senders = graph_dict["senders"]
+    receivers = graph_dict["receivers"]
+    all_verts = senders = np.vstack((senders[:, None], receivers[:, None]))
+    all_verts = np.unique(all_verts)
+    n = all_verts.shape[0]
+    G = ig.Graph()
+    G.add_vertices(n)
+    edges = []
+    for i in range(senders.shape[0]):
+        s = senders[i]
+        r = receivers[i]
+        e = (s, r)
+        edges.append(e)
+    G.add_edges(edges)
+    G.es["w"] = 1 - sim_probs
+    S = partition(G, k)
+    return S
+
+
 if __name__ == "__main__":
+    # similar nodes should have low edge weight
     G = ig.Graph()
     G.add_vertices(6)
     G.add_edges([(0,1), (1,2), (2, 3), (3, 4), (4, 5), (5, 3)])
