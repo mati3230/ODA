@@ -290,7 +290,7 @@ def main():
 
     init_p = initial_partition(P=P, sp_idxs=sp_idxs)
     # TODO include partition of felzenswalb
-    # part = partition_from_probs(graph_dict=graph_dict, sim_probs=probs, k=100)
+    # part = partition_from_probs(graph_dict=graph_dict, sim_probs=probs, k=100, P=P, sp_idxs=sp_idxs)
     part = partition(
         graph_dict=graph_dict,
         unions=unions,
@@ -302,6 +302,7 @@ def main():
     if not args.load_unions:
         viewer = render_pptk(P=P, initial_partition=init_p, partition=part, point_size=point_size, v=viewer, colors=colors)
         while True:
+            # TODO d_b could be parameter k of segmentation algorithm of felzenswalb
             d_b = input("Decision Boundary [0,1] | Decision boundary check [d] | Continue: [-1]: ")
             if d_b == "d":
                 visu_dec_bs(graph_dict=graph_dict, P=P, sp_idxs=sp_idxs, probs=probs, partition_func=partition)
