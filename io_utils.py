@@ -493,6 +493,8 @@ def load_cloud(file, r=255, g=0, b=0, p=1):
         P = from_npz(file=file, r=r, g=g, b=b, p=p)
     elif file.endswith("pcd"):
         P = from_pcd(file=file, r=r, g=g, b=b, p=p)
+    elif file.endswith("ply"):
+        P = from_ply(file=file, r=r, g=g, b=b, p=p)
     elif file.endswith("txt"):
         P = from_txt(file=file, r=r, g=g, b=b, p=p)
     elif file.endswith("xyz"):
@@ -621,6 +623,16 @@ def from_npz(file, r=255, g=0, b=0, p=1):
         xyz = data["xyz"]
         rgb = data["rgb"]
         P = np.hstack((xyz, rgb))
+    P = cloud(P=P, r=r, g=g, b=b, p=p)
+    return P
+
+
+def from_ply(file, r=255, g=0, b=0, p=1):
+    mesh = o3d.io.read_triangle_mesh(file)
+    P = np.asarray(mesh.vertices)
+    if mesh.vertex_colors is not None:
+        C = np.asarray(mesh.vertex_colors)
+        P = np.hstack((P, C))
     P = cloud(P=P, r=r, g=g, b=b, p=p)
     return P
 

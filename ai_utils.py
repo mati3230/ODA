@@ -1,10 +1,7 @@
 # cut pursuit library (see https://github.com/loicland/superpoint_graph/tree/ssp%2Bspg/partition)
-try:
-    import cp_ext as libcp
-    import ply_c_ext as libply_c
-except:
-    import libcp
-    import libply_c
+import libcp
+import libply_c
+import libgeo
 
 import numpy as np
 import numpy.matlib
@@ -17,7 +14,8 @@ import time
 import sys
 from multiprocessing.pool import ThreadPool
 
-from network import FFGraphNet
+#from network import FFGraphNet
+from graphnet_light import GraphNetLight
 
 from io_utils import load_nn_file, save_nn_file
 import open3d as o3d
@@ -185,7 +183,7 @@ def save_features(features, name):
 def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0.1, d_se_max=0, 
         verbose=True, with_graph_stats=False,
         use_mesh_feat=False, mesh_tris=None, adj_list=None, g_dir=None, g_filename=None, n_proc=1,
-        use_mesh_graph=False, return_graph_nn=False, igraph_nn=None, ignore_knn=False):
+        use_mesh_graph=False, return_graph_nn=False, igraph_nn=None, ignore_knn=False, n_repair=4, make_bidirect=False):
     """ This function is developed by Landrieu et al. 
     (see https://github.com/loicland/superpoint_graph). 
     We modified the output of the function to fit our use case. 
@@ -196,7 +194,7 @@ def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, 
     # target_fea are the indices of the k nearest neighbours of each point (a point itself is not considered as neighbour)
     if igraph_nn is None:
         graph_nn, target_fea = compute_graph_nn_2(xyz, k_nn_adj, k_nn_geof, verbose=verbose)
-        graph_nn = clean_edges_threads(d_mesh=graph_nn)
+        #graph_nn = clean_edges_threads(d_mesh=graph_nn)
     else:
         graph_nn = igraph_nn
     #graph_nn = clean_edges(d_mesh=graph_nn)
@@ -236,15 +234,41 @@ def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, 
             geof = libply_c.compute_geof(xyz, d_mesh["target"], k_nn_adj, False).astype(np.float32)
     else:
         #geof = libply_c.compute_geof(xyz, graph_nn["c_target"], k_nn_geof, False).astype(np.float32)
-        geof = libply_c.compute_geof(xyz, graph_nn["target"], k_nn_adj, False).astype(np.float32)
+        #geof = libply_c.compute_geof(xyz, graph_nn["target"], k_nn_adj, False).astype(np.float32)
+        geof_all = libply_c.compute_all_geof(xyz, target_fea, k_nn_geof, False).astype(np.float32)
+        geof = np.array(geof_all[:, :4], copy=True)
     if igraph_nn is None:
         del target_fea
 
+    senders = graph_nn["source"]
+    receivers = graph_nn["target"]
+    distances = graph_nn["distances"]
+
+    uni_verts, direct_neigh_idxs, n_edges = np.unique(senders, return_index=True, return_counts=True)
+    senders = senders.astype(np.uint32)
+    receivers = receivers.astype(np.uint32)
+    uni_verts = uni_verts.astype(np.uint32)
+    direct_neigh_idxs = direct_neigh_idxs.astype(np.uint32)
+    n_edges = n_edges.astype(np.uint32)
+
+    if verbose:
+        print("Make unidirectional")
+    mask = libgeo.unidirectional(uni_verts, direct_neigh_idxs, n_edges, receivers)
+    mask = mask.astype(np.bool)
+    #print(mask.shape, mask.dtype)
+    senders = senders [mask]
+    receivers = receivers[mask]
+    distances = distances[mask]
+
+    graph_nn["source"] = senders
+    graph_nn["target"] = receivers
+    graph_nn["distances"] = distances
+
     #choose here which features to use for the partition (features vector for each point)
-    features = np.hstack((geof, rgb)).astype("float32")#add rgb as a feature for partitioning
+    features = np.hstack((geof, rgb/255)).astype("float32")#add rgb as a feature for partitioning
     features[:,3] = 2. * features[:,3] #increase importance of verticality (heuristic)
 
-    save_features(features=features, name="P")
+    #save_features(features=features, name="P")
 
 
     verbosity_level = 0.0
@@ -253,11 +277,11 @@ def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, 
         d_mesh["edge_weight"] = np.array(1. / ( lambda_edge_weight + d_mesh["c_distances"] / np.mean(d_mesh["c_distances"])), dtype = "float32")
         if verbose:
             print("Compute cut pursuit")
-        components, in_component, stats = libcp.cutpursuit(features, d_mesh["c_source"], d_mesh["c_target"],
+        components, in_component, stats = libcp.cutpursuit(features, d_mesh["source"], d_mesh["target"],
             d_mesh["edge_weight"], reg_strength, 0, 0, 1, verbosity_level, speed)
     else:
         if igraph_nn is None:
-            graph_nn["edge_weight"] = np.array(1. / ( lambda_edge_weight + graph_nn["c_distances"] / np.mean(graph_nn["c_distances"])), dtype = "float32")
+            graph_nn["edge_weight"] = np.array(1. / ( lambda_edge_weight + graph_nn["distances"] / np.mean(graph_nn["distances"])), dtype = "float32")
         #print("        minimal partition...")
         if verbose:
             print("Minimal Partition")
@@ -266,33 +290,16 @@ def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, 
         in_component: this is one list with the length of number of points - here we got a superpoint idx for each point
             this is just another representation of components.
         """
-        components, in_component, stats = libcp.cutpursuit(features, graph_nn["c_source"], graph_nn["c_target"], 
-            graph_nn["edge_weight"], reg_strength, 0, 0, 1, verbosity_level, speed)
+        verbosity_level = 0.0
+        speed = 2.0
+        store_bin_labels = 0
+        cutoff = 0 
+        spatial = 0 
+        weight_decay = 1
+        components, in_component, stats, duration = libcp.cutpursuit(features, graph_nn["source"], graph_nn["target"], 
+            graph_nn["edge_weight"], reg_strength, cutoff, spatial, weight_decay, verbosity_level, speed, store_bin_labels)
 
-
-
-
-    stats = stats.tolist()
-    stats[0] = int(stats[0]) # n ite main
-    stats[1] = int(stats[1]) # iterations
-    stats[2] = int(stats[2]) # exit code
-    if with_graph_stats:
-        geof = features[:, :4] # geometric features
-        g_mean = np.mean(geof, axis=0)
-        stats.extend(g_mean.tolist())
-        g_std = np.std(geof, axis=0)
-        stats.extend(g_std.tolist())
-        g_med = np.median(geof, axis=0)
-        stats.extend(g_med.tolist())
-        w_mean = np.mean(graph_nn["edge_weight"])
-        stats.append(w_mean)
-        w_std = np.std(graph_nn["edge_weight"])
-        stats.append(w_std)
-        w_median = np.median(graph_nn["edge_weight"])
-        stats.append(w_median)
-    if verbose:
-        print("Done")
-        print("Python stats:", stats)
+    
     #print(components)
     #print(in_component)
     # components represent the actual superpoints (partition) - now we need to compute the edges of the superpoints
@@ -302,139 +309,100 @@ def superpoint_graph(xyz, rgb, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, 
 
     in_component = np.array(in_component)
 
-    """
-    # Uncomment to see how components and in_component are structured
-    print("len in_component", in_component.shape)
-    #print(np.unique(in_component))
-    unis = np.unique(in_component)
-    print("in_component")
-    for i in range(unis.shape[0]):
-        uni = unis[i]
-        idxs = np.where(in_component == uni)[0]
-        print(uni, len(idxs), idxs)
+    sp_centers = np.zeros((n_com, 3), dtype=np.float32)
+    for i in range(n_com):
+        idxs = components[i]
+        sp_centers[i] = np.mean(xyz[idxs], axis=0)
 
-    #print(unis)
-    print("-------------")
-    print("components")
-    #print(len(components))
-    i = 0
-    for c in components:
-        print(i, len(c), np.sort(c)[:10])
-        i += 1
-    """
-    
-    tri = Delaunay(xyz)
+    assigned_partition_vec = np.zeros((xyz.shape[0], ), dtype=np.uint32)
+    for i in range(n_com):
+        idxs = components[i]
+        assigned_partition_vec[idxs] = i
 
-    #interface select the edges between different superpoints
-    interface = in_component[tri.vertices[:, 0]] != in_component[tri.vertices[:, 1]]
-    #edgx and edgxr converts from tetrahedrons to edges (from i to j (edg1) and from j to i (edg1r))
-    #done separatly for each edge of the tetrahedrons to limit memory impact
-    edg1 = np.vstack((tri.vertices[interface, 0], tri.vertices[interface, 1]))
-    edg1r = np.vstack((tri.vertices[interface, 1], tri.vertices[interface, 0]))
-    
-    interface = in_component[tri.vertices[:, 0]] != in_component[tri.vertices[:, 2]]
-    # shape: (2, n_tetras)
-    edg2 = np.vstack((tri.vertices[interface, 0], tri.vertices[interface, 2]))
-    edg2r = np.vstack((tri.vertices[interface, 2], tri.vertices[interface, 0]))
-    
-    interface = in_component[tri.vertices[:, 0]] != in_component[tri.vertices[:, 3]]
-    edg3 = np.vstack((tri.vertices[interface, 0], tri.vertices[interface, 3]))
-    edg3r = np.vstack((tri.vertices[interface, 3], tri.vertices[interface, 0]))
-    
-    interface = in_component[tri.vertices[:, 1]] != in_component[tri.vertices[:, 2]]
-    edg4 = np.vstack((tri.vertices[interface, 1], tri.vertices[interface, 2]))
-    edg4r = np.vstack((tri.vertices[interface, 2], tri.vertices[interface, 1]))
-    
-    interface = in_component[tri.vertices[:, 1]] != in_component[tri.vertices[:, 3]]
-    edg5 = np.vstack((tri.vertices[interface, 1], tri.vertices[interface, 3]))
-    edg5r = np.vstack((tri.vertices[interface, 3], tri.vertices[interface, 1]))
-    
-    interface = in_component[tri.vertices[:, 2]] != in_component[tri.vertices[:, 3]]
-    edg6 = np.vstack((tri.vertices[interface, 2], tri.vertices[interface, 3]))
-    edg6r = np.vstack((tri.vertices[interface, 3], tri.vertices[interface, 2]))
-    
-    del tri, interface
-    # edges of points where one end point lies in a superpoint and another end point in the superpoint b != a
-    edges = np.hstack((edg1, edg2, edg3, edg4 ,edg5, edg6, edg1r, edg2r,
-                       edg3r, edg4r ,edg5r, edg6r))
-    del edg1, edg2, edg3, edg4 ,edg5, edg6, edg1r, edg2r, edg3r, edg4r, edg5r, edg6r    
-    # Filter edges that occur multiple times in edges, e.g. [[x, x, z], [y, y, z]] -> [[x, z], [y, z]]
-    edges = np.unique(edges, axis=1)
-    if d_se_max > 0:
-        # distance between the superpoints on the edges
-        dist = np.sqrt(((xyz[edges[0,:]]-xyz[edges[1,:]])**2).sum(1))
-        # filter edges with too large distance
-        edges = edges[:,dist<d_se_max]
-    
-    #---sort edges by alpha numeric order wrt to the components (superpoints) of their source/target---
-    # number of edges n_edg
-    n_edg = len(edges[0])
-    
-    # replace point indices in edges with the superpoint idx of each point and save it in edge_comp
-    edge_comp = in_component[edges]
-    # len(edge_comp_index) == n_edg
-    edge_comp_index = n_com * edge_comp[0,:] + edge_comp[1,:]
-    order = np.argsort(edge_comp_index)
-    
-    # reordering of the edges, the edge_comp and the edge_comp_index array itself
-    edges = edges[:, order]
-    edge_comp = edge_comp[:, order]
-    edge_comp_index = edge_comp_index[order]
-    #print(edge_comp_index)
+    source = graph_nn["source"].astype(np.uint32)
+    target = graph_nn["target"].astype(np.uint32)
+    senders, receivers = libgeo.components_graph(assigned_partition_vec, source, target)
 
-    """
-    np.argwhere(np.diff(edge_comp_index)): where does the sorted edge_comp_index change? 
-    This is stored in the array idxs_comp_change. The edge_comp array could have multiple 
-    connections between the same superpoints. Therefore, we filter them with the jump_edg 
-    in order to take once account of them. Thus, multiple edges from superpoint S_1 to S_2
-    will be filtered so that we only have one edge from S_1 to S_2.  
-    """
-    idxs_comp_change = np.argwhere(np.diff(edge_comp_index)) + 1
-    #marks where the edges change components in order to compute them by blocks
-    jump_edg = np.vstack((0, idxs_comp_change, n_edg)).flatten()
-    n_sedg = len(jump_edg) - 1
+    # make each edge bidirectional
+    if make_bidirect:
+        tmp_senders = np.array(senders, copy=True)
+        senders = np.hstack((senders[None, :], receivers[None, :]))
+        receivers = np.hstack((receivers[None, :], tmp_senders[None, :]))
+    # unique: filter multiple occurance of the same edges
+    edges = np.vstack((senders, receivers))
+    uni_edges = np.unique(edges, axis=1)
+    senders = uni_edges[0, :]
+    receivers = uni_edges[1, :]
 
-    ########################################
-    # Our modification
-    ########################################
-    senders = []
-    receivers = []
-    uni_edges = []
-    if verbose:
-        print("Total number of edges: {0}".format(n_sedg))
-    n_filtered = 0
-    if edge_comp.shape[1] == 0:
-        raise Exception("Zero edge comp")
-    #---compute the superedges features---
-    for i_sedg in range(0, n_sedg):
-        i_edg_begin = jump_edg[i_sedg]
-        i_edg_end = jump_edg[i_sedg + 1]
-        #ver_source = edges[0, range(i_edg_begin, i_edg_end)]
-        #ver_target = edges[1, range(i_edg_begin, i_edg_end)]
-        com_source = edge_comp[0, i_edg_begin]
-        com_target = edge_comp[1, i_edg_begin]
-        #xyz_source = xyz[ver_source, :]
-        #xyz_target = xyz[ver_target, :]
-        edge = (com_source, com_target)
-        if edge in uni_edges:
-            n_filtered += 1
-            continue
-        senders.append(com_source)
-        receivers.append(com_target)
-        inv_edge = (com_target, com_source)
-        uni_edges.append(inv_edge)
-    # bidirectional
-    tmp_senders = senders.copy()
-    senders.extend(receivers)
-    receivers.extend(tmp_senders)
-    senders = np.array(senders, dtype=np.uint32)
-    receivers = np.array(receivers, dtype=np.uint32)
-    if verbose:
-        print("{0} edges filtered, {1} unique edges".format(n_filtered, len(uni_edges)))
+    # sorted them according to the senders 
+    sortation = np.argsort(senders)
+    senders = senders[sortation]
+    receivers = receivers[sortation]
+
+    uni_senders, senders_idxs, senders_counts = np.unique(senders, return_index=True, return_counts=True)
+
+    ####################################
+    if n_com != uni_senders.shape[0]:
+        # identify which nodes do not have senders (i.e. single nodes)
+        single_nodes = []
+        for i in range(n_com):
+            if i in uni_senders:
+                continue
+            single_nodes.append(i)
+        #print("Have to connect {0} nodes".format(len(single_nodes)))
+        single_nodes = np.array(single_nodes, dtype=np.uint32)
+        #single_nodes = single_nodes.reshape(1, -1)
+        # determine the nearest neighbours of the single nodes
+        nn = NearestNeighbors(n_neighbors=n_repair, algorithm="kd_tree").fit(sp_centers)
+        single_dists, single_neigh = nn.kneighbors(sp_centers[single_nodes])
+
+        offset = n_repair - 1
+        n_add = single_nodes.shape[0] * offset
+        n_senders = np.zeros((n_add, ), dtype=np.uint32)
+        n_receivers = np.zeros((n_add, ), dtype=np.uint32)
+        for i in range(single_nodes.shape[0]):
+            single_node = single_nodes[i]
+            start = i * offset
+            stop = start + offset
+            n_senders[start:stop] = single_node
+            n_receivers[start:stop] = single_neigh[i, 1:]
+
+        # make new edges bidirectional
+        if make_bidirect:
+            tmp_n_senders = np.array(n_senders, copy=True)
+            n_senders = np.hstack((n_senders[None, :], n_receivers[None, :]))
+            n_receivers = np.hstack((n_receivers[None, :], tmp_n_senders[None, :]))
+            n_senders = n_senders.reshape((n_senders.shape[1], ))
+            n_receivers = n_receivers.reshape((n_receivers.shape[1], ))
+        
+        # add new edges to the old ones
+        senders = np.vstack((senders[:, None], n_senders[:, None]))
+        receivers = np.vstack((receivers[:, None], n_receivers[:, None]))
+
+        senders = senders.reshape((senders.shape[0], ))
+        receivers = receivers.reshape((senders.shape[0], ))
+
+        # sorted them according to the senders 
+        sortation = np.argsort(senders)
+        senders = senders[sortation]
+        receivers = receivers[sortation]
+
+        uni_senders, senders_idxs, senders_counts = np.unique(senders, return_index=True, return_counts=True)
+
+    # double check
+    if n_com != uni_senders.shape[0]:
+        raise Exception("Different number of superpoints and unique senders ({0}, {1})".format(n_com, uni_senders.shape[0]))
+    ######################################
+    #print("{0} edges filtered, {1} unique edges".format(n_filtered, len(uni_edges)))
+    
+    #render_graph(P=np.array(np.hstack((xyz, rgb)), copy=True), nodes=np.arange(n_com), sp_idxs=components, sp_centers=sp_centers, senders=senders, receivers=receivers)
+
     if return_graph_nn:
-        return n_com, n_sedg, components, senders, receivers, len(uni_edges), stats, graph_nn
+        return n_com, senders.shape[0], components, senders, receivers,\
+            len(uni_senders), stats, graph_nn, geof_all, sp_centers
     else:
-        return n_com, n_sedg, components, senders, receivers, len(uni_edges), stats
+        return n_com, senders.shape[0], components, senders, receivers,\
+            len(uni_senders), stats, geof_all, sp_centers
 
 
 def get_characteristic_points(P, center, k, far_points=True):
@@ -650,6 +618,23 @@ def hists_feature(P, center, bins=10, min_r=-0.5, max_r=0.5):
         stop = start + bins
         hists[start:stop] = hist / P.shape[0]
     return hists
+
+
+def compute_features_geof(cloud, geof, mean_cloud, std_cloud, mean_geof, std_geof):
+    geof_mean = np.mean(geof, axis=0)
+    #geof_mean = 2 * (geof_mean - 0.5)
+    geof_mean = (geof_mean - mean_geof) / std_geof
+
+    #rgb_mean = np.mean(cloud[:, 3:6], axis=0)
+    #rgb_mean = (rgb_mean - mean_cloud[3:6]) / std_cloud[3:6]
+        
+    #print(geof_mean, rgb_mean)
+
+    #feats = np.vstack((geof_mean[:, None], rgb_mean[:, None]))
+    feats = geof_mean
+    feats = feats.astype(np.float32)
+    feats = feats.reshape(feats.shape[0], )
+    return feats, np.any(np.isnan(geof_mean))# or np.any(np.isnan(rgb_mean))
 
 
 def compute_features(cloud, n_curv=30, k_curv=14, k_far=30, n_normal=30, bins=10, min_r=-0.5, max_r=0.5):
@@ -977,14 +962,16 @@ def graph(cloud, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0
     P = np.array(cloud, copy=True)
     print("Compute superpoint graph")
     t1 = time.time()
-    n_sps, n_edges, sp_idxs, senders, receivers, _ = superpoint_graph(
-        xyz=P[:, :3],
-        rgb=P[:, 3:],
-        reg_strength=reg_strength,
-        k_nn_geof=k_nn_geof,
-        k_nn_adj=k_nn_adj,
-        lambda_edge_weight=lambda_edge_weight,
-        d_se_max=d_se_max)
+
+    n_sps, n_edges, sp_idxs, senders, receivers, _, _, geof, sp_centers = superpoint_graph(
+            xyz=P[:, :3],
+            rgb=P[:, 3:],
+            reg_strength=reg_strength,
+            k_nn_geof=k_nn_geof,
+            k_nn_adj=k_nn_adj,
+            lambda_edge_weight=lambda_edge_weight,
+            d_se_max=d_se_max,
+            make_bidirect=True)
 
     """
     n_sps: Number of superpoints (vertices) in the graph
@@ -1002,7 +989,13 @@ def graph(cloud, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0
     print("Compute features for every superpoint")
 
     t1 = time.time()
-    P, center = feature_point_cloud(P=P)
+    #P, center = feature_point_cloud(P=P)
+
+    P[:, 3:6] /= 255
+    mean_P = np.mean(P, axis=0)
+    std_P = np.std(P, axis=0)
+    mean_geof = np.mean(geof, axis=0)
+    std_geof = np.std(geof, axis=0)
 
     print("Check superpoint sizes")
     # so that every superpoint is smaller than the max_sp_size
@@ -1018,7 +1011,11 @@ def graph(cloud, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0
 
     idxs = sp_idxs[0]
     sp = P[idxs]
-    features = compute_features(cloud=sp)
+    sp_geof = geof[idxs]
+
+    features, isnan = compute_features_geof(cloud=sp, geof=sp_geof,
+        mean_cloud=mean_P, std_cloud=std_P, mean_geof=mean_geof, std_geof=std_geof)
+
     n_ft = features.shape[0]
     print("Use {0} features".format(n_ft))
 
@@ -1027,7 +1024,8 @@ def graph(cloud, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0
     for k in tqdm(range(1, n_sps), desc="Node features"):
         idxs = sp_idxs[k]
         sp = P[idxs]
-        features = compute_features(cloud=sp)
+        features, isnan = compute_features_geof(cloud=sp, geof=sp_geof,
+            mean_cloud=mean_P, std_cloud=std_P, mean_geof=mean_geof, std_geof=std_geof)
         node_features[k] = features
 
     t2 = time.time()
@@ -1057,7 +1055,7 @@ def init_model(n_ft, is_mesh=False):
     model : network.FFGraphNet
         The model that predicts the correlations
     """
-    model = FFGraphNet(
+    model = GraphNetLight(
         name="target_policy",
         n_ft_outpt=8,
         n_actions=2,
@@ -1069,18 +1067,19 @@ def init_model(n_ft, is_mesh=False):
         stateful=False,
         discrete=True,
         head_only=True,
-        observation_size=(910, ))
+        observation_size=(8, ))
     n_nodes = 6
     features_points = 6
-    feature_func = compute_features
+    #feature_func = compute_features_geof
     if is_mesh:
         features_points = 9
         feature_func = compute_mesh_features
     node_features = np.zeros((n_nodes, n_ft), dtype=np.float32)
     for i in range(n_nodes):
-        sp = np.random.randn(100, features_points)
-        features = feature_func(cloud=sp)
-        features = features.reshape(features.shape[0], )        
+        #sp = np.random.randn(100, features_points)
+        #features = feature_func(cloud=sp)
+        #features = features.reshape(features.shape[0], )        
+        features = np.random.randn(n_ft, )
         node_features[i] = features
     senders = np.array(list(range(0, n_nodes-1)), dtype=np.uint32)
     receivers = np.array(list(range(1, n_nodes)), dtype=np.uint32)
@@ -2414,10 +2413,12 @@ def superpoint_graph_mesh(mesh_vertices_xyz, mesh_vertices_rgb, mesh_tris, adj_l
     features[:,3] *= 2. #increase importance of verticality (heuristic)
     #print(features)
 
+    """
     if ignore_knn:
         save_features(features=features, name="M_k")
     else:
         save_features(features=features, name="M")
+    """
 
     verbosity_level = 0.0
     speed = 2.0

@@ -23,7 +23,7 @@ from io_utils import\
     mkdir
 from ai_utils import graph, predict
 # TODO test!
-#from partition.felzenswalb import partition_from_probs
+from partition.felzenszwalb import partition_from_probs
 from sp_utils import\
     unify,\
     extend_superpoint,\
@@ -290,23 +290,26 @@ def main():
 
     init_p = initial_partition(P=P, sp_idxs=sp_idxs)
     # TODO include partition of felzenswalb
-    # part = partition_from_probs(graph_dict=graph_dict, sim_probs=probs, k=100, P=P, sp_idxs=sp_idxs)
+    part = partition_from_probs(graph_dict=graph_dict, sim_probs=probs, k=100, P=P, sp_idxs=sp_idxs)
+    """
     part = partition(
         graph_dict=graph_dict,
         unions=unions,
         P=P,
         sp_idxs=sp_idxs,
         half=False)
+    """
     save_partition(partition=part, fdir=args.g_dir, fname=args.g_filename)
     print("You can switch between the colored point cloud, the initial partition and the GNN partition by pressing: AltGr + ]")
     if not args.load_unions:
         viewer = render_pptk(P=P, initial_partition=init_p, partition=part, point_size=point_size, v=viewer, colors=colors)
         while True:
             # TODO d_b could be parameter k of segmentation algorithm of felzenswalb
-            d_b = input("Decision Boundary [0,1] | Decision boundary check [d] | Continue: [-1]: ")
-            if d_b == "d":
-                visu_dec_bs(graph_dict=graph_dict, P=P, sp_idxs=sp_idxs, probs=probs, partition_func=partition)
-                continue
+            #d_b = input("Decision Boundary [0,1] | Decision boundary check [d] | Continue: [-1]: ")
+            d_b = input("k [1,inf] | Continue: [-1]: ")
+            #if d_b == "d":
+            #    visu_dec_bs(graph_dict=graph_dict, P=P, sp_idxs=sp_idxs, probs=probs, partition_func=partition)
+            #    continue
             try:
                 d_b = float(d_b)
             except:
@@ -319,12 +322,13 @@ def main():
             t2 = time.time()
             duration = t2 - t1
             print("Threshold operation takes {0:.3f} seconds.".format(duration))
-            part = partition(
+            part = partition_from_probs(graph_dict=graph_dict, sim_probs=probs, k=d_b, P=P, sp_idxs=sp_idxs)
+            """part = partition(
                 graph_dict=graph_dict,
                 unions=unions,
                 P=P,
                 sp_idxs=sp_idxs,
-                half=False)
+                half=False)"""
             # TODO include partition of felzenswalb
             # part = partition_from_probs(graph_dict=graph_dict, sim_probs=probs, k=100)
             save_partition(partition=part, fdir=args.g_dir, fname=args.g_filename)

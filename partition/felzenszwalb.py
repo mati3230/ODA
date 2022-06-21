@@ -95,7 +95,7 @@ def partition(G, k):
 def partition_from_probs(graph_dict, sim_probs, k, P, sp_idxs):
     senders = graph_dict["senders"]
     receivers = graph_dict["receivers"]
-    all_verts = senders = np.vstack((senders[:, None], receivers[:, None]))
+    all_verts = np.vstack((senders[:, None], receivers[:, None]))
     all_verts = np.unique(all_verts)
     n = all_verts.shape[0]
     G = ig.Graph()
