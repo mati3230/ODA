@@ -139,7 +139,23 @@ def get_ground_truth(scannet_dir, scene):
     return mesh, partition_vec, mesh_file
 
 
-def get_scenes():
+def get_scannet_dir():
+    return os.environ["SCANNET_DIR"] + "/scans"
+
+
+def get_scenes(blacklist=[]):
     scannet_dir = os.environ["SCANNET_DIR"] + "/scans"
     scenes = os.listdir(scannet_dir)
-    return scenes, scannet_dir
+    scene_dict = {}
+    s_len = len("scene") + 4
+    uni_scenes = []
+    for i in range(len(scenes)):
+        scene = scenes[i]
+        key = scene[:s_len]
+        if key in scene_dict:
+            continue
+        scene_dict[key] = key
+        if scene in blacklist:
+            continue
+        uni_scenes.append(scene)
+    return uni_scenes, scenes, scannet_dir
