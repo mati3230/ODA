@@ -463,8 +463,9 @@ def get_submesh(m_triangles, vertices, vertex_colors):
     return nmesh
 
 
-def partition(graph_dict, unions, P, sp_idxs, half=False, stris=None):
-    print("Calculate partition")
+def partition(graph_dict, unions, P, sp_idxs, half=False, stris=None, verbose=True):
+    if verbose:
+        print("Calculate partition")
     is_mesh = False
     if type(P) == o3d.geometry.TriangleMesh:
         vertices = np.asarray(P.vertices)
@@ -481,7 +482,8 @@ def partition(graph_dict, unions, P, sp_idxs, half=False, stris=None):
     c_list = comp_list(graph_dict=graph_dict, unions=unions, n_P=n_P, sp_idxs=sp_idxs, half=half)
 
     if is_mesh:
-        print("Calculate partition vector and partition of triangles")
+        if verbose:
+            print("Calculate partition vector and partition of triangles")
         for i in range(len(c_list)):
             #print("-----------")
             comp = c_list[i]
@@ -518,7 +520,8 @@ def partition(graph_dict, unions, P, sp_idxs, half=False, stris=None):
             nmesh.vertex_colors = o3d.utility.Vector3dVector(m_colors)
             meshes.append(nmesh)
             # print("Add mesh with {0} vertices and {1} triangles".format(m_verts.shape[0], n_triangles.shape[0]))
-        print("Done")
+        if verbose:
+            print("Done")
         return par_v, meshes
     else:
         for i in range(len(c_list)):
@@ -527,7 +530,8 @@ def partition(graph_dict, unions, P, sp_idxs, half=False, stris=None):
             for j in range(n_sp_comp):
                 P_idxs = comp[j][1]
                 par_v[P_idxs] = i    
-        print("Done")
+        if verbose:
+            print("Done")
         return par_v
 
 

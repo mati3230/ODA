@@ -932,7 +932,8 @@ def feature_point_cloud(P):
     return P, center
 
 
-def graph(cloud, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0.1, d_se_max=0, max_sp_size=-1):
+def graph(cloud, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0.1,
+        d_se_max=0, max_sp_size=-1, verbose=True, return_p_vec=False):
     """ This function creates a superpoint graph from a point cloud. 
 
     Parameters
@@ -960,7 +961,8 @@ def graph(cloud, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0
     """
     # make a copy of the original cloud to prevent that points do not change any properties
     P = np.array(cloud, copy=True)
-    print("Compute superpoint graph")
+    if verbose:
+        print("Compute superpoint graph")
     t1 = time.time()
 
     n_sps, n_edges, sp_idxs, senders, receivers, _, _, geof, sp_centers = superpoint_graph(
@@ -971,7 +973,8 @@ def graph(cloud, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0
             k_nn_adj=k_nn_adj,
             lambda_edge_weight=lambda_edge_weight,
             d_se_max=d_se_max,
-            make_bidirect=True)
+            make_bidirect=True,
+            verbose=verbose)
 
     """
     n_sps: Number of superpoints (vertices) in the graph
@@ -984,9 +987,9 @@ def graph(cloud, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0
     # create a feature vector for every superpoint
     t2 = time.time()
     duration = t2 - t1
-    print("Superpoint graph has {0} nodes and {1} edges (duration: {2:.3f} seconds)".format(n_sps, n_edges, duration))
-
-    print("Compute features for every superpoint")
+    if verbose:
+        print("Superpoint graph has {0} nodes and {1} edges (duration: {2:.3f} seconds)".format(n_sps, n_edges, duration))
+        print("Compute features for every superpoint")
 
     t1 = time.time()
     #P, center = feature_point_cloud(P=P)
@@ -996,8 +999,8 @@ def graph(cloud, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0
     std_P = np.std(P, axis=0)
     mean_geof = np.mean(geof, axis=0)
     std_geof = np.std(geof, axis=0)
-
-    print("Check superpoint sizes")
+    if verbose:
+        print("Check superpoint sizes")
     # so that every superpoint is smaller than the max_sp_size
     sps_sizes = []
     for i in range(n_sps):
@@ -1007,7 +1010,8 @@ def graph(cloud, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0
         if max_sp_size > 0 and sp_size > max_sp_size:
             raise Exception("Superpoint {0} too large with {1} points (max: {2}). Try to lower the reg_strength.".format(i, sp_size, max_sp_size))
         sps_sizes.append(sp_size)
-    print("Average superpoint size: {0:.2f} ({1:.2f})".format(np.mean(sps_sizes), np.std(sps_sizes)))
+    if verbose:
+        print("Average superpoint size: {0:.2f} ({1:.2f})".format(np.mean(sps_sizes), np.std(sps_sizes)))
 
     idxs = sp_idxs[0]
     sp = P[idxs]
@@ -1017,11 +1021,12 @@ def graph(cloud, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0
         mean_cloud=mean_P, std_cloud=std_P, mean_geof=mean_geof, std_geof=std_geof)
 
     n_ft = features.shape[0]
-    print("Use {0} features".format(n_ft))
+    if verbose:
+        print("Use {0} features".format(n_ft))
 
     node_features = np.zeros((n_sps, n_ft), dtype=np.float32)
     node_features[0] = features
-    for k in tqdm(range(1, n_sps), desc="Node features"):
+    for k in tqdm(range(1, n_sps), desc="Node features", disable=not verbose):
         idxs = sp_idxs[k]
         sp = P[idxs]
         features, isnan = compute_features_geof(cloud=sp, geof=sp_geof,
@@ -1030,7 +1035,8 @@ def graph(cloud, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0
 
     t2 = time.time()
     duration = t2 - t1
-    print("Computed features in {0:.3f} seconds".format(duration))
+    if verbose:
+        print("Computed features in {0:.3f} seconds".format(duration))
 
     graph_dict = {
         "nodes": node_features,
@@ -1039,6 +1045,14 @@ def graph(cloud, k_nn_adj=10, k_nn_geof=45, lambda_edge_weight=1, reg_strength=0
         "edges": None,
         "globals": None
         }
+    if return_p_vec:
+        p_vec = -np.ones((P.shape[0], ), dtype=np.int32)
+        sp_v = 1
+        for i in range(len(sp_idxs)):
+            sp_idx = sp_idxs[i]
+            p_vec[sp_idx] = sp_v
+            sp_v += 1
+        return graph_dict, sp_idxs, p_vec
     return graph_dict, sp_idxs
 
 
@@ -1096,7 +1110,7 @@ def init_model(n_ft, is_mesh=False):
     return model
 
 
-def predict(graph_dict, dec_b=0.5, is_mesh=False):
+def predict(graph_dict, dec_b=0.5, is_mesh=False, model=None, return_model=False, verbose=True):
     """Predict correlations between the nodes in the graph
 
     Parameters
@@ -1118,7 +1132,8 @@ def predict(graph_dict, dec_b=0.5, is_mesh=False):
     """
     t1 = time.time()
     n_ft = graph_dict["nodes"].shape[1]
-    model = init_model(n_ft=n_ft, is_mesh=is_mesh)
+    if model is None:
+        model = init_model(n_ft=n_ft, is_mesh=is_mesh)
     input_graphs = utils_tf.data_dicts_to_graphs_tuple([graph_dict])
     
     a_dict = model.action(obs=input_graphs, training=False, decision_boundary=dec_b)
@@ -1131,7 +1146,10 @@ def predict(graph_dict, dec_b=0.5, is_mesh=False):
     probs = probs.numpy()
     t2 = time.time()
     duration = t2 - t1
-    print("Model prediction takes {0:.3f} seconds".format(duration))
+    if verbose:
+        print("Model prediction takes {0:.3f} seconds".format(duration))
+    if return_model:
+        return action, probs, model 
     return action, probs
 
 
