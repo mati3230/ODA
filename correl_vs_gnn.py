@@ -200,9 +200,9 @@ def main():
         unions_gt = get_unions(graph_dict=graph_dict, alpha=alpha)
 
         if model is None:
-            _, probs_gnn, model = predict(graph_dict=graph_dict, dec_b=args.t, return_model=True, verbose=False)
+            _, probs_gnn, model = predict(graph_dict=graph_dict, dec_b=0.8, return_model=True, verbose=False)
         else:
-            _, probs_gnn = predict(graph_dict=graph_dict, dec_b=args.t, model=model, verbose=False)
+            _, probs_gnn = predict(graph_dict=graph_dict, dec_b=0.8, model=model, verbose=False)
         part_gnn = partition_from_probs(graph_dict=graph_dict, sim_probs=probs_gnn, k=args.k, P=P, sp_idxs=sp_idxs)
         
         probs_correl = predict_correl(graph_dict=graph_dict)

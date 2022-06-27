@@ -91,9 +91,9 @@ def ooa(par_v_gt, par_v, partition_gt=None, sortation=None):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--min_k", type=int, default=1000, help="Minimum k parameter of FH04 segmentation algorithm.")
-    parser.add_argument("--max_k", type=int, default=100, help="Maximum k parameter of FH04 segmentation algorithm.")
-    parser.add_argument("--step_k", type=int, default=100, help="Step size to which the k parameter of FH04 segmentation algorithm will be varied.")
+    parser.add_argument("--min_k", type=float, default=1000, help="Minimum k parameter of FH04 segmentation algorithm.")
+    parser.add_argument("--max_k", type=float, default=100, help="Maximum k parameter of FH04 segmentation algorithm.")
+    parser.add_argument("--step_k", type=float, default=100, help="Step size to which the k parameter of FH04 segmentation algorithm will be varied.")
     # cp params
     parser.add_argument("--reg_strength", default=0.1, type=float, help="Regularization strength for the minimal partition. Increase lambda for a coarser partition. ")
     parser.add_argument("--k_nn_geof", default=45, type=int, help="Number of neighbors for the geometric features.")
@@ -122,7 +122,7 @@ def main():
     scene_name = scenes[args.sn_id]
 
     csv_header = get_csv_header()
-    csv_name = "fh04_k"
+    csv_name = "fh04_k_id{0}".format(args.sn_id)
     
     verbose = False
     model = None
@@ -143,29 +143,49 @@ def main():
         verbose=verbose,
         return_p_vec=True)
 
-    unions, probs, model = predict(graph_dict=graph_dict, dec_b=args.t, return_model=True, verbose=False)
+    unions, probs, model = predict(graph_dict=graph_dict, dec_b=0.8, return_model=True, verbose=False)
 
     ooas = []
     sizes = []
     all_data = []
-    for i in tqdm(range(k_params.shape[0]), desc="Vary K of FH04", disable=not verbose):
+    partition_gt = None
+    sortation = None
+
+    ooa_cp, partition_gt, sortation = ooa(par_v_gt=p_vec_gt, par_v=part_cp, partition_gt=partition_gt, sortation=sortation)
+    size_cp = len(sp_idxs)
+
+    for i in tqdm(range(k_params.shape[0]), desc="Vary K of FH04", disable=verbose):
         k = k_params[i]
         part_fh04 = partition_from_probs(graph_dict=graph_dict, sim_probs=probs, k=k, P=P, sp_idxs=sp_idxs)
-        ooa_fh04, partition_gt, sortation = ooa(par_v_gt=p_vec_gt, par_v=part_fh04)
+        ooa_fh04, partition_gt, sortation = ooa(par_v_gt=p_vec_gt, par_v=part_fh04, partition_gt=partition_gt, sortation=sortation)
         size_fh04 = np.unique(part_fh04).shape[0]
         ooas.append(ooa_fh04)
         sizes.append(size_fh04)
-        all_data.append([scene_name, k, ooa_fh04, size_fh04])
+        all_data.append([scene_name, k, ooa_fh04, size_fh04, ooa_cp, size_cp])
     
     save_csv(res=all_data, csv_dir=args.csv_dir, csv_name=csv_name, data_header=csv_header)
 
     ooas = np.array(ooas)
     sizes = np.array(sizes)
 
-    plt.plot(k_params, ooas)
-    plt.show()
-    plt.savefig(fname="fh04_k_ooa.jpg")
+    ooa_cps = np.zeros((ooas.shape[0], ))
+    ooa_cps[:] = ooa_cp
 
-    plt.plot(k_params, sizes)
+    plt.plot(k_params, ooas, ".")
+    plt.plot(k_params, ooa_cps, "-")
+    #plt.xticks(k_params)
+    plt.savefig(fname="fh04_k_ooa_id{0}.jpg".format(args.sn_id))
     plt.show()
-    plt.savefig(fname="fh04_k_sizes.jpg")
+
+
+    sizes_cps = np.zeros((sizes.shape[0], ))
+    sizes_cps[:] = size_cp
+    plt.plot(k_params, sizes, ".")
+    plt.plot(k_params, sizes_cps, "-")
+    #plt.xticks(k_params)
+    plt.savefig(fname="fh04_k_sizes_id{0}.jpg".format(args.sn_id))
+    plt.show()
+
+
+if __name__ == "__main__":
+    main()
