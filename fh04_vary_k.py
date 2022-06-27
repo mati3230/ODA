@@ -198,7 +198,7 @@ def all_scenes():
     parser.add_argument("--max_sp_size", default=-1, type=int, help="Maximum size of a superpoint.")
     #
     parser.add_argument("--pkg_size", default=5, type=int, help="Number of packages to save a csv")
-    parser.add_argument("--csv_dir", default="./", type=str, help="Directory where we save the csv.")
+    parser.add_argument("--csv_dir", default="./csvs_vary_k", type=str, help="Directory where we save the csv.")
     args = parser.parse_args()
 
     k_params = [0.001, 0.1, 1, 2, 3, 4, 10]
