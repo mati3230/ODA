@@ -3,13 +3,13 @@ import os
 from tqdm import tqdm
 import numpy as np
 
-"""
+#"""
 from scannet_utils import get_scenes, get_ground_truth
 from ai_utils import graph, predict, np_fast_dot
 from partition.felzenszwalb import partition_from_probs
 from partition.partition import Partition
 from partition.density_utils import densities_np
-"""
+#"""
 
 def mkdir(directory):
     """Method to create a new directory.
@@ -97,7 +97,7 @@ def get_unions(graph_dict, alpha):
     unions = np.zeros((senders.shape[0], ), dtype=np.bool)
     for i in range(senders.shape[0]):
         e_i = senders[i]
-        e_j = receivers[j]
+        e_j = receivers[i]
         unions[i] = alpha[e_i] == alpha[e_j]
     return unions
 
@@ -110,7 +110,7 @@ def predict_correl(graph_dict):
     probs = np.zeros((senders.shape[0], ), dtype=np.float32)
     for i in range(senders.shape[0]):
         e_i = senders[i]
-        e_j = receivers[j]
+        e_j = receivers[i]
         f_i = node_features[e_i]
         f_j = node_features[e_j]
         correlation, _, _ = np_fast_dot(a=f_i, b=f_j)
@@ -215,7 +215,7 @@ def main():
         size_correl = np.unique(part_correl).shape[0]
 
         bce_gnn = binary_cross_entropy(y=unions_gt, probs=probs_gnn)
-        bce_correl = binary_cross_entropy(y=unions_gt, probs=probs_gnn)
+        bce_correl = binary_cross_entropy(y=unions_gt, probs=probs_correl)
 
         csv_data.append([file_gt, P.shape[0], ooa_gnn, size_gnn, bce_gnn, ooa_correl, size_correl, bce_correl])
         if i % args.pkg_size == 0 and len(csv_data) > 0:

@@ -9,6 +9,7 @@ from ai_utils import graph, predict
 from partition.felzenszwalb import partition_from_probs
 from partition.partition import Partition
 from partition.density_utils import densities_np
+# try to iterate over all scenes with $K \in \{0.001, 0.1, 1, 1.5, 10\}$
 
 
 def mkdir(directory):
