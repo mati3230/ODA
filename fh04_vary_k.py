@@ -53,12 +53,12 @@ def save_csv(res, csv_dir, csv_name, data_header):
     write_csv(filedir=csv_dir, filename=csv_name, csv=csv)
 
 
-def get_csv_header(algorithms=["FH04"]):
+def get_csv_header(algorithms=["FH04", "CP"]):
     header = [
-        "Name"
+        "Name",
+        "K"
     ]
     algo_stats = [
-        "K",
         "OOA",
         "|S|"
     ]
@@ -203,57 +203,57 @@ def all_scenes():
 
     k_params = [0.001, 0.1, 1, 2, 3, 4, 10]
 
-    max_sn_id = 707
-    min_sn_id = 0
-    if args.sn_id > max_sn_id or args.sn_id < min_sn_id:
-        raise Exception("Scannet ID {0} should be between {1} and {2}.".format(args.sn_id, min_sn_id, max_sn_id))
     scenes, _, scannet_dir = get_scenes(blacklist=[])
-    scene_name = scenes[args.sn_id]
-
+    
     csv_header = get_csv_header()
-    csv_name = "fh04_k_id{0}".format(args.sn_id)
+    csv_name = "fh04_k_all"
     
     verbose = False
     model = None
 
-    mesh, p_vec_gt, file_gt = get_ground_truth(scannet_dir=scannet_dir, scene=scene_name)
-    xyz = np.asarray(mesh.vertices)
-    rgb = np.asarray(mesh.vertex_colors)
-    P = np.hstack((xyz, rgb))
+    for j in range(len(scenes)):
+        scene_name = scenes[j]
+        mesh, p_vec_gt, file_gt = get_ground_truth(
+            scannet_dir=scannet_dir, scene=scene_name)
+        xyz = np.asarray(mesh.vertices)
+        rgb = np.asarray(mesh.vertex_colors)
+        P = np.hstack((xyz, rgb))
 
-    graph_dict, sp_idxs, part_cp = graph(
-        cloud=P,
-        k_nn_adj=args.k_nn_adj,
-        k_nn_geof=args.k_nn_geof,
-        lambda_edge_weight=args.lambda_edge_weight,
-        reg_strength=args.reg_strength,
-        d_se_max=args.d_se_max,
-        max_sp_size=args.max_sp_size,
-        verbose=verbose,
-        return_p_vec=True)
+        graph_dict, sp_idxs, part_cp = graph(
+            cloud=P,
+            k_nn_adj=args.k_nn_adj,
+            k_nn_geof=args.k_nn_geof,
+            lambda_edge_weight=args.lambda_edge_weight,
+            reg_strength=args.reg_strength,
+            d_se_max=args.d_se_max,
+            max_sp_size=args.max_sp_size,
+            verbose=verbose,
+            return_p_vec=True)
 
-    unions, probs, model = predict(graph_dict=graph_dict, dec_b=0.8, return_model=True, verbose=False)
+        unions, probs, model = predict(graph_dict=graph_dict, dec_b=0.8, return_model=True, verbose=False)
 
-    ooas = []
-    sizes = []
-    all_data = []
-    partition_gt = None
-    sortation = None
+        ooas = []
+        sizes = []
+        all_data = []
+        partition_gt = None
+        sortation = None
 
-    ooa_cp, partition_gt, sortation = ooa(par_v_gt=p_vec_gt, par_v=part_cp, partition_gt=partition_gt, sortation=sortation)
-    size_cp = len(sp_idxs)
+        ooa_cp, partition_gt, sortation = ooa(par_v_gt=p_vec_gt, par_v=part_cp, partition_gt=partition_gt, sortation=sortation)
+        size_cp = len(sp_idxs)
 
-    for i in tqdm(range(k_params.shape[0]), desc="Vary K of FH04", disable=verbose):
-        k = k_params[i]
-        part_fh04 = partition_from_probs(graph_dict=graph_dict, sim_probs=probs, k=k, P=P, sp_idxs=sp_idxs)
-        ooa_fh04, partition_gt, sortation = ooa(par_v_gt=p_vec_gt, par_v=part_fh04, partition_gt=partition_gt, sortation=sortation)
-        size_fh04 = np.unique(part_fh04).shape[0]
-        ooas.append(ooa_fh04)
-        sizes.append(size_fh04)
-        all_data.append([scene_name, k, ooa_fh04, size_fh04, ooa_cp, size_cp])
-    
-    save_csv(res=all_data, csv_dir=args.csv_dir, csv_name=csv_name, data_header=csv_header)
+        for i in tqdm(range(len(k_params)), desc="Vary K of FH04", disable=verbose):
+            k = k_params[i]
+            part_fh04 = partition_from_probs(graph_dict=graph_dict, sim_probs=probs, k=k, P=P, sp_idxs=sp_idxs)
+            ooa_fh04, partition_gt, sortation = ooa(par_v_gt=p_vec_gt, par_v=part_fh04, partition_gt=partition_gt, sortation=sortation)
+            size_fh04 = np.unique(part_fh04).shape[0]
+            ooas.append(ooa_fh04)
+            sizes.append(size_fh04)
+            all_data.append([scene_name, k, ooa_fh04, size_fh04, ooa_cp, size_cp])
+        if j % args.pkg_size == 0 and len(csv_data) > 0:
+            save_csv(res=all_data, csv_dir=args.csv_dir, csv_name=str(i), data_header=csv_header)
+            csv_data.clear()
 
 
 if __name__ == "__main__":
-    main()
+    #main()
+    all_scenes()
