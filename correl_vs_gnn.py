@@ -104,9 +104,6 @@ def main():
         part_gnn = partition_from_probs(graph_dict=graph_dict, sim_probs=probs_gnn, k=args.k, P=P, sp_idxs=sp_idxs)
         part_correl = partition_from_probs(graph_dict=graph_dict, sim_probs=probs_correl, k=args.k, P=P, sp_idxs=sp_idxs)
 
-        ooa_gnn, partition_gt, sortation = ooa(par_v_gt=p_vec_gt, par_v=part_gnn)
-        ooa_correl, partition_gt, sortation = ooa(par_v_gt=p_vec_gt, par_v=part_correl, partition_gt=partition_gt, sortation=sortation)
-
         partition_gt = Partition(partition=p_vec_gt)
         ms_gnn, raw_score_gnn, ooa_gnn, match_stats_gnn, dens_stats_gnn = match_score(
             gt_partition=partition_gt, partition=Partition(partition=part_gnn), return_ooa=True)

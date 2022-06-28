@@ -9,7 +9,7 @@ from ai_utils import graph, predict
 from partition.felzenszwalb import partition_from_probs
 from partition.partition import Partition
 from exp_utils import \
-    ooa,\
+    match_score,\
     get_csv_header,\
     save_csv,\
     mkdir,\
@@ -136,7 +136,8 @@ def all_scenes():
 
     scenes, _, scannet_dir = get_scenes(blacklist=[])
     
-    csv_header = get_csv_header(header=["Name", "K"], algorithms=["FH04", "CP"], algo_stats=["OOA", "|S|"])
+    csv_header = get_csv_header(header=["Name", "K"], algorithms=["FH04", "CP"],
+        algo_stats=["OOA", "|S|", "MS", "RS", "NFOM", "NSOM", "NTOM", "DFOM", "DSOM", "DTOM"])
     
     verbose = False
     model = None
@@ -179,19 +180,31 @@ def all_scenes():
         sizes = []
         all_data = []
         partition_gt = None
-        sortation = None
 
-        ooa_cp, partition_gt, sortation = ooa(par_v_gt=p_vec_gt, par_v=part_cp, partition_gt=partition_gt, sortation=sortation)
-        size_cp = len(sp_idxs)
+        partition_gt = Partition(partition=p_vec_gt)
+        ms_cp, raw_score_cp, ooa_cp, match_stats_cp, dens_stats_cp = match_score(
+            gt_partition=partition_gt, partition=Partition(partition=part_cp), return_ooa=True)
+        size_cp = np.unique(part_cp).shape[0]
 
         for i in range(len(k_params)):
             k = k_params[i]
             part_fh04 = partition_from_probs(graph_dict=graph_dict, sim_probs=probs, k=k, P=P, sp_idxs=sp_idxs)
-            ooa_fh04, partition_gt, sortation = ooa(par_v_gt=p_vec_gt, par_v=part_fh04, partition_gt=partition_gt, sortation=sortation)
+            
+            ms_fh04, raw_score_fh04, ooa_fh04, match_stats_fh04, dens_stats_fh04 = match_score(
+                gt_partition=partition_gt, partition=Partition(partition=part_fh04), return_ooa=True)
+            
             size_fh04 = np.unique(part_fh04).shape[0]
             ooas.append(ooa_fh04)
             sizes.append(size_fh04)
-            all_data.append([scene_name, k, ooa_fh04, size_fh04, ooa_cp, size_cp])
+            all_data.append([
+                scene_name, k, ooa_fh04, size_fh04, ms_fh04, raw_score_fh04, 
+                match_stats_fh04[0], match_stats_fh04[1], match_stats_fh04[2], 
+                dens_stats_fh04[0], dens_stats_fh04[1], dens_stats_fh04[2],
+                #
+                ooa_cp, size_cp, ms_cp, raw_score_cp, 
+                match_stats_cp[0], match_stats_cp[1], match_stats_cp[2], 
+                dens_stats_cp[0], dens_stats_cp[1], dens_stats_cp[2]
+                ])
         if j % args.pkg_size == 0 and len(all_data) > 0:
             save_csv(res=all_data, csv_dir=args.csv_dir, csv_name=str(j), data_header=csv_header)
             all_data.clear()
