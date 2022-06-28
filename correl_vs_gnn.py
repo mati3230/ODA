@@ -33,6 +33,8 @@ def main():
     #
     parser.add_argument("--pkg_size", default=5, type=int, help="Number of packages to save a csv")
     parser.add_argument("--csv_dir", default="./csvs_correl_vs_gnn", type=str, help="Directory where we save the csv.")
+    parser.add_argument("--load_exp", default=False, type=bool, help="Use data from pre calculated dataset")
+    parser.add_argument("--h5_dir", default="./exp_data", type=str, help="Directory where we load the h5 files.")
     args = parser.parse_args()
 
     mkdir(args.csv_dir)
@@ -47,36 +49,46 @@ def main():
     model = None
     for i in tqdm(range(n_scenes), desc=desc, disable=verbose):
         scene_name = scenes[i]
-        mesh, p_vec_gt, file_gt = get_ground_truth(scannet_dir=scannet_dir, scene=scene_name)
-        xyz = np.asarray(mesh.vertices)
-        rgb = np.asarray(mesh.vertex_colors)
-        P = np.hstack((xyz, rgb))
-        p_gt = Partition(partition=p_vec_gt)
-
-        graph_dict, sp_idxs, part_cp = graph(
-            cloud=P,
-            k_nn_adj=args.k_nn_adj,
-            k_nn_geof=args.k_nn_geof,
-            lambda_edge_weight=args.lambda_edge_weight,
-            reg_strength=args.reg_strength,
-            d_se_max=args.d_se_max,
-            max_sp_size=args.max_sp_size,
-            verbose=verbose,
-            return_p_vec=True)
-
-        p_cp = Partition(partition=part_cp)
-
-        densities = p_gt.compute_densities(p_cp, densities_np)
-        alpha = p_cp.alpha(densities)
-        unions_gt = get_unions(graph_dict=graph_dict, alpha=alpha)
-
-        if model is None:
-            _, probs_gnn, model = predict(graph_dict=graph_dict, dec_b=0.8, return_model=True, verbose=False)
+        if args.load_exp:
+            exp_dict = load_exp_data(fdir=args.h5_dir, fname=scene_name)
+            graph_dict = {
+                "nodes": exp_dict["node_features"],
+                "senders": exp_dict["senders"],
+                "receivers": exp_dict["receivers"]
+            }
         else:
-            _, probs_gnn = predict(graph_dict=graph_dict, dec_b=0.8, model=model, verbose=False)
-        part_gnn = partition_from_probs(graph_dict=graph_dict, sim_probs=probs_gnn, k=args.k, P=P, sp_idxs=sp_idxs)
+            mesh, p_vec_gt, file_gt = get_ground_truth(scannet_dir=scannet_dir, scene=scene_name)
+            xyz = np.asarray(mesh.vertices)
+            rgb = np.asarray(mesh.vertex_colors)
+            P = np.hstack((xyz, rgb))
+            p_gt = Partition(partition=p_vec_gt)
+
+            graph_dict, sp_idxs, part_cp = graph(
+                cloud=P,
+                k_nn_adj=args.k_nn_adj,
+                k_nn_geof=args.k_nn_geof,
+                lambda_edge_weight=args.lambda_edge_weight,
+                reg_strength=args.reg_strength,
+                d_se_max=args.d_se_max,
+                max_sp_size=args.max_sp_size,
+                verbose=verbose,
+                return_p_vec=True)
+
+            p_cp = Partition(partition=part_cp)
+
+            densities = p_gt.compute_densities(p_cp, densities_np)
+            alpha = p_cp.alpha(densities)
+            unions_gt = get_unions(graph_dict=graph_dict, alpha=alpha)
+
+            if model is None:
+                _, probs_gnn, model = predict(graph_dict=graph_dict, dec_b=0.8, return_model=True, verbose=False)
+            else:
+                _, probs_gnn = predict(graph_dict=graph_dict, dec_b=0.8, model=model, verbose=False)
+            probs_correl = predict_correl(graph_dict=graph_dict)
+            bce_gnn = binary_cross_entropy(y=unions_gt, probs=probs_gnn)
+            bce_correl = binary_cross_entropy(y=unions_gt, probs=probs_correl)
         
-        probs_correl = predict_correl(graph_dict=graph_dict)
+        part_gnn = partition_from_probs(graph_dict=graph_dict, sim_probs=probs_gnn, k=args.k, P=P, sp_idxs=sp_idxs)
         part_correl = partition_from_probs(graph_dict=graph_dict, sim_probs=probs_correl, k=args.k, P=P, sp_idxs=sp_idxs)
 
         ooa_gnn, partition_gt, sortation = ooa(par_v_gt=p_vec_gt, par_v=part_gnn)
@@ -84,9 +96,6 @@ def main():
 
         size_gnn = np.unique(part_gnn).shape[0]
         size_correl = np.unique(part_correl).shape[0]
-
-        bce_gnn = binary_cross_entropy(y=unions_gt, probs=probs_gnn)
-        bce_correl = binary_cross_entropy(y=unions_gt, probs=probs_correl)
 
         csv_data.append([file_gt, P.shape[0], ooa_gnn, size_gnn, bce_gnn, ooa_correl, size_correl, bce_correl])
         if i % args.pkg_size == 0 and len(csv_data) > 0:

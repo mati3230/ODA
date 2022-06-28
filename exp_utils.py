@@ -144,3 +144,29 @@ def save_exp_data(fdir, fname, exp_dict):
     for k, v in exp_dict.items():
         hf.create_dataset(k, data=v)
     hf.close()
+
+
+def load_exp_data(fdir, fname):
+    if fdir[-1] != "/":
+        fdir += "/"
+    if not fname.endswith(".h5"):
+        fname += ".h5"
+    hf = h5py.File("{0}{1}".format(fdir, fname), "r")
+    exp_dict = {
+        "node_features": np.array(hf["node_features"], copy=True),
+        "senders": np.array(hf["senders"], copy=True),
+        "receivers": np.array(hf["receivers"], copy=True),
+        "probs_gnn": np.array(hf["probs_gnn"], copy=True),
+        "probs_correl": np.array(hf["probs_correl"], copy=True),
+        "probs_random": np.array(hf["probs_random"], copy=True),
+        "probs_imperfect": np.array(hf["probs_imperfect"], copy=True),
+        "p_gt": np.array(hf["p_gt"], copy=True),
+        "p_cp": np.array(hf["p_cp"], copy=True),
+        "unions_gt": np.array(hf["unions_gt"], copy=True),
+        "bce_gnn": np.array(hf["bce_gnn"], copy=True),
+        "bce_correl": np.array(hf["bce_correl"], copy=True),
+        "bce_random": np.array(hf["bce_random"], copy=True),
+        "bce_imperfect": np.array(hf["bce_imperfect"], copy=True)
+    }
+    hf.close()
+    return exp_dict

@@ -23,7 +23,7 @@ def main():
     parser.add_argument("--max_sp_size", default=-1, type=int, help="Maximum size of a superpoint.")
     #
     parser.add_argument("--pkg_size", default=5, type=int, help="Number of packages to save a csv")
-    parser.add_argument("--h5_dir", default="./exp_data", type=str, help="Directory where we save the csv.")
+    parser.add_argument("--h5_dir", default="./exp_data", type=str, help="Directory where we save the h5 files.")
     args = parser.parse_args()
 
     mkdir(args.h5_dir)
@@ -84,8 +84,12 @@ def main():
             "bce_gnn": np.array([bce_gnn]),
             "bce_correl": np.array([bce_correl]),
             "bce_random": np.array([bce_random]),
-            "bce_imperfect": np.array([bce_imperfect])
+            "bce_imperfect": np.array([bce_imperfect]),
+            "|S|": np.array([len(sp_idxs)]),
         }
+        for j in range(len(sp_idxs)):
+            sp = sp_idxs[j]
+            exp_dict[str(j)] = np.array(sp)
         save_exp_data(fdir=args.h5_dir, fname=scene_name, exp_dict=exp_dict)
 
 
