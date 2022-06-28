@@ -254,7 +254,7 @@ def all_scenes():
             sizes.append(size_fh04)
             all_data.append([scene_name, k, ooa_fh04, size_fh04, ooa_cp, size_cp])
         if j % args.pkg_size == 0 and len(all_data) > 0:
-            save_csv(res=all_data, csv_dir=args.csv_dir, csv_name=str(i), data_header=csv_header)
+            save_csv(res=all_data, csv_dir=args.csv_dir, csv_name=str(j), data_header=csv_header)
             all_data.clear()
 
 
