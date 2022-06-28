@@ -5,7 +5,7 @@ import numpy as np
 
 from scannet_utils import get_scenes, get_ground_truth
 from ai_utils import graph, predict
-from exp_utils import mkdir
+from exp_utils import mkdir, predict_correl, get_unions, get_imperfect_probs, save_exp_data
 from partition.partition import Partition
 from partition.density_utils import densities_np
 
@@ -58,7 +58,7 @@ def main():
         else:
             _, probs_gnn = predict(graph_dict=graph_dict, dec_b=args.t, model=model, verbose=False)
         probs_correl = predict_correl(graph_dict=graph_dict)
-        probs_random = np.random.rand(probs.shape[0], )
+        probs_random = np.random.rand(probs_gnn.shape[0], )
 
         densities = p_gt.compute_densities(p_cp, densities_np)
         alpha = p_cp.alpha(densities)

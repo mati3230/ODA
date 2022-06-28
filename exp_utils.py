@@ -5,6 +5,7 @@ import numpy as np
 from ai_utils import np_fast_dot
 from partition.partition import Partition
 from partition.density_utils import densities_np
+import h5py
 #"""
 
 
@@ -122,7 +123,7 @@ def binary_cross_entropy(y, probs, eps=1e-6):
     return bce
 
 
-def get_imperfect_probs(unions, lam=0.1, sig=0.05)
+def get_imperfect_probs(unions, lam=0.1, sig=0.05):
     u = np.array(unions, copy=True)
     u = u.astype(np.float32)
     pos_idxs = np.where(u == 1)[0]
