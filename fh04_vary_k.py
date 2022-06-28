@@ -8,49 +8,12 @@ from scannet_utils import get_scenes, get_ground_truth
 from ai_utils import graph, predict
 from partition.felzenszwalb import partition_from_probs
 from partition.partition import Partition
-from partition.density_utils import densities_np
+from exp_utils import \
+    ooa,\
+    get_csv_header,\
+    save_csv,\
+    mkdir
 
-
-def mkdir(directory):
-    """Method to create a new directory.
-
-    Parameters
-    ----------
-    directory : str
-        Relative or absolute path.
-    """
-    if not os.path.isdir(directory):
-        os.makedirs(directory)
-
-
-def write_csv(filedir, filename, csv):
-    if filedir[-1] != "/":
-        filedir += "/"
-    if not filename.endswith(".csv"):
-        filename += ".csv"
-    out_filename = filedir + filename
-    file = open(out_filename, "w")
-    file.write(csv)
-    file.close()
-
-
-def save_csv(res, csv_dir, csv_name, data_header):
-    # write results of the cut pursuit calculations as csv
-    csv = ""
-    for header in data_header:
-        csv += header + ","
-    csv = csv[:-1] + "\n"
-
-    for tup in res:
-        if tup is None:
-            continue
-        for elem in tup:
-            if type(elem) == list:
-                csv += str(elem)[1:-1].replace(" ", "") + ","
-            else:
-                csv += str(elem) + ","
-        csv = csv[:-1] + "\n"
-    write_csv(filedir=csv_dir, filename=csv_name, csv=csv)
 
 
 def get_csv_header(algorithms=["FH04", "CP"]):
@@ -67,26 +30,6 @@ def get_csv_header(algorithms=["FH04", "CP"]):
         for algs in algo_stats:
             header.append(algs + "_" + algo)
     return header
-
-
-def ooa(par_v_gt, par_v, partition_gt=None, sortation=None):
-    precalc = partition_gt is not None and sortation is not None
-    if precalc:
-        par_v = par_v[sortation]
-        partition_A = Partition(partition=par_v)
-    else:
-        sortation = np.argsort(par_v_gt)
-        par_v_gt = par_v_gt[sortation]
-        par_v = par_v[sortation]
-        
-        ugt, ugt_idxs, ugt_counts = np.unique(par_v_gt, return_index=True, return_counts=True)
-
-        partition_gt = Partition(partition=par_v_gt, uni=ugt, idxs=ugt_idxs, counts=ugt_counts)
-        partition_A = Partition(partition=par_v)
-        
-    max_density = partition_gt.partition.shape[0]
-    ooa_A, _ = partition_gt.overall_obj_acc(max_density=max_density, partition_B=partition_A, density_function=densities_np)
-    return ooa_A, partition_gt, sortation
 
 
 def main():
@@ -207,7 +150,7 @@ def all_scenes():
 
     scenes, _, scannet_dir = get_scenes(blacklist=[])
     
-    csv_header = get_csv_header()
+    csv_header = get_csv_header(header=["Name", "K"], algorithms=["FH04", "CP"], algo_stats=["OOA", "|S|"])
     csv_name = "fh04_k_all"
     
     verbose = False

@@ -5,15 +5,9 @@ import numpy as np
 
 from scannet_utils import get_scenes, get_ground_truth
 from ai_utils import graph, predict
-from partition.felzenszwalb import partition_from_probs
-from sp_utils import partition
+from exp_utils import mkdir
 from partition.partition import Partition
 from partition.density_utils import densities_np
-from exp_utils import \
-    ooa,\
-    get_csv_header,\
-    save_csv,\
-    mkdir
 
 
 def main():
@@ -29,17 +23,15 @@ def main():
     parser.add_argument("--max_sp_size", default=-1, type=int, help="Maximum size of a superpoint.")
     #
     parser.add_argument("--pkg_size", default=5, type=int, help="Number of packages to save a csv")
-    parser.add_argument("--csv_dir", default="./csvs_cc_vs_fh04", type=str, help="Directory where we save the csv.")
+    parser.add_argument("--h5_dir", default="./exp_data", type=str, help="Directory where we save the csv.")
     args = parser.parse_args()
 
-    mkdir(args.csv_dir)
+    mkdir(args.h5_dir)
 
     scenes, _, scannet_dir = get_scenes(blacklist=[])
     n_scenes = len(scenes)
     
-    csv_header = get_csv_header(header=["Name", "|P|"], algorithms=["FH04", "CC", "CP"], algo_stats=["OOA", "|S|"])
-    csv_data = []
-    desc = "CC vs. FH04"
+    desc = "Exp Data"
     verbose = False
     model = None
     for i in tqdm(range(n_scenes), desc=desc, disable=verbose):
@@ -48,6 +40,7 @@ def main():
         xyz = np.asarray(mesh.vertices)
         rgb = np.asarray(mesh.vertex_colors)
         P = np.hstack((xyz, rgb))
+        p_gt = Partition(partition=p_vec_gt)
 
         graph_dict, sp_idxs, part_cp = graph(
             cloud=P,
@@ -59,28 +52,30 @@ def main():
             max_sp_size=args.max_sp_size,
             verbose=verbose,
             return_p_vec=True)
+        p_cp = Partition(partition=part_cp)
         if model is None:
-            unions, probs, model = predict(graph_dict=graph_dict, dec_b=args.t, return_model=True, verbose=False)
+            _, probs_gnn, model = predict(graph_dict=graph_dict, dec_b=args.t, return_model=True, verbose=False)
         else:
-            unions, probs = predict(graph_dict=graph_dict, dec_b=args.t, model=model, verbose=False)
+            _, probs_gnn = predict(graph_dict=graph_dict, dec_b=args.t, model=model, verbose=False)
+        probs_correl = predict_correl(graph_dict=graph_dict)
+        probs_random = np.random.rand(probs.shape[0], )
 
-        part_fh04 = partition_from_probs(graph_dict=graph_dict, sim_probs=probs, k=args.k, P=P, sp_idxs=sp_idxs)
-        part_cc = partition(graph_dict=graph_dict, unions=unions, P=P, sp_idxs=sp_idxs, half=False, verbose=verbose)
-
-
-        ooa_fh04, partition_gt, sortation = ooa(par_v_gt=p_vec_gt, par_v=part_fh04)
-        ooa_cc, partition_gt, sortation = ooa(par_v_gt=p_vec_gt, par_v=part_cc, partition_gt=partition_gt, sortation=sortation)
-        ooa_cp, partition_gt, sortation = ooa(par_v_gt=p_vec_gt, par_v=part_cp, partition_gt=partition_gt, sortation=sortation)
-
-        size_fh04 = np.unique(part_fh04).shape[0]
-        size_cc = np.unique(part_cc).shape[0]
-        size_cp = len(sp_idxs)
-
-        csv_data.append([file_gt, P.shape[0], ooa_fh04, size_fh04, ooa_cc, size_cc, ooa_cp, size_cp])
-        if i % args.pkg_size == 0 and len(csv_data) > 0:
-            save_csv(res=csv_data, csv_dir=args.csv_dir, csv_name=str(i), data_header=csv_header)
-            csv_data.clear()
-
+        densities = p_gt.compute_densities(p_cp, densities_np)
+        alpha = p_cp.alpha(densities)
+        unions_gt = get_unions(graph_dict=graph_dict, alpha=alpha)
+        probs_imperfect = get_imperfect_probs(unions=unions_gt, lam=0.1, sig=0.05)
         
+        exp_dict = {
+            "node_features": graph_dict["nodes"],
+            "senders": graph_dict["senders"],
+            "receivers": graph_dict["receivers"],
+            "probs_gnn": probs_gnn,
+            "probs_correl": probs_correl,
+            "probs_random": probs_random,
+            "probs_imperfect": probs_imperfect
+        }
+        save_exp_data(fdir=args.h5_dir, fname=scene_name, exp_dict=exp_dict)
+
+
 if __name__ == "__main__":
     main()
