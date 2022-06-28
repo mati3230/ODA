@@ -72,7 +72,9 @@ def main():
             "probs_gnn": probs_gnn,
             "probs_correl": probs_correl,
             "probs_random": probs_random,
-            "probs_imperfect": probs_imperfect
+            "probs_imperfect": probs_imperfect,
+            "p_gt": p_vec_gt,
+            "p_cp": part_cp 
         }
         save_exp_data(fdir=args.h5_dir, fname=scene_name, exp_dict=exp_dict)
 
