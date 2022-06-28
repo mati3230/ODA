@@ -15,23 +15,6 @@ from exp_utils import \
     mkdir
 
 
-
-def get_csv_header(algorithms=["FH04", "CP"]):
-    header = [
-        "Name",
-        "K"
-    ]
-    algo_stats = [
-        "OOA",
-        "|S|"
-    ]
-
-    for algo in algorithms:
-        for algs in algo_stats:
-            header.append(algs + "_" + algo)
-    return header
-
-
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--min_k", type=float, default=1000, help="Minimum k parameter of FH04 segmentation algorithm.")
@@ -142,6 +125,8 @@ def all_scenes():
     #
     parser.add_argument("--pkg_size", default=5, type=int, help="Number of packages to save a csv")
     parser.add_argument("--csv_dir", default="./csvs_vary_k", type=str, help="Directory where we save the csv.")
+    parser.add_argument("--load_exp", default=False, type=bool, help="Use data from pre calculated dataset")
+    parser.add_argument("--h5_dir", default="./exp_data", type=str, help="Directory where we load the h5 files.")
     args = parser.parse_args()
 
     mkdir(args.csv_dir)
@@ -151,7 +136,6 @@ def all_scenes():
     scenes, _, scannet_dir = get_scenes(blacklist=[])
     
     csv_header = get_csv_header(header=["Name", "K"], algorithms=["FH04", "CP"], algo_stats=["OOA", "|S|"])
-    csv_name = "fh04_k_all"
     
     verbose = False
     model = None
@@ -164,20 +148,31 @@ def all_scenes():
         rgb = np.asarray(mesh.vertex_colors)
         P = np.hstack((xyz, rgb))
 
-        graph_dict, sp_idxs, part_cp = graph(
-            cloud=P,
-            k_nn_adj=args.k_nn_adj,
-            k_nn_geof=args.k_nn_geof,
-            lambda_edge_weight=args.lambda_edge_weight,
-            reg_strength=args.reg_strength,
-            d_se_max=args.d_se_max,
-            max_sp_size=args.max_sp_size,
-            verbose=verbose,
-            return_p_vec=True)
-        if model is None:
-            unions, probs, model = predict(graph_dict=graph_dict, dec_b=0.8, return_model=True, verbose=False)
+        if args.load_exp:
+            exp_dict, sp_idxs = load_exp_data(fdir=args.h5_dir, fname=scene_name)
+            graph_dict = {
+                "nodes": exp_dict["node_features"],
+                "senders": exp_dict["senders"],
+                "receivers": exp_dict["receivers"]
+            }
+            probs = exp_dict["probs_gnn"]
+            p_vec_gt = exp_dict["p_gt"]
+            part_cp = exp_dict["p_cp"]
         else:
-            unions, probs = predict(graph_dict=graph_dict, dec_b=0.8, model=model, verbose=False)
+            graph_dict, sp_idxs, part_cp = graph(
+                cloud=P,
+                k_nn_adj=args.k_nn_adj,
+                k_nn_geof=args.k_nn_geof,
+                lambda_edge_weight=args.lambda_edge_weight,
+                reg_strength=args.reg_strength,
+                d_se_max=args.d_se_max,
+                max_sp_size=args.max_sp_size,
+                verbose=verbose,
+                return_p_vec=True)
+            if model is None:
+                _, probs, model = predict(graph_dict=graph_dict, dec_b=0.8, return_model=True, verbose=False)
+            else:
+                _, probs = predict(graph_dict=graph_dict, dec_b=0.8, model=model, verbose=False)
 
         ooas = []
         sizes = []

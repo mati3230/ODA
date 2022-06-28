@@ -30,6 +30,8 @@ def main():
     #
     parser.add_argument("--pkg_size", default=5, type=int, help="Number of packages to save a csv")
     parser.add_argument("--csv_dir", default="./csvs_cc_vs_fh04", type=str, help="Directory where we save the csv.")
+    parser.add_argument("--load_exp", default=False, type=bool, help="Use data from pre calculated dataset")
+    parser.add_argument("--h5_dir", default="./exp_data", type=str, help="Directory where we load the h5 files.")
     args = parser.parse_args()
 
     mkdir(args.csv_dir)
@@ -48,25 +50,39 @@ def main():
         xyz = np.asarray(mesh.vertices)
         rgb = np.asarray(mesh.vertex_colors)
         P = np.hstack((xyz, rgb))
-
-        graph_dict, sp_idxs, part_cp = graph(
-            cloud=P,
-            k_nn_adj=args.k_nn_adj,
-            k_nn_geof=args.k_nn_geof,
-            lambda_edge_weight=args.lambda_edge_weight,
-            reg_strength=args.reg_strength,
-            d_se_max=args.d_se_max,
-            max_sp_size=args.max_sp_size,
-            verbose=verbose,
-            return_p_vec=True)
-        if model is None:
-            unions, probs, model = predict(graph_dict=graph_dict, dec_b=args.t, return_model=True, verbose=False)
+        
+        if args.load_exp:
+            exp_dict, sp_idxs = load_exp_data(fdir=args.h5_dir, fname=scene_name)
+            graph_dict = {
+                "nodes": exp_dict["node_features"],
+                "senders": exp_dict["senders"],
+                "receivers": exp_dict["receivers"]
+            }
+            probs = exp_dict["probs_gnn"]
+            p_vec_gt = exp_dict["p_gt"]
+            part_cp = exp_dict["p_cp"]
+            unions = np.zeros(probs.shape, dtype=np.bool)
+            for j in range(probs.shape[0]):
+                prob = probs[j]
+                unions[j] = prob >= args.t
         else:
-            unions, probs = predict(graph_dict=graph_dict, dec_b=args.t, model=model, verbose=False)
+            graph_dict, sp_idxs, part_cp = graph(
+                cloud=P,
+                k_nn_adj=args.k_nn_adj,
+                k_nn_geof=args.k_nn_geof,
+                lambda_edge_weight=args.lambda_edge_weight,
+                reg_strength=args.reg_strength,
+                d_se_max=args.d_se_max,
+                max_sp_size=args.max_sp_size,
+                verbose=verbose,
+                return_p_vec=True)
+            if model is None:
+                unions, probs, model = predict(graph_dict=graph_dict, dec_b=args.t, return_model=True, verbose=False)
+            else:
+                unions, probs = predict(graph_dict=graph_dict, dec_b=args.t, model=model, verbose=False)
 
         part_fh04 = partition_from_probs(graph_dict=graph_dict, sim_probs=probs, k=args.k, P=P, sp_idxs=sp_idxs)
         part_cc = partition(graph_dict=graph_dict, unions=unions, P=P, sp_idxs=sp_idxs, half=False, verbose=verbose)
-
 
         ooa_fh04, partition_gt, sortation = ooa(par_v_gt=p_vec_gt, par_v=part_fh04)
         ooa_cc, partition_gt, sortation = ooa(par_v_gt=p_vec_gt, par_v=part_cc, partition_gt=partition_gt, sortation=sortation)
