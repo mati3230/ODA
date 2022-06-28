@@ -101,14 +101,19 @@ def main():
             bce_gnn = binary_cross_entropy(y=unions_gt, probs=probs_gnn)
             bce_correl = binary_cross_entropy(y=unions_gt, probs=probs_correl)
         
+        sortation = np.argsort(p_vec_gt)
+        p_vec_gt = p_vec_gt[sortation]
+
         part_gnn = partition_from_probs(graph_dict=graph_dict, sim_probs=probs_gnn, k=args.k, P=P, sp_idxs=sp_idxs)
         part_correl = partition_from_probs(graph_dict=graph_dict, sim_probs=probs_correl, k=args.k, P=P, sp_idxs=sp_idxs)
+        part_gnn = part_gnn[sortation]
+        part_correl = part_correl[sortation]
 
         partition_gt = Partition(partition=p_vec_gt)
         ms_gnn, raw_score_gnn, ooa_gnn, match_stats_gnn, dens_stats_gnn = match_score(
             gt_partition=partition_gt, partition=Partition(partition=part_gnn), return_ooa=True)
         ms_correl, raw_score_correl, ooa_correl, match_stats_correl, dens_stats_correl = match_score(
-            gt_partition=partition_gt, partition=Partition(partition=part_gnn), return_ooa=True)
+            gt_partition=partition_gt, partition=Partition(partition=part_correl), return_ooa=True)
 
         size_gnn = np.unique(part_gnn).shape[0]
         size_correl = np.unique(part_correl).shape[0]

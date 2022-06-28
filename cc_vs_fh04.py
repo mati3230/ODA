@@ -10,7 +10,7 @@ from sp_utils import partition
 from partition.partition import Partition
 from partition.density_utils import densities_np
 from exp_utils import \
-    ooa,\
+    match_score,\
     get_csv_header,\
     save_csv,\
     mkdir
@@ -81,12 +81,23 @@ def main():
             else:
                 unions, probs = predict(graph_dict=graph_dict, dec_b=args.t, model=model, verbose=False)
 
+        sortation = np.argsort(p_vec_gt)
+        p_vec_gt = p_vec_gt[sortation]
+
         part_fh04 = partition_from_probs(graph_dict=graph_dict, sim_probs=probs, k=args.k, P=P, sp_idxs=sp_idxs)
         part_cc = partition(graph_dict=graph_dict, unions=unions, P=P, sp_idxs=sp_idxs, half=False, verbose=verbose)
+        
+        part_fh04 = part_fh04[sortation]
+        part_cc = part_cc[sortation]
+        part_cp = part_cp[sortation]
 
-        ooa_fh04, partition_gt, sortation = ooa(par_v_gt=p_vec_gt, par_v=part_fh04)
-        ooa_cc, partition_gt, sortation = ooa(par_v_gt=p_vec_gt, par_v=part_cc, partition_gt=partition_gt, sortation=sortation)
-        ooa_cp, partition_gt, sortation = ooa(par_v_gt=p_vec_gt, par_v=part_cp, partition_gt=partition_gt, sortation=sortation)
+        partition_gt = Partition(partition=p_vec_gt)
+        ms_fh04, raw_score_fh04, ooa_fh04, match_stats_fh04, dens_stats_fh04 = match_score(
+            gt_partition=partition_gt, partition=Partition(partition=part_fh04), return_ooa=True)
+        ms_cc, raw_score_cc, ooa_cc, match_stats_cc, dens_stats_cc = match_score(
+            gt_partition=partition_gt, partition=Partition(partition=part_cc), return_ooa=True)
+        ms_cp, raw_score_cp, ooa_cp, match_stats_cp, dens_stats_cp = match_score(
+            gt_partition=partition_gt, partition=Partition(partition=part_cp), return_ooa=True)
 
         size_fh04 = np.unique(part_fh04).shape[0]
         size_cc = np.unique(part_cc).shape[0]

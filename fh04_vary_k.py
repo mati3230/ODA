@@ -208,9 +208,8 @@ def all_scenes():
                 match_stats_cp[0], match_stats_cp[1], match_stats_cp[2], 
                 dens_stats_cp[0], dens_stats_cp[1], dens_stats_cp[2]
                 ])
-        if j % args.pkg_size == 0 and len(all_data) > 0:
-            save_csv(res=all_data, csv_dir=args.csv_dir, csv_name=str(j), data_header=csv_header)
-            all_data.clear()
+        save_csv(res=all_data, csv_dir=args.csv_dir, csv_name=str(j), data_header=csv_header)
+        all_data.clear()
 
 
 if __name__ == "__main__":
