@@ -132,7 +132,7 @@ def all_scenes():
 
     mkdir(args.csv_dir)
 
-    k_params = [0.001, 0.1, 1, 2, 3, 4, 10]
+    k_params = [0.001, 0.1, 1, 2, 10, 100]
 
     scenes, _, scannet_dir = get_scenes(blacklist=[])
     
@@ -181,6 +181,9 @@ def all_scenes():
         all_data = []
         partition_gt = None
 
+        sortation = np.argsort(p_vec_gt)
+        p_vec_gt = p_vec_gt[sortation]
+        part_cp = part_cp[sortation]
         partition_gt = Partition(partition=p_vec_gt)
         ms_cp, raw_score_cp, ooa_cp, match_stats_cp, dens_stats_cp = match_score(
             gt_partition=partition_gt, partition=Partition(partition=part_cp), return_ooa=True)
@@ -189,7 +192,7 @@ def all_scenes():
         for i in range(len(k_params)):
             k = k_params[i]
             part_fh04 = partition_from_probs(graph_dict=graph_dict, sim_probs=probs, k=k, P=P, sp_idxs=sp_idxs)
-            
+            part_fh04 = part_fh04[sortation]
             ms_fh04, raw_score_fh04, ooa_fh04, match_stats_fh04, dens_stats_fh04 = match_score(
                 gt_partition=partition_gt, partition=Partition(partition=part_fh04), return_ooa=True)
             
