@@ -58,6 +58,52 @@ def get_csv_header(header=["Name", "|P|"], algorithms=["GNN", "Correl"], algo_st
     return header
 
 
+def match_score(gt_partition, partition, ignore=None, weighted=True, limitation=4, return_ooa=False):
+    classification, densities = gt_partition.classify(partition_B=partition, density_function=densities_np)
+
+    # ignore matches in the pair classification
+    if ignore is not None:
+        for i in ignore:
+            classification[classification == i] = 0
+
+    # number of points
+    max_density = gt_partition.partition.shape[0]
+
+    n_matches = np.where(classification > 0)[0].shape[0]
+    match_stats = 3*[0]
+    dens_stats = 3*[0]
+    match_values = np.arange(4, dtype=np.int32)
+    #print(match_values)
+    for i in range(match_values.shape[0]):
+        mv = match_values[i]
+        if mv == 0:
+            continue
+        mv_idxs = np.where(classification == mv)
+        n_mv = mv_idxs[0].shape[0]
+        den_sum = np.sum(densities[mv_idxs[0], mv_idxs[1]])
+        dens_stats[i-1] = "{0:.3f}".format(100*den_sum/max_density)
+        match_stats[i-1] = n_mv
+
+    # determine the value of a first order match
+    foc = gt_partition.first_order_class
+    if not weighted:
+        classification[classification > 0] = 1
+        foc = 1
+
+    # calculate the reward
+    weighted_sum = np.sum(densities * classification)
+    max_sum = np.sum(foc * gt_partition.counts)
+    raw_score = weighted_sum / max_sum
+
+    # determine the limitation
+    L = max(classification.shape[0] / classification.shape[1], classification.shape[1] / classification.shape[0])**(limitation)
+    score = raw_score / L
+    if return_ooa:
+        ooa, _ = gt_partition.overall_obj_acc(max_density=max_density, partition_B=partition, densities=densities)
+        return score, raw_score, ooa, match_stats, dens_stats
+    return score, raw_score, match_stats, dens_stats
+
+
 def ooa(par_v_gt, par_v, partition_gt=None, sortation=None):
     precalc = partition_gt is not None and sortation is not None
     if precalc:
@@ -171,7 +217,7 @@ def load_exp_data(fdir, fname):
     sp_idxs = []
     size = hf["|S|"][0]
     for i in range(size):
-        sp = hf[str(i)]
+        sp = np.array(hf[str(i)], copy=True)
         sp_idxs.append(sp)
     hf.close()
     return exp_dict, sp_idxs

@@ -13,11 +13,12 @@ from exp_utils import \
     binary_cross_entropy,\
     predict_correl,\
     get_unions,\
-    ooa,\
+    match_score,\
     get_csv_header,\
     save_csv,\
     mkdir,\
-    load_exp_data
+    load_exp_data,\
+    match_score
 #"""
 
 
@@ -42,8 +43,14 @@ def main():
 
     scenes, _, scannet_dir = get_scenes(blacklist=[])
     n_scenes = len(scenes)
-    
-    csv_header = get_csv_header(header=["Name", "|P|"], algorithms=["GNN", "Correl"], algo_stats=["OOA", "|S|", "BCE"])
+    """
+
+            ooa_gnn, size_gnn, bce_gnn, ms_gnn, raw_score_gnn, 
+            match_stats_gnn[0], match_stats_gnn[1], match_stats_gnn[2], 
+            dens_stats_gnn[0], dens_stats_gnn[1], dens_stats_gnn[2],
+    """
+    csv_header = get_csv_header(header=["Name", "|P|"], algorithms=["GNN", "Correl"],
+        algo_stats=["OOA", "|S|", "BCE", "MS", "RS", "NFOM", "NSOM", "NTOM", "DFOM", "DSOM", "DTOM"])
     csv_data = []
     desc = "Correlation vs. GNN"
     verbose = False
@@ -100,10 +107,24 @@ def main():
         ooa_gnn, partition_gt, sortation = ooa(par_v_gt=p_vec_gt, par_v=part_gnn)
         ooa_correl, partition_gt, sortation = ooa(par_v_gt=p_vec_gt, par_v=part_correl, partition_gt=partition_gt, sortation=sortation)
 
+        partition_gt = Partition(partition=p_vec_gt)
+        ms_gnn, raw_score_gnn, ooa_gnn, match_stats_gnn, dens_stats_gnn = match_score(
+            gt_partition=partition_gt, partition=Partition(partition=part_gnn), return_ooa=True)
+        ms_correl, raw_score_correl, ooa_correl, match_stats_correl, dens_stats_correl = match_score(
+            gt_partition=partition_gt, partition=Partition(partition=part_gnn), return_ooa=True)
+
         size_gnn = np.unique(part_gnn).shape[0]
         size_correl = np.unique(part_correl).shape[0]
 
-        csv_data.append([file_gt, P.shape[0], ooa_gnn, size_gnn, bce_gnn, ooa_correl, size_correl, bce_correl])
+        csv_data.append([file_gt, P.shape[0], 
+            ooa_gnn, size_gnn, bce_gnn, ms_gnn, raw_score_gnn, 
+            match_stats_gnn[0], match_stats_gnn[1], match_stats_gnn[2], 
+            dens_stats_gnn[0], dens_stats_gnn[1], dens_stats_gnn[2],
+            #
+            ooa_correl, size_correl, bce_correl, ms_correl, raw_score_correl, 
+            match_stats_correl[0], match_stats_correl[1], match_stats_correl[2], 
+            dens_stats_correl[0], dens_stats_correl[1], dens_stats_correl[2]
+            ])
         if i % args.pkg_size == 0 and len(csv_data) > 0:
             save_csv(res=csv_data, csv_dir=args.csv_dir, csv_name=str(i), data_header=csv_header)
             csv_data.clear()
