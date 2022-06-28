@@ -107,19 +107,21 @@ def predict_correl(graph_dict):
 
 
 def binary_cross_entropy(y, probs, eps=1e-6):
-    y = y.astype(np.float32)
+    y_ = np.array(y, copy=True)
+    y_ = y_.astype(np.float32)
     zero_idxs = np.where(probs == 0)[0]
     probs[zero_idxs] = eps
-    pos_idxs = np.where(y == 1)[0]
+    pos_idxs = np.where(y_ == 1)[0]
     pos_bce = -np.log(probs[pos_idxs])
 
     zero_idxs = np.where((1-probs) == 0)[0]
     probs[zero_idxs] = 1-eps
-    neg_idxs = np.where(y == 0)[0]
+    neg_idxs = np.where(y_ == 0)[0]
     neg_bce = -np.log(1-probs[neg_idxs])
 
-    bce = pos_bce + neg_bce
-    bce = np.mean(bce)
+    bce = np.vstack((pos_bce[:, None], neg_bce[:, None]))
+    bce = np.abs(np.mean(bce))
+    #print(bce)
     return bce
 
 

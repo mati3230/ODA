@@ -5,7 +5,7 @@ import numpy as np
 
 from scannet_utils import get_scenes, get_ground_truth
 from ai_utils import graph, predict
-from exp_utils import mkdir, predict_correl, get_unions, get_imperfect_probs, save_exp_data
+from exp_utils import mkdir, predict_correl, get_unions, get_imperfect_probs, save_exp_data, binary_cross_entropy
 from partition.partition import Partition
 from partition.density_utils import densities_np
 
@@ -64,6 +64,11 @@ def main():
         alpha = p_cp.alpha(densities)
         unions_gt = get_unions(graph_dict=graph_dict, alpha=alpha)
         probs_imperfect = get_imperfect_probs(unions=unions_gt, lam=0.1, sig=0.05)
+
+        bce_gnn = binary_cross_entropy(y=unions_gt, probs=probs_gnn, eps=1e-6)
+        bce_correl = binary_cross_entropy(y=unions_gt, probs=probs_correl, eps=1e-6)
+        bce_random = binary_cross_entropy(y=unions_gt, probs=probs_random, eps=1e-6)
+        bce_imperfect = binary_cross_entropy(y=unions_gt, probs=probs_imperfect, eps=1e-6)
         
         exp_dict = {
             "node_features": graph_dict["nodes"],
@@ -74,7 +79,12 @@ def main():
             "probs_random": probs_random,
             "probs_imperfect": probs_imperfect,
             "p_gt": p_vec_gt,
-            "p_cp": part_cp 
+            "p_cp": part_cp,
+            "unions_gt": unions_gt,
+            "bce_gnn": np.array([bce_gnn]),
+            "bce_correl": np.array([bce_correl]),
+            "bce_random": np.array([bce_random]),
+            "bce_imperfect": np.array([bce_imperfect])
         }
         save_exp_data(fdir=args.h5_dir, fname=scene_name, exp_dict=exp_dict)
 
