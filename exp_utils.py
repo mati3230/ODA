@@ -168,5 +168,10 @@ def load_exp_data(fdir, fname):
         "bce_random": np.array(hf["bce_random"], copy=True),
         "bce_imperfect": np.array(hf["bce_imperfect"], copy=True)
     }
+    sp_idxs = []
+    size = hf["|S|"][0]
+    for i in range(size):
+        sp = hf[str(i)]
+        sp_idxs.append(sp)
     hf.close()
-    return exp_dict
+    return exp_dict, sp_idxs

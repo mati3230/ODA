@@ -16,7 +16,8 @@ from exp_utils import \
     ooa,\
     get_csv_header,\
     save_csv,\
-    mkdir
+    mkdir,\
+    load_exp_data
 #"""
 
 
@@ -49,18 +50,23 @@ def main():
     model = None
     for i in tqdm(range(n_scenes), desc=desc, disable=verbose):
         scene_name = scenes[i]
+        mesh, p_vec_gt, file_gt = get_ground_truth(scannet_dir=scannet_dir, scene=scene_name)
+        xyz = np.asarray(mesh.vertices)
+        rgb = np.asarray(mesh.vertex_colors)
+        P = np.hstack((xyz, rgb))
         if args.load_exp:
-            exp_dict = load_exp_data(fdir=args.h5_dir, fname=scene_name)
+            exp_dict, sp_idxs = load_exp_data(fdir=args.h5_dir, fname=scene_name)
             graph_dict = {
                 "nodes": exp_dict["node_features"],
                 "senders": exp_dict["senders"],
                 "receivers": exp_dict["receivers"]
             }
+            probs_gnn = exp_dict["probs_gnn"]
+            probs_correl = exp_dict["probs_correl"]
+            bce_gnn = exp_dict["bce_gnn"][0]
+            bce_correl = exp_dict["bce_correl"][0]
+            p_vec_gt = exp_dict["p_gt"]
         else:
-            mesh, p_vec_gt, file_gt = get_ground_truth(scannet_dir=scannet_dir, scene=scene_name)
-            xyz = np.asarray(mesh.vertices)
-            rgb = np.asarray(mesh.vertex_colors)
-            P = np.hstack((xyz, rgb))
             p_gt = Partition(partition=p_vec_gt)
 
             graph_dict, sp_idxs, part_cp = graph(
