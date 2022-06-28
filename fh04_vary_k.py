@@ -201,6 +201,8 @@ def all_scenes():
     parser.add_argument("--csv_dir", default="./csvs_vary_k", type=str, help="Directory where we save the csv.")
     args = parser.parse_args()
 
+    mkdir(args.csv_dir)
+
     k_params = [0.001, 0.1, 1, 2, 3, 4, 10]
 
     scenes, _, scannet_dir = get_scenes(blacklist=[])
@@ -211,7 +213,7 @@ def all_scenes():
     verbose = False
     model = None
 
-    for j in range(len(scenes)):
+    for j in tqdm(range(len(scenes)), desc="Vary K"):
         scene_name = scenes[j]
         mesh, p_vec_gt, file_gt = get_ground_truth(
             scannet_dir=scannet_dir, scene=scene_name)
@@ -229,8 +231,10 @@ def all_scenes():
             max_sp_size=args.max_sp_size,
             verbose=verbose,
             return_p_vec=True)
-
-        unions, probs, model = predict(graph_dict=graph_dict, dec_b=0.8, return_model=True, verbose=False)
+        if model is None:
+            unions, probs, model = predict(graph_dict=graph_dict, dec_b=0.8, return_model=True, verbose=False)
+        else:
+            unions, probs = predict(graph_dict=graph_dict, dec_b=0.8, model=model, verbose=False)
 
         ooas = []
         sizes = []
@@ -241,7 +245,7 @@ def all_scenes():
         ooa_cp, partition_gt, sortation = ooa(par_v_gt=p_vec_gt, par_v=part_cp, partition_gt=partition_gt, sortation=sortation)
         size_cp = len(sp_idxs)
 
-        for i in tqdm(range(len(k_params)), desc="Vary K of FH04", disable=verbose):
+        for i in range(len(k_params)):
             k = k_params[i]
             part_fh04 = partition_from_probs(graph_dict=graph_dict, sim_probs=probs, k=k, P=P, sp_idxs=sp_idxs)
             ooa_fh04, partition_gt, sortation = ooa(par_v_gt=p_vec_gt, par_v=part_fh04, partition_gt=partition_gt, sortation=sortation)
@@ -249,9 +253,9 @@ def all_scenes():
             ooas.append(ooa_fh04)
             sizes.append(size_fh04)
             all_data.append([scene_name, k, ooa_fh04, size_fh04, ooa_cp, size_cp])
-        if j % args.pkg_size == 0 and len(csv_data) > 0:
+        if j % args.pkg_size == 0 and len(all_data) > 0:
             save_csv(res=all_data, csv_dir=args.csv_dir, csv_name=str(i), data_header=csv_header)
-            csv_data.clear()
+            all_data.clear()
 
 
 if __name__ == "__main__":
