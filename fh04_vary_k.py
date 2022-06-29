@@ -205,9 +205,9 @@ def all_scenes():
             k = k_params[i]
             if args.cc:
                 unions = np.zeros(probs.shape, dtype=np.bool)
-                for j in range(probs.shape[0]):
-                    prob = probs[j]
-                    unions[j] = prob >= k
+                for z in range(probs.shape[0]):
+                    prob = probs[z]
+                    unions[z] = prob >= k
                 part_fh04 = partition(graph_dict=graph_dict, unions=unions, P=P, sp_idxs=sp_idxs, half=False, verbose=verbose)
             else:
                 part_fh04 = partition_from_probs(graph_dict=graph_dict, sim_probs=probs, k=k, P=P, sp_idxs=sp_idxs)
