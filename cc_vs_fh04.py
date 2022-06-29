@@ -13,7 +13,8 @@ from exp_utils import \
     match_score,\
     get_csv_header,\
     save_csv,\
-    mkdir
+    mkdir,\
+    load_exp_data
 
 
 def main():

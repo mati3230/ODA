@@ -117,6 +117,7 @@ def main():
         part_correl = part_correl[sortation]
         if args.load_exp:
             part_random = partition_from_probs(graph_dict=graph_dict, sim_probs=probs_random, k=args.k, P=P, sp_idxs=sp_idxs)
+            # print(probs_correl[:200])
             part_imperfect = partition_from_probs(graph_dict=graph_dict, sim_probs=probs_imperfect, k=args.k, P=P, sp_idxs=sp_idxs)
             part_random = part_random[sortation]
             part_imperfect = part_imperfect[sortation]

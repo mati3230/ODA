@@ -140,14 +140,17 @@ def predict_correl(graph_dict):
     node_features = graph_dict["nodes"]
     senders = graph_dict["senders"]
     receivers = graph_dict["receivers"]
-
+    #print(node_features[:100])
     probs = np.zeros((senders.shape[0], ), dtype=np.float32)
     for i in range(senders.shape[0]):
         e_i = senders[i]
         e_j = receivers[i]
+        #print(e_i, e_j)
         f_i = node_features[e_i]
         f_j = node_features[e_j]
+        #print(f_i, f_j)
         correlation, _, _ = np_fast_dot(a=f_i, b=f_j)
+        #print(correlation)
         probs[i] = (correlation + 1) / 2
     return probs
 
