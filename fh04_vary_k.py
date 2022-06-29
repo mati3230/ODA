@@ -8,6 +8,7 @@ from scannet_utils import get_scenes, get_ground_truth
 from ai_utils import graph, predict
 from partition.felzenszwalb import partition_from_probs
 from partition.partition import Partition
+from sp_utils import partition
 from exp_utils import \
     match_score,\
     get_csv_header,\
@@ -128,21 +129,32 @@ def all_scenes():
     parser.add_argument("--csv_dir", default="./csvs_vary_k", type=str, help="Directory where we save the csv.")
     parser.add_argument("--load_exp", default=False, type=bool, help="Use data from pre calculated dataset")
     parser.add_argument("--h5_dir", default="./exp_data", type=str, help="Directory where we load the h5 files.")
+    parser.add_argument("--cc", default=False, type=bool, help="Use connected components")
     args = parser.parse_args()
 
     mkdir(args.csv_dir)
 
     k_params = [0.001, 0.1, 1, 2, 10, 100]
+    if args.cc:
+        k_params = [0.75, 0.8, 0.85, 0.9, 0.95]
 
     scenes, _, scannet_dir = get_scenes(blacklist=[])
-    
-    csv_header = get_csv_header(header=["Name", "K"], algorithms=["FH04", "CP"],
+    header = ["Name", "K"]
+    algorithms=["FH04", "CP"]
+    if args.cc:
+        header = ["Name", "T"]
+        algorithms=["CC", "CP"]
+
+    csv_header = get_csv_header(header=header, algorithms=algorithms,
         algo_stats=["OOA", "|S|", "MS", "RS", "NFOM", "NSOM", "NTOM", "DFOM", "DSOM", "DTOM"])
     
     verbose = False
     model = None
 
-    for j in tqdm(range(len(scenes)), desc="Vary K"):
+    desc = "Vary K"
+    if args.cc:
+        desc = "Vary T"
+    for j in tqdm(range(len(scenes)), desc=desc):
         scene_name = scenes[j]
         mesh, p_vec_gt, file_gt = get_ground_truth(
             scannet_dir=scannet_dir, scene=scene_name)
@@ -191,7 +203,14 @@ def all_scenes():
 
         for i in range(len(k_params)):
             k = k_params[i]
-            part_fh04 = partition_from_probs(graph_dict=graph_dict, sim_probs=probs, k=k, P=P, sp_idxs=sp_idxs)
+            if args.cc:
+                unions = np.zeros(probs.shape, dtype=np.bool)
+                for j in range(probs.shape[0]):
+                    prob = probs[j]
+                    unions[j] = prob >= k
+                part_fh04 = partition(graph_dict=graph_dict, unions=unions, P=P, sp_idxs=sp_idxs, half=False, verbose=verbose)
+            else:
+                part_fh04 = partition_from_probs(graph_dict=graph_dict, sim_probs=probs, k=k, P=P, sp_idxs=sp_idxs)
             part_fh04 = part_fh04[sortation]
             ms_fh04, raw_score_fh04, ooa_fh04, match_stats_fh04, dens_stats_fh04 = match_score(
                 gt_partition=partition_gt, partition=Partition(partition=part_fh04), return_ooa=True)
