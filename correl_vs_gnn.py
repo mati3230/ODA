@@ -78,6 +78,8 @@ def main():
             p_vec_gt = exp_dict["p_gt"]
             probs_random = exp_dict["probs_random"]
             probs_imperfect = exp_dict["probs_imperfect"]
+            bce_random = exp_dict["bce_random"][0]
+            bce_imperfect = exp_dict["bce_imperfect"][0]
         else:
             p_gt = Partition(partition=p_vec_gt)
 
@@ -144,10 +146,12 @@ def main():
             dens_stats_correl[0], dens_stats_correl[1], dens_stats_correl[2]
             ]
         if args.load_exp:
+            size_random = np.unique(part_random).shape[0]
+            size_imperfect = np.unique(part_imperfect).shape[0]
             d.extend([
                 ooa_random, size_random, bce_random, ms_random, raw_score_random, 
                 match_stats_random[0], match_stats_random[1], match_stats_random[2], 
-                dens_stats_random[0], dens_stats_random[1], dens_stats_random[2]
+                dens_stats_random[0], dens_stats_random[1], dens_stats_random[2],
                 #
                 ooa_imperfect, size_imperfect, bce_imperfect, ms_imperfect, raw_score_imperfect, 
                 match_stats_imperfect[0], match_stats_imperfect[1], match_stats_imperfect[2], 
