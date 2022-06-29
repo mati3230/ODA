@@ -39,7 +39,8 @@ def main():
     scenes, _, scannet_dir = get_scenes(blacklist=[])
     n_scenes = len(scenes)
     
-    csv_header = get_csv_header(header=["Name", "|P|"], algorithms=["FH04", "CC", "CP"], algo_stats=["OOA", "|S|"])
+    csv_header = get_csv_header(header=["Name", "|P|"], algorithms=["CP", "FH04", "CC"],
+        algo_stats=["OOA", "|S|", "MS", "RS", "NFOM", "NSOM", "NTOM", "DFOM", "DSOM", "DTOM"])
     csv_data = []
     desc = "CC vs. FH04"
     verbose = False
@@ -103,7 +104,19 @@ def main():
         size_cc = np.unique(part_cc).shape[0]
         size_cp = len(sp_idxs)
 
-        csv_data.append([file_gt, P.shape[0], ooa_fh04, size_fh04, ooa_cc, size_cc, ooa_cp, size_cp])
+        csv_data.append([file_gt, P.shape[0],
+                ooa_cp, size_cp, ms_cp, raw_score_cp, 
+                match_stats_cp[0], match_stats_cp[1], match_stats_cp[2], 
+                dens_stats_cp[0], dens_stats_cp[1], dens_stats_cp[2],
+                #
+                ooa_fh04, size_fh04, ms_fh04, raw_score_fh04, 
+                match_stats_fh04[0], match_stats_fh04[1], match_stats_fh04[2], 
+                dens_stats_fh04[0], dens_stats_fh04[1], dens_stats_fh04[2],
+                #
+                ooa_cc, size_cc, ms_cc, raw_score_cc, 
+                match_stats_cc[0], match_stats_cc[1], match_stats_cc[2], 
+                dens_stats_cc[0], dens_stats_cc[1], dens_stats_cc[2]
+            ])
         if i % args.pkg_size == 0 and len(csv_data) > 0:
             save_csv(res=csv_data, csv_dir=args.csv_dir, csv_name=str(i), data_header=csv_header)
             csv_data.clear()
