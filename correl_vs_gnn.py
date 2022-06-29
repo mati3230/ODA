@@ -49,7 +49,10 @@ def main():
             match_stats_gnn[0], match_stats_gnn[1], match_stats_gnn[2], 
             dens_stats_gnn[0], dens_stats_gnn[1], dens_stats_gnn[2],
     """
-    csv_header = get_csv_header(header=["Name", "|P|"], algorithms=["GNN", "Correl"],
+    algorithms=["GNN", "Correl"]
+    if args.load_exp:
+        algorithms.extend(["Random", "Imperfect"])
+    csv_header = get_csv_header(header=["Name", "|P|"], algorithms=algorithms,
         algo_stats=["OOA", "|S|", "BCE", "MS", "RS", "NFOM", "NSOM", "NTOM", "DFOM", "DSOM", "DTOM"])
     csv_data = []
     desc = "Correlation vs. GNN"
@@ -73,6 +76,8 @@ def main():
             bce_gnn = exp_dict["bce_gnn"][0]
             bce_correl = exp_dict["bce_correl"][0]
             p_vec_gt = exp_dict["p_gt"]
+            probs_random = exp_dict["probs_random"]
+            probs_imperfect = exp_dict["probs_imperfect"]
         else:
             p_gt = Partition(partition=p_vec_gt)
 
@@ -108,17 +113,28 @@ def main():
         part_correl = partition_from_probs(graph_dict=graph_dict, sim_probs=probs_correl, k=args.k, P=P, sp_idxs=sp_idxs)
         part_gnn = part_gnn[sortation]
         part_correl = part_correl[sortation]
+        if args.load_exp:
+            part_random = partition_from_probs(graph_dict=graph_dict, sim_probs=probs_random, k=args.k, P=P, sp_idxs=sp_idxs)
+            part_imperfect = partition_from_probs(graph_dict=graph_dict, sim_probs=probs_imperfect, k=args.k, P=P, sp_idxs=sp_idxs)
+            part_random = part_random[sortation]
+            part_imperfect = part_imperfect[sortation]
+
 
         partition_gt = Partition(partition=p_vec_gt)
         ms_gnn, raw_score_gnn, ooa_gnn, match_stats_gnn, dens_stats_gnn = match_score(
             gt_partition=partition_gt, partition=Partition(partition=part_gnn), return_ooa=True)
         ms_correl, raw_score_correl, ooa_correl, match_stats_correl, dens_stats_correl = match_score(
             gt_partition=partition_gt, partition=Partition(partition=part_correl), return_ooa=True)
+        if args.load_exp:
+            ms_random, raw_score_random, ooa_random, match_stats_random, dens_stats_random = match_score(
+                gt_partition=partition_gt, partition=Partition(partition=part_random), return_ooa=True)
+            ms_imperfect, raw_score_imperfect, ooa_imperfect, match_stats_imperfect, dens_stats_imperfect = match_score(
+                gt_partition=partition_gt, partition=Partition(partition=part_imperfect), return_ooa=True)
 
         size_gnn = np.unique(part_gnn).shape[0]
         size_correl = np.unique(part_correl).shape[0]
 
-        csv_data.append([file_gt, P.shape[0], 
+        d = [file_gt, P.shape[0], 
             ooa_gnn, size_gnn, bce_gnn, ms_gnn, raw_score_gnn, 
             match_stats_gnn[0], match_stats_gnn[1], match_stats_gnn[2], 
             dens_stats_gnn[0], dens_stats_gnn[1], dens_stats_gnn[2],
@@ -126,7 +142,18 @@ def main():
             ooa_correl, size_correl, bce_correl, ms_correl, raw_score_correl, 
             match_stats_correl[0], match_stats_correl[1], match_stats_correl[2], 
             dens_stats_correl[0], dens_stats_correl[1], dens_stats_correl[2]
-            ])
+            ]
+        if args.load_exp:
+            d.extend([
+                ooa_random, size_random, bce_random, ms_random, raw_score_random, 
+                match_stats_random[0], match_stats_random[1], match_stats_random[2], 
+                dens_stats_random[0], dens_stats_random[1], dens_stats_random[2]
+                #
+                ooa_imperfect, size_imperfect, bce_imperfect, ms_imperfect, raw_score_imperfect, 
+                match_stats_imperfect[0], match_stats_imperfect[1], match_stats_imperfect[2], 
+                dens_stats_imperfect[0], dens_stats_imperfect[1], dens_stats_imperfect[2]
+                ])
+        csv_data.append(d)
         if i % args.pkg_size == 0 and len(csv_data) > 0:
             save_csv(res=csv_data, csv_dir=args.csv_dir, csv_name=str(i), data_header=csv_header)
             csv_data.clear()
