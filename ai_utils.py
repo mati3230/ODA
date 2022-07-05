@@ -15,7 +15,8 @@ import sys
 from multiprocessing.pool import ThreadPool
 
 #from network import FFGraphNet
-from graphnet_light import GraphNetLight
+#from graphnet_light import GraphNetLight
+from graphnet_head import GraphNetLight
 
 from io_utils import load_nn_file, save_nn_file
 import open3d as o3d
