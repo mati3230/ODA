@@ -220,6 +220,18 @@ def extend_edges(senders, n_senders, receivers, n_receivers, n_edges, unions):
 
 
 def unify(picked_points_idxs, sp_idxs, graph_dict, unions):
+    """
+    Unify different superpoints.
+
+    Params
+    -
+    picked_points_idxs : list(int)
+        List of point indices.
+    sp_idxs : list(list(int))
+        List of point indices lists. Each list of point indices represents a superpoint.
+    graph_dict : dict()
+        Representation of the 
+    """
     if len(picked_points_idxs) == 0:
         return graph_dict, unions
     sp_to_unify = uni_superpoint_idxs(picked_points_idxs=picked_points_idxs, sp_idxs=sp_idxs)
@@ -270,6 +282,16 @@ def unify(picked_points_idxs, sp_idxs, graph_dict, unions):
 
 
 def points_to_superpoints(picked_points_idxs, sp_idxs):
+    """
+    Converts points indices to superpoint indices. 
+
+    Params
+    -
+    picked_points_idxs : list(int)
+        List of point indices.
+    sp_idxs : list(list(int))
+        List of point indices lists. Each list of point indices represents a superpoint.  
+    """
     result = []
     for i in range(len(picked_points_idxs)):
         p_idx = picked_points_idxs[i]
@@ -283,6 +305,9 @@ def points_to_superpoints(picked_points_idxs, sp_idxs):
 
 
 def uni_superpoint_idxs(picked_points_idxs, sp_idxs):
+    """
+    Returns the unique superpoint indices given a list of point indices. 
+    """
     result = points_to_superpoints(picked_points_idxs=picked_points_idxs, sp_idxs=sp_idxs)
     result = np.unique(result)
     return result

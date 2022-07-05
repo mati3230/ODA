@@ -73,11 +73,15 @@ def main():
             }
             probs_gnn = exp_dict["probs_gnn"]
             probs_correl = exp_dict["probs_correl"]
+            probs_imperfect = exp_dict["probs_imperfect"]
+            #print(probs_gnn[:100])
+            #print(probs_correl[:100])
+            #print(probs_imperfect[:100])
+            #return
             bce_gnn = exp_dict["bce_gnn"][0]
             bce_correl = exp_dict["bce_correl"][0]
             p_vec_gt = exp_dict["p_gt"]
             probs_random = exp_dict["probs_random"]
-            probs_imperfect = exp_dict["probs_imperfect"]
             bce_random = exp_dict["bce_random"][0]
             bce_imperfect = exp_dict["bce_imperfect"][0]
         else:
