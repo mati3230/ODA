@@ -70,6 +70,11 @@ def main():
         bce_random = binary_cross_entropy(y=unions_gt, probs=probs_random, eps=1e-6)
         bce_imperfect = binary_cross_entropy(y=unions_gt, probs=probs_imperfect, eps=1e-6)
         
+        acc_gnn, prec_gnn, rec_gnn, f1_gnn, action_gnn = classification_metrics(y=unions_gt, probs=probs_gnn)
+        acc_correl, prec_correl, rec_correl, f1_correl, action_correl = classification_metrics(y=unions_gt, probs=probs_correl)
+        acc_random, prec_random, rec_random, f1_random, action_random = classification_metrics(y=unions_gt, probs=probs_random)
+        acc_imperfect, prec_imperfect, rec_imperfect, f1_imperfect, action_imperfect = classification_metrics(y=unions_gt, probs=probs_imperfect)
+
         exp_dict = {
             "node_features": graph_dict["nodes"],
             "senders": graph_dict["senders"],
@@ -86,6 +91,31 @@ def main():
             "bce_random": np.array([bce_random]),
             "bce_imperfect": np.array([bce_imperfect]),
             "|S|": np.array([len(sp_idxs)]),
+            #
+            "action_gnn": action_gnn,
+            "action_correl": action_correl,
+            "action_random": action_random,
+            "action_imperfect": action_imperfect,
+            #
+            "acc_gnn": np.array([acc_gnn]),
+            "acc_correl": np.array([acc_correl]),
+            "acc_random": np.array([acc_random]),
+            "acc_imperfect": np.array([acc_imperfect]),
+            #
+            "prec_gnn": np.array([prec_gnn]),
+            "prec_correl": np.array([prec_correl]),
+            "prec_random": np.array([prec_random]),
+            "prec_imperfect": np.array([prec_imperfect]),
+            #
+            "rec_gnn": np.array([rec_gnn]),
+            "rec_correl": np.array([rec_correl]),
+            "rec_random": np.array([rec_random]),
+            "rec_imperfect": np.array([rec_imperfect]),
+            #
+            "f1_gnn": np.array([f1_gnn]),
+            "f1_correl": np.array([f1_correl]),
+            "f1_random": np.array([f1_random]),
+            "f1_imperfect": np.array([f1_imperfect])
         }
         for j in range(len(sp_idxs)):
             sp = sp_idxs[j]

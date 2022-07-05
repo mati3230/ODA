@@ -124,6 +124,30 @@ def ooa(par_v_gt, par_v, partition_gt=None, sortation=None):
     return ooa_A, partition_gt, sortation
 
 
+def classification_metrics(y, probs, t=0.5):
+    action = np.zeros(probs.shape, dtype=np.int32)
+    action[probs > t] = 1
+    
+    TP = np.sum((y == 1) & (action == 1))
+    TN = np.sum((y == 0) & (action == 0))
+    FN = np.sum((y == 1) & (action == 0))
+    FP = np.sum((y == 0) & (action == 1))
+    acc = (TP + TN) / y.shape[0]
+    if TP + FP == 0:
+        prec = TP / (TP + FP + 1e-12)
+    else:
+        prec = TP / (TP + FP)
+    if TP + FN == 0:
+        rec = TP / (TP + FN + 1e-12)
+    else:
+        rec = TP / (TP + FN)
+    if prec + rec == 0:
+        f1 = 2*(prec * rec)/(prec + rec + 1e-12)
+    else:
+        f1 = 2*(prec * rec)/(prec + rec)
+    return acc, prec, rec, f1, action
+
+
 def get_unions(graph_dict, alpha):
     senders = graph_dict["senders"]
     receivers = graph_dict["receivers"]
