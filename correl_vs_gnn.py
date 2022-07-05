@@ -18,7 +18,8 @@ from exp_utils import \
     save_csv,\
     mkdir,\
     load_exp_data,\
-    match_score
+    match_score,\
+    classification_metrics
 #"""
 
 
@@ -84,6 +85,26 @@ def main():
             probs_random = exp_dict["probs_random"]
             bce_random = exp_dict["bce_random"][0]
             bce_imperfect = exp_dict["bce_imperfect"][0]
+            #
+            acc_gnn = exp_dict["acc_gnn"][0]
+            acc_correl = exp_dict["acc_correl"][0]
+            acc_random = exp_dict["acc_random"][0]
+            acc_imperfect = exp_dict["acc_imperfect"][0]
+            #
+            prec_gnn = exp_dict["prec_gnn"][0]
+            prec_correl = exp_dict["prec_correl"][0]
+            prec_random = exp_dict["prec_random"][0]
+            prec_imperfect = exp_dict["prec_imperfect"][0]
+            #
+            rec_gnn = exp_dict["rec_gnn"][0]
+            rec_correl = exp_dict["rec_correl"][0]
+            rec_random = exp_dict["rec_random"][0]
+            rec_imperfect = exp_dict["rec_imperfect"][0]
+            #
+            f1_gnn = exp_dict["f1_gnn"][0]
+            f1_correl = exp_dict["f1_correl"][0]
+            f1_random = exp_dict["f1_random"][0]
+            f1_imperfect = exp_dict["f1_imperfect"][0]
         else:
             p_gt = Partition(partition=p_vec_gt)
 
@@ -111,6 +132,9 @@ def main():
             probs_correl = predict_correl(graph_dict=graph_dict)
             bce_gnn = binary_cross_entropy(y=unions_gt, probs=probs_gnn)
             bce_correl = binary_cross_entropy(y=unions_gt, probs=probs_correl)
+
+            acc_gnn, prec_gnn, rec_gnn, f1_gnn, action_gnn = classification_metrics(y=unions_gt, probs=probs_gnn)
+            acc_correl, prec_correl, rec_correl, f1_correl, action_correl = classification_metrics(y=unions_gt, probs=probs_correl)
         
         sortation = np.argsort(p_vec_gt)
         p_vec_gt = p_vec_gt[sortation]
@@ -145,10 +169,12 @@ def main():
             ooa_gnn, size_gnn, bce_gnn, ms_gnn, raw_score_gnn, 
             match_stats_gnn[0], match_stats_gnn[1], match_stats_gnn[2], 
             dens_stats_gnn[0], dens_stats_gnn[1], dens_stats_gnn[2],
+            acc_gnn, prec_gnn, rec_gnn, f1_gnn,
             #
             ooa_correl, size_correl, bce_correl, ms_correl, raw_score_correl, 
             match_stats_correl[0], match_stats_correl[1], match_stats_correl[2], 
-            dens_stats_correl[0], dens_stats_correl[1], dens_stats_correl[2]
+            dens_stats_correl[0], dens_stats_correl[1], dens_stats_correl[2],
+            acc_correl, prec_correl, rec_correl, f1_correl
             ]
         if args.load_exp:
             size_random = np.unique(part_random).shape[0]
@@ -157,10 +183,12 @@ def main():
                 ooa_random, size_random, bce_random, ms_random, raw_score_random, 
                 match_stats_random[0], match_stats_random[1], match_stats_random[2], 
                 dens_stats_random[0], dens_stats_random[1], dens_stats_random[2],
+                acc_random, prec_random, rec_random, f1_random,
                 #
                 ooa_imperfect, size_imperfect, bce_imperfect, ms_imperfect, raw_score_imperfect, 
                 match_stats_imperfect[0], match_stats_imperfect[1], match_stats_imperfect[2], 
-                dens_stats_imperfect[0], dens_stats_imperfect[1], dens_stats_imperfect[2]
+                dens_stats_imperfect[0], dens_stats_imperfect[1], dens_stats_imperfect[2],
+                acc_imperfect, prec_imperfect, rec_imperfect, f1_imperfect
                 ])
         csv_data.append(d)
         if i % args.pkg_size == 0 and len(csv_data) > 0:
