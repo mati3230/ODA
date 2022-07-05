@@ -5,7 +5,7 @@ import numpy as np
 
 from scannet_utils import get_scenes, get_ground_truth
 from ai_utils import graph, predict
-from exp_utils import mkdir, predict_correl, get_unions, get_imperfect_probs, save_exp_data, binary_cross_entropy
+from exp_utils import mkdir, predict_correl, get_unions, get_imperfect_probs, save_exp_data, binary_cross_entropy, classification_metrics
 from partition.partition import Partition
 from partition.density_utils import densities_np
 
@@ -13,7 +13,7 @@ from partition.density_utils import densities_np
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--t", type=float, default=0.8, help="Similarity threshold.")
-    parser.add_argument("--k", type=float, default=100, help="k parameter of FH04 segmentation algorithm.")
+    #parser.add_argument("--k", type=float, default=100, help="k parameter of FH04 segmentation algorithm.")
     # cp params
     parser.add_argument("--reg_strength", default=0.1, type=float, help="Regularization strength for the minimal partition. Increase lambda for a coarser partition. ")
     parser.add_argument("--k_nn_geof", default=45, type=int, help="Number of neighbors for the geometric features.")
@@ -22,10 +22,10 @@ def main():
     parser.add_argument("--d_se_max", default=0, type=float, help="Max length of super edges.")
     parser.add_argument("--max_sp_size", default=-1, type=int, help="Maximum size of a superpoint.")
     #
-    parser.add_argument("--pkg_size", default=5, type=int, help="Number of packages to save a csv")
+    #parser.add_argument("--pkg_size", default=5, type=int, help="Number of packages to save a csv")
     parser.add_argument("--h5_dir", default="./exp_data", type=str, help="Directory where we save the h5 files.")
     args = parser.parse_args()
-
+    os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
     mkdir(args.h5_dir)
 
     scenes, _, scannet_dir = get_scenes(blacklist=[])
