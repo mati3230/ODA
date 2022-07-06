@@ -57,6 +57,7 @@ def main():
             _, probs_gnn, model = predict(graph_dict=graph_dict, dec_b=args.t, return_model=True, verbose=False)
         else:
             _, probs_gnn = predict(graph_dict=graph_dict, dec_b=args.t, model=model, verbose=False)
+        probs_gnn = probs_gnn.reshape(probs_gnn.shape[0], )
         probs_correl = predict_correl(graph_dict=graph_dict)
         probs_random = np.random.rand(probs_gnn.shape[0], )
 

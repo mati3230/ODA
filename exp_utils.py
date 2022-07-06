@@ -203,8 +203,10 @@ def get_imperfect_probs(unions, lam=0.1, sig=0.05):
     u = u.astype(np.float32)
     pos_idxs = np.where(u == 1)[0]
     neg_idxs = np.where(u == 0)[0]
-    u[pos_idxs] -= lam * np.random.normal(loc=0, scale=sig, size=(pos_idxs.shape[0], ))
-    u[neg_idxs] += lam * np.random.normal(loc=0, scale=sig, size=(neg_idxs.shape[0], ))
+    u[pos_idxs] -= np.random.normal(loc=-lam, scale=sig, size=(pos_idxs.shape[0], ))
+    u[neg_idxs] += np.random.normal(loc= lam, scale=sig, size=(neg_idxs.shape[0], ))
+    u[u > 1] = 1
+    u[u < 0] = 0
     return u
 
 
@@ -225,13 +227,11 @@ def load_exp_data(fdir, fname):
     if not fname.endswith(".h5"):
         fname += ".h5"
     hf = h5py.File("{0}{1}".format(fdir, fname), "r")
-    probs_gnn = np.array(hf["probs_gnn"], copy=True)
-    probs_gnn = probs_gnn.reshape(probs_gnn.shape[0], )
     exp_dict = {
         "node_features": np.array(hf["node_features"], copy=True),
         "senders": np.array(hf["senders"], copy=True),
         "receivers": np.array(hf["receivers"], copy=True),
-        "probs_gnn": probs_gnn,
+        "probs_gnn": np.array(hf["probs_gnn"], copy=True),
         "probs_correl": np.array(hf["probs_correl"], copy=True),
         "probs_random": np.array(hf["probs_random"], copy=True),
         "probs_imperfect": np.array(hf["probs_imperfect"], copy=True),
