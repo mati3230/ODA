@@ -61,8 +61,8 @@ def main():
     verbose = False
     model = None
     for i in tqdm(range(n_scenes), desc=desc, disable=verbose):
-        if i >= 50:
-            return
+        #if i >= 1:
+        #    return
         scene_name = scenes[i]
         mesh, p_vec_gt, file_gt = get_ground_truth(scannet_dir=scannet_dir, scene=scene_name)
         xyz = np.asarray(mesh.vertices)
@@ -76,6 +76,8 @@ def main():
                 "receivers": exp_dict["receivers"]
             }
             probs_gnn = exp_dict["probs_gnn"]
+            #print(probs_gnn.shape)
+            probs_gnn = probs_gnn.reshape(probs_gnn.shape[0], )
             probs_correl = exp_dict["probs_correl"]
             probs_imperfect = exp_dict["probs_imperfect"]
             #print(probs_gnn)
@@ -108,6 +110,7 @@ def main():
             f1_correl = exp_dict["f1_correl"][0]
             f1_random = exp_dict["f1_random"][0]
             f1_imperfect = exp_dict["f1_imperfect"][0]
+            #print(acc_gnn, acc_correl, acc_random, acc_imperfect)
         else:
             p_gt = Partition(partition=p_vec_gt)
 
@@ -167,8 +170,8 @@ def main():
 
         size_gnn = np.unique(part_gnn).shape[0]
         size_correl = np.unique(part_correl).shape[0]
-
         d = [file_gt, P.shape[0], 
+            #
             ooa_gnn, size_gnn, bce_gnn, ms_gnn, raw_score_gnn, 
             match_stats_gnn[0], match_stats_gnn[1], match_stats_gnn[2], 
             dens_stats_gnn[0], dens_stats_gnn[1], dens_stats_gnn[2],

@@ -58,6 +58,7 @@ def main():
         else:
             _, probs_gnn = predict(graph_dict=graph_dict, dec_b=args.t, model=model, verbose=False)
         probs_gnn = probs_gnn.reshape(probs_gnn.shape[0], )
+        #print(probs_gnn.shape)
         probs_correl = predict_correl(graph_dict=graph_dict)
         probs_random = np.random.rand(probs_gnn.shape[0], )
 
@@ -75,6 +76,7 @@ def main():
         acc_correl, prec_correl, rec_correl, f1_correl, action_correl = classification_metrics(y=unions_gt, probs=probs_correl)
         acc_random, prec_random, rec_random, f1_random, action_random = classification_metrics(y=unions_gt, probs=probs_random)
         acc_imperfect, prec_imperfect, rec_imperfect, f1_imperfect, action_imperfect = classification_metrics(y=unions_gt, probs=probs_imperfect)
+        #print(acc_gnn, acc_correl, acc_random, acc_imperfect)
 
         exp_dict = {
             "node_features": graph_dict["nodes"],

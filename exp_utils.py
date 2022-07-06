@@ -227,6 +227,7 @@ def load_exp_data(fdir, fname):
     if not fname.endswith(".h5"):
         fname += ".h5"
     hf = h5py.File("{0}{1}".format(fdir, fname), "r")
+    #print(np.array(hf["acc_gnn"], copy=True))
     exp_dict = {
         "node_features": np.array(hf["node_features"], copy=True),
         "senders": np.array(hf["senders"], copy=True),
