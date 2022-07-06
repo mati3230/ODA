@@ -239,7 +239,23 @@ def load_exp_data(fdir, fname):
         "bce_gnn": np.array(hf["bce_gnn"], copy=True),
         "bce_correl": np.array(hf["bce_correl"], copy=True),
         "bce_random": np.array(hf["bce_random"], copy=True),
-        "bce_imperfect": np.array(hf["bce_imperfect"], copy=True)
+        "bce_imperfect": np.array(hf["bce_imperfect"], copy=True),
+        "acc_gnn": np.array(hf["acc_gnn"], copy=True),
+        "acc_gnn": np.array(hf["acc_gnn"], copy=True),
+        "acc_gnn": np.array(hf["acc_gnn"], copy=True),
+        "acc_gnn": np.array(hf["acc_gnn"], copy=True),
+        "prec_gnn": np.array(hf["prec_gnn"], copy=True),
+        "prec_gnn": np.array(hf["prec_gnn"], copy=True),
+        "prec_gnn": np.array(hf["prec_gnn"], copy=True),
+        "prec_gnn": np.array(hf["prec_gnn"], copy=True),
+        "rec_gnn": np.array(hf["rec_gnn"], copy=True),
+        "rec_gnn": np.array(hf["rec_gnn"], copy=True),
+        "rec_gnn": np.array(hf["rec_gnn"], copy=True),
+        "rec_gnn": np.array(hf["rec_gnn"], copy=True),
+        "f1_gnn": np.array(hf["f1_gnn"], copy=True),
+        "f1_gnn": np.array(hf["f1_gnn"], copy=True),
+        "f1_gnn": np.array(hf["f1_gnn"], copy=True),
+        "f1_gnn": np.array(hf["f1_gnn"], copy=True)
     }
     sp_idxs = []
     size = hf["|S|"][0]
