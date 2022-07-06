@@ -75,7 +75,7 @@ def main():
             probs_gnn = exp_dict["probs_gnn"]
             probs_correl = exp_dict["probs_correl"]
             probs_imperfect = exp_dict["probs_imperfect"]
-            #print(probs_gnn[:100])
+            #print(probs_gnn)
             #print(probs_correl[:100])
             #print(probs_imperfect[:100])
             #return
