@@ -240,22 +240,31 @@ def load_exp_data(fdir, fname):
         "bce_correl": np.array(hf["bce_correl"], copy=True),
         "bce_random": np.array(hf["bce_random"], copy=True),
         "bce_imperfect": np.array(hf["bce_imperfect"], copy=True),
+        #
         "acc_gnn": np.array(hf["acc_gnn"], copy=True),
-        "acc_gnn": np.array(hf["acc_gnn"], copy=True),
-        "acc_gnn": np.array(hf["acc_gnn"], copy=True),
-        "acc_gnn": np.array(hf["acc_gnn"], copy=True),
+        "acc_correl": np.array(hf["acc_correl"], copy=True),
+        "acc_random": np.array(hf["acc_random"], copy=True),
+        "acc_imperfect": np.array(hf["acc_imperfect"], copy=True),
+        #
         "prec_gnn": np.array(hf["prec_gnn"], copy=True),
-        "prec_gnn": np.array(hf["prec_gnn"], copy=True),
-        "prec_gnn": np.array(hf["prec_gnn"], copy=True),
-        "prec_gnn": np.array(hf["prec_gnn"], copy=True),
+        "prec_correl": np.array(hf["prec_correl"], copy=True),
+        "prec_random": np.array(hf["prec_random"], copy=True),
+        "prec_imperfect": np.array(hf["prec_imperfect"], copy=True),
+        #
         "rec_gnn": np.array(hf["rec_gnn"], copy=True),
-        "rec_gnn": np.array(hf["rec_gnn"], copy=True),
-        "rec_gnn": np.array(hf["rec_gnn"], copy=True),
-        "rec_gnn": np.array(hf["rec_gnn"], copy=True),
+        "rec_correl": np.array(hf["rec_correl"], copy=True),
+        "rec_random": np.array(hf["rec_random"], copy=True),
+        "rec_imperfect": np.array(hf["rec_imperfect"], copy=True),
+        #
         "f1_gnn": np.array(hf["f1_gnn"], copy=True),
-        "f1_gnn": np.array(hf["f1_gnn"], copy=True),
-        "f1_gnn": np.array(hf["f1_gnn"], copy=True),
-        "f1_gnn": np.array(hf["f1_gnn"], copy=True)
+        "f1_correl": np.array(hf["f1_correl"], copy=True),
+        "f1_random": np.array(hf["f1_random"], copy=True),
+        "f1_imperfect": np.array(hf["f1_imperfect"], copy=True),
+        #
+        "action_gnn": np.array(hf["action_gnn"], copy=True),
+        "action_correl": np.array(hf["action_correl"], copy=True),
+        "action_random": np.array(hf["action_random"], copy=True),
+        "action_imperfect": np.array(hf["action_imperfect"], copy=True)
     }
     sp_idxs = []
     size = hf["|S|"][0]
