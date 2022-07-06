@@ -54,12 +54,15 @@ def main():
     if args.load_exp:
         algorithms.extend(["Random", "Imperfect"])
     csv_header = get_csv_header(header=["Name", "|P|"], algorithms=algorithms,
-        algo_stats=["OOA", "|S|", "BCE", "MS", "RS", "NFOM", "NSOM", "NTOM", "DFOM", "DSOM", "DTOM"])
+        algo_stats=["OOA", "|S|", "BCE", "MS", "RS", "NFOM", "NSOM", "NTOM", "DFOM", "DSOM", "DTOM",
+        "ACC", "PREC", "REC", "F1"])
     csv_data = []
     desc = "Correlation vs. GNN"
     verbose = False
     model = None
     for i in tqdm(range(n_scenes), desc=desc, disable=verbose):
+        if i >= 50:
+            return
         scene_name = scenes[i]
         mesh, p_vec_gt, file_gt = get_ground_truth(scannet_dir=scannet_dir, scene=scene_name)
         xyz = np.asarray(mesh.vertices)
