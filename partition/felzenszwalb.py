@@ -12,17 +12,43 @@ def component_size(S, C):
 def tau(k, S, C):
     return k / component_size(S, C)
 
+def max_weight(G, w, e_idxs):
+    w_arr = np.array(w)
+    return np.max(w_arr[e_idxs])
+
 def internal_difference(G, S, C):
-    # maximum edge weight w_max in the graph G that connects two nodes of the component C of the partition S.
+    # maximum edge weight w_max in the minimum spanning tree MST of the component C.
+    if component_size(S=S, C=C) <= 1:
+        return 0.0
     E = G.get_edgelist()
-    w_max = sys.float_info.min
+    G_C = ig.Graph()
+    weights_C = []
+    edges_C = []
+    verts_C = {}
+    v_idx = 0
     for k in range(len(E)):
         e = E[k]
         i, j = e
         if S[i] == C and S[j] == C:
+            if i not in verts_C:
+                verts_C[i] = v_idx
+                v_idx += 1
+            if j not in verts_C:
+                verts_C[j] = v_idx
+                v_idx += 1
+            edges_C.append((verts_C[i],verts_C[j]))
             w = get_edge_weight(G, k)
-            if w > w_max:
-                w_max = w
+            weights_C.append(w)
+    if len(weights_C) == 0:
+        return 0.0
+    elif len(weights_C) == 1:
+        return weights_C[0]
+    elif len(weights_C) == 2:
+        return min(weights_C)
+    G_C.add_vertices(len(verts_C))
+    G_C.add_edges(edges_C)
+    edge_idxs_MST = G_C.spanning_tree(weights=weights_C, return_tree=False)
+    w_max = max_weight(G=G_C, w=weights_C, e_idxs=edge_idxs_MST)
     return w_max
 
 def min_internal_difference(G, S, C1, C2, k):
@@ -132,10 +158,11 @@ def partition_from_probs(graph_dict, sim_probs, k, P, sp_idxs):
 
 if __name__ == "__main__":
     # similar nodes should have low edge weight
-    G = ig.Graph()
-    G.add_vertices(6)
-    G.add_edges([(0,1), (1,2), (2, 3), (3, 4), (4, 5), (5, 3)])
-    w = np.random.rand(G.ecount())
+    #G = ig.Graph()
+    #G.add_vertices(6)
+    #G.add_edges([(0,1), (1,2), (2, 3), (3, 4), (4, 5), (5, 3)])
+    G = ig.Graph.Lattice([5, 5], circular=False)
+    w = np.random.rand(G.ecount())    
     G.es["w"] = w.tolist()
     p_vec = partition(G=G, k=100)
     print(p_vec)
