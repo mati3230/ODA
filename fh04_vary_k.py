@@ -19,8 +19,8 @@ from exp_utils import \
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--min_k", type=float, default=1000, help="Minimum k parameter of FH04 segmentation algorithm.")
-    parser.add_argument("--max_k", type=float, default=100, help="Maximum k parameter of FH04 segmentation algorithm.")
+    parser.add_argument("--min_k", type=float, default=100, help="Minimum k parameter of FH04 segmentation algorithm.")
+    parser.add_argument("--max_k", type=float, default=1000, help="Maximum k parameter of FH04 segmentation algorithm.")
     parser.add_argument("--step_k", type=float, default=100, help="Step size to which the k parameter of FH04 segmentation algorithm will be varied.")
     # cp params
     parser.add_argument("--reg_strength", default=0.1, type=float, help="Regularization strength for the minimal partition. Increase lambda for a coarser partition. ")
@@ -79,13 +79,20 @@ def main():
     partition_gt = None
     sortation = None
 
-    ooa_cp, partition_gt, sortation = ooa(par_v_gt=p_vec_gt, par_v=part_cp, partition_gt=partition_gt, sortation=sortation)
+    partition_gt = Partition(partition=p_vec_gt)
+    #ooa_cp, partition_gt, sortation = ooa(par_v_gt=p_vec_gt, par_v=part_cp, partition_gt=partition_gt, sortation=sortation)
+    _, _, ooa_cp, _, _ = match_score(
+        gt_partition=partition_gt, partition=Partition(partition=part_cp), return_ooa=True)
     size_cp = len(sp_idxs)
 
     for i in tqdm(range(k_params.shape[0]), desc="Vary K of FH04", disable=verbose):
         k = k_params[i]
         part_fh04 = partition_from_probs(graph_dict=graph_dict, sim_probs=probs, k=k, P=P, sp_idxs=sp_idxs)
-        ooa_fh04, partition_gt, sortation = ooa(par_v_gt=p_vec_gt, par_v=part_fh04, partition_gt=partition_gt, sortation=sortation)
+        #ooa_fh04, partition_gt, sortation = ooa(par_v_gt=p_vec_gt, par_v=part_fh04, partition_gt=partition_gt, sortation=sortation)
+        _, _, ooa_fh04, _, _ = match_score(
+            gt_partition=partition_gt, partition=Partition(partition=part_fh04), return_ooa=True)
+        #_, _, ooa_fh04, _, _ = match_score(
+        #    gt_partition=partition_gt, partition=partition_gt, return_ooa=True)
         size_fh04 = np.unique(part_fh04).shape[0]
         ooas.append(ooa_fh04)
         sizes.append(size_fh04)
@@ -232,5 +239,5 @@ def all_scenes():
 
 
 if __name__ == "__main__":
-    #main()
-    all_scenes()
+    main()
+    #all_scenes()

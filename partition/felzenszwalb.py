@@ -18,6 +18,8 @@ def max_weight(G, w, e_idxs):
 
 def internal_difference(G, S, C):
     # maximum edge weight w_max in the minimum spanning tree MST of the component C.
+    csize = component_size(S=S, C=C)
+    #print(csize)
     if component_size(S=S, C=C) <= 1:
         return 0.0
     E = G.get_edgelist()
@@ -39,6 +41,7 @@ def internal_difference(G, S, C):
             edges_C.append((verts_C[i],verts_C[j]))
             w = get_edge_weight(G, k)
             weights_C.append(w)
+    #print(weights_C)
     if len(weights_C) == 0:
         return 0.0
     elif len(weights_C) == 1:
@@ -49,6 +52,7 @@ def internal_difference(G, S, C):
     G_C.add_edges(edges_C)
     edge_idxs_MST = G_C.spanning_tree(weights=weights_C, return_tree=False)
     w_max = max_weight(G=G_C, w=weights_C, e_idxs=edge_idxs_MST)
+    #print(w_max)
     return w_max
 
 def min_internal_difference(G, S, C1, C2, k):
@@ -57,7 +61,9 @@ def min_internal_difference(G, S, C1, C2, k):
 
 def merge(G, w, C1, C2, S, e, k):
     # merge the components C1 and C2 if the edge weight w is greater than the minimum internal difference between them
-    if w > min_internal_difference(G, S, C1, C2, k):
+    MInt = min_internal_difference(G, S, C1, C2, k)
+    #print(C1, C2, MInt, w)
+    if w > MInt:
         return S
     i, j = e
     S[j] = S[i]
@@ -71,6 +77,7 @@ def sort_edges_ascending(G):
     w_ = w[sortation]
     E = G.get_edgelist()
     E_ = []
+    #print(sortation.shape)
     for i in range(len(E)):
         idx = sortation[i]
         e = E[idx]
@@ -109,10 +116,12 @@ def partition(G, k):
     G_ = sort_edges_ascending(G)
     S = initial_partition(G_)
     m = get_n_edges(G_)
+    #print("number of edges", m)
     for i in range(m):
         e = get_edge(G_, i)
         w = get_edge_weight(G_, i)
         C1, C2 = get_components_from_edge(S, e)
+        #print(C1, C2, w, e)
         if C1 == C2:
             continue
         S = merge(G_, w, C1, C2, S, e, k)
@@ -132,8 +141,13 @@ def partition_from_probs(graph_dict, sim_probs, k, P, sp_idxs):
         r = receivers[i]
         e = (s, r)
         edges.append(e)
+    #print(edges)
     G.add_edges(edges)
-    G.es["w"] = 1 - sim_probs
+    weights = 1 - sim_probs
+    #weights = sim_probs
+    weights = weights.reshape(weights.shape[0], )
+    G.es["w"] = weights.tolist()
+    # G.es["w"] = sim_probs
     # now we now which superpoints belong together
     # S is a vector where each entry belongs to a superpoint
     # Merged superpoints have the same number as entry in S
