@@ -239,5 +239,5 @@ def all_scenes():
 
 
 if __name__ == "__main__":
-    main()
-    #all_scenes()
+    #main()
+    all_scenes()
