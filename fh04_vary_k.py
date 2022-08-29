@@ -143,7 +143,7 @@ def all_scenes():
 
     k_params = [0.001, 0.1, 1, 2, 10, 100]
     if args.cc:
-        k_params = [0.75, 0.8, 0.85, 0.9, 0.95]
+        k_params = [0.5, 0.6, 0.7, 0.8, 0.9]
 
     scenes, _, scannet_dir = get_scenes(blacklist=[])
     header = ["Name", "K"]
