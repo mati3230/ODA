@@ -22,7 +22,7 @@ from io_utils import load_colors
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--t", type=float, default=0.8, help="Similarity threshold.")
+    parser.add_argument("--t", type=float, default=0.6, help="Similarity threshold.")
     parser.add_argument("--k", type=float, default=100, help="k parameter of FH04 segmentation algorithm.")
     # cp params
     parser.add_argument("--reg_strength", default=0.1, type=float, help="Regularization strength for the minimal partition. Increase lambda for a coarser partition. ")
