@@ -359,6 +359,59 @@ def sp_in_comp(sp_i, comp):
     return False
 
 
+def connected_components_(i, uni, u_idxs, counts, visited, unions, receivers, components):
+    visited[i] = True
+    node_u = uni[i]
+    start = u_idxs[i]
+    stop = start + counts[i]
+    for j in range(start, stop):
+        union = unions[j]
+        if not union:
+            continue
+        
+        node_v = receivers[j]
+        idx = np.where(uni == node_v)[0]
+        if visited[idx]:
+            continue
+
+        components[-1] = components[-1].union({node_v, node_u})
+        components, visited = connected_components_(i=idx, uni=uni, u_idxs=u_idxs, counts=counts,
+            visited=visited, unions=unions, components=components)
+    
+    return components, visited
+
+
+def connected_components(graph_dict, unions, sp_idxs):
+    senders = np.array(graph_dict["senders"], copy=True)
+    receivers = np.array(graph_dict["receivers"], copy=True)
+    sortation = np.argsort(senders)
+    senders = senders[sortation]
+    receivers = receivers[sortation]
+    unions_ = np.array(unions, copy=True)
+    unions_ = unions_[sortation]
+    uni, u_idxs, counts = np.unique(senders, return_index=True, return_counts=True)
+    
+    visited = np.zeros(uni.shape, dtype=np.bool)
+    components = []
+
+    for i in range(uni.shape[0]):
+        if visited[i]:
+            continue
+        components.append(set())
+        components, visited = connected_components_(i=i, uni=uni, u_idxs=u_idxs, counts=counts,
+            visited=visited, unions=unions, receivers=receivers, components=components)
+    
+    components_list = []
+    for i in range(len(components)):
+        component = list(components[i])
+        components_list.append(list())
+        for sp_idx in component:
+            P_idxs = sp_idxs[sp_idx]
+            components_list[-1].append((sp_idx, P_idxs))
+    
+    return components_list
+
+
 def get_objects(picked_points_idxs, P, sp_idxs, graph_dict, unions):
     n_P = P.shape[0]
     selected_sps = uni_superpoint_idxs(picked_points_idxs=picked_points_idxs, sp_idxs=sp_idxs)
@@ -504,7 +557,8 @@ def partition(graph_dict, unions, P, sp_idxs, half=False, stris=None, verbose=Tr
     else:
         n_P = P.shape[0]
     par_v = np.zeros((n_P, ), dtype=np.uint32)
-    c_list = comp_list(graph_dict=graph_dict, unions=unions, n_P=n_P, sp_idxs=sp_idxs, half=half)
+    #c_list = comp_list(graph_dict=graph_dict, unions=unions, n_P=n_P, sp_idxs=sp_idxs, half=half)
+    c_list = connected_components(graph_dict=graph_dict, unions=unions, sp_idxs=sp_idxs)
 
     if is_mesh:
         if verbose:
