@@ -359,24 +359,21 @@ def sp_in_comp(sp_i, comp):
     return False
 
 
-def connected_components_(i, uni, u_idxs, counts, visited, unions, receivers, components):
+def connected_components_(i, uni, u_idxs, counts, visited, receivers, components):
     visited[i] = True
-    node_u = uni[i]
-    start = u_idxs[i]
-    stop = start + counts[i]
+    node_u = int(uni[i])
+    start = int(u_idxs[i])
+    stop = start + int(counts[i])
     for j in range(start, stop):
-        union = unions[j]
-        if not union:
-            continue
-        
-        node_v = receivers[j]
+        node_v = int(receivers[j])
         idx = np.where(uni == node_v)[0]
+        idx = int(idx[0])
         if visited[idx]:
             continue
 
         components[-1] = components[-1].union({node_v, node_u})
         components, visited = connected_components_(i=idx, uni=uni, u_idxs=u_idxs, counts=counts,
-            visited=visited, unions=unions, components=components)
+            visited=visited, receivers=receivers, components=components)
     
     return components, visited
 
@@ -384,11 +381,11 @@ def connected_components_(i, uni, u_idxs, counts, visited, unions, receivers, co
 def connected_components(graph_dict, unions, sp_idxs):
     senders = np.array(graph_dict["senders"], copy=True)
     receivers = np.array(graph_dict["receivers"], copy=True)
+    senders = senders[unions == True]
+    receivers = receivers[unions == True]
     sortation = np.argsort(senders)
     senders = senders[sortation]
     receivers = receivers[sortation]
-    unions_ = np.array(unions, copy=True)
-    unions_ = unions_[sortation]
     uni, u_idxs, counts = np.unique(senders, return_index=True, return_counts=True)
     
     visited = np.zeros(uni.shape, dtype=np.bool)
@@ -399,8 +396,21 @@ def connected_components(graph_dict, unions, sp_idxs):
             continue
         components.append(set())
         components, visited = connected_components_(i=i, uni=uni, u_idxs=u_idxs, counts=counts,
-            visited=visited, unions=unions, receivers=receivers, components=components)
-    
+            visited=visited, receivers=receivers, components=components)
+        if len(components[-1]) == 0:
+            del components[-1]
+    """
+    for i in range(len(components)):
+        comp_i = components[i]
+        for j in range(len(components)):
+            if i == j: 
+                continue
+            comp_j = components[j]
+            inter = comp_i.intersection(comp_j)
+            if len(inter) > 0:
+                raise Exception("inter: {0}, i: {1}, j: {2}".format(inter, comp_i, comp_j))
+    """
+
     components_list = []
     for i in range(len(components)):
         component = list(components[i])
