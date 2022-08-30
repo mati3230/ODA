@@ -4,6 +4,39 @@ import pptk
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
+#render_graph(P=np.array(np.hstack((xyz, rgb)), copy=True), nodes=np.arange(n_com), sp_idxs=components, sp_centers=sp_centers, senders=senders, receivers=receivers)
+def render_graph(P, nodes, sp_idxs, sp_centers=None, senders=None, receivers=None, sampled_nodes=None, colors=None):
+    sps = []
+    q_nodes = []
+    centers = []
+
+    o3d_P = o3d.utility.Vector3dVector(P[:, :3])
+    o3d_C = None
+    if colors is None:
+        if P.shape[1] > 3:
+            o3d_C = o3d.utility.Vector3dVector(P_[:, 3:6])
+    else:
+        C = np.zeros((P.shape[0], 3))
+        for i in range(len(sp_idxs)):
+            p_idxs = sp_idxs[i]
+            color = colors[i]
+            C[p_idxs] = color
+        o3d_C = o3d.utility.Vector3dVector(C)
+
+    cloud = o3d.geometry.PointCloud(points=o3d_P)
+    if o3d_C is not None:
+        cloud.colors = o3d_C
+    visu_list = [cloud]
+
+    if senders is not None:
+        o3d_centers = o3d.utility.Vector3dVector(sp_centers)
+        edges = np.hstack((senders[:, None], receivers[:, None]))
+        o3d_edges = o3d.utility.Vector2iVector(edges)
+        line_set = o3d.geometry.LineSet(points=o3d_centers, lines=o3d_edges)
+        visu_list.append(line_set)
+    
+    o3d.visualization.draw_geometries(visu_list)
+
 
 def pick_sp_points_o3d(pcd, is_mesh=False):
     print("")
@@ -115,8 +148,11 @@ def render_pptk(P, partition=None, initial_partition=None, point_size=-1, v=None
 
 
 def render_partition_vec_o3d(mesh, partition, colors):
-    vertices = np.asarray(mesh.vertices)
-    n_vert = vertices.shape[0]
+    if type(mesh) == np.ndarray:
+        n_vert = mesh.shape[0]
+    else:
+        vertices = np.asarray(mesh.vertices)
+        n_vert = vertices.shape[0]
     rgb = np.zeros((n_vert, 3), dtype=np.float32)
     uni_p = np.unique(partition)
     for i in range(len(uni_p)):
@@ -124,10 +160,15 @@ def render_partition_vec_o3d(mesh, partition, colors):
         idxs = np.where(partition == sp_v)[0]
         color = colors[i]
         rgb[idxs] = color
-    pmesh = o3d.geometry.TriangleMesh(
-        vertices=mesh.vertices,
-        triangles=mesh.triangles)
-    pmesh.vertex_colors = o3d.utility.Vector3dVector(rgb)
+    if type(mesh) == np.ndarray:
+        pmesh = o3d.geometry.PointCloud()
+        pmesh.points = o3d.utility.Vector3dVector(mesh[:, :3])
+        pmesh.colors = o3d.utility.Vector3dVector(rgb)
+    else:
+        pmesh = o3d.geometry.TriangleMesh(
+            vertices=mesh.vertices,
+            triangles=mesh.triangles)
+        pmesh.vertex_colors = o3d.utility.Vector3dVector(rgb)
     render_o3d(pmesh)
     return pmesh
 

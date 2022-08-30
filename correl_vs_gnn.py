@@ -45,10 +45,9 @@ def main():
     scenes, _, scannet_dir = get_scenes(blacklist=[])
     n_scenes = len(scenes)
     """
-
-            ooa_gnn, size_gnn, bce_gnn, ms_gnn, raw_score_gnn, 
-            match_stats_gnn[0], match_stats_gnn[1], match_stats_gnn[2], 
-            dens_stats_gnn[0], dens_stats_gnn[1], dens_stats_gnn[2],
+    ooa_gnn, size_gnn, bce_gnn, ms_gnn, raw_score_gnn, 
+    match_stats_gnn[0], match_stats_gnn[1], match_stats_gnn[2], 
+    dens_stats_gnn[0], dens_stats_gnn[1], dens_stats_gnn[2],
     """
     algorithms=["GNN", "Correl"]
     if args.load_exp:
@@ -112,6 +111,13 @@ def main():
             f1_imperfect = exp_dict["f1_imperfect"][0]
             #print(acc_gnn, acc_correl, acc_random, acc_imperfect)
         else:
+            sortation = np.argsort(p_vec_gt)
+            sortation = sortation.astype(np.uint32)
+            p_vec_gt = p_vec_gt[sortation]
+            xyz = xyz[sortation]
+            rgb = rgb[sortation]
+            P = P[sortation]
+
             p_gt = Partition(partition=p_vec_gt)
 
             graph_dict, sp_idxs, part_cp = graph(
@@ -142,20 +148,14 @@ def main():
             acc_gnn, prec_gnn, rec_gnn, f1_gnn, action_gnn = classification_metrics(y=unions_gt, probs=probs_gnn)
             acc_correl, prec_correl, rec_correl, f1_correl, action_correl = classification_metrics(y=unions_gt, probs=probs_correl)
         
-        sortation = np.argsort(p_vec_gt)
-        p_vec_gt = p_vec_gt[sortation]
 
         part_gnn = partition_from_probs(graph_dict=graph_dict, sim_probs=probs_gnn, k=args.k, P=P, sp_idxs=sp_idxs)
         part_correl = partition_from_probs(graph_dict=graph_dict, sim_probs=probs_correl, k=args.k, P=P, sp_idxs=sp_idxs)
-        part_gnn = part_gnn[sortation]
-        part_correl = part_correl[sortation]
+
         if args.load_exp:
             part_random = partition_from_probs(graph_dict=graph_dict, sim_probs=probs_random, k=args.k, P=P, sp_idxs=sp_idxs)
             # print(probs_correl[:200])
             part_imperfect = partition_from_probs(graph_dict=graph_dict, sim_probs=probs_imperfect, k=args.k, P=P, sp_idxs=sp_idxs)
-            part_random = part_random[sortation]
-            part_imperfect = part_imperfect[sortation]
-
 
         partition_gt = Partition(partition=p_vec_gt)
         ms_gnn, raw_score_gnn, ooa_gnn, match_stats_gnn, dens_stats_gnn = match_score(
