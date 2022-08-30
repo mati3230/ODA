@@ -180,6 +180,12 @@ def all_scenes():
             p_vec_gt = exp_dict["p_gt"]
             part_cp = exp_dict["p_cp"]
         else:
+            sortation = np.argsort(p_vec_gt)
+            sortation = sortation.astype(np.uint32)
+            p_vec_gt = p_vec_gt[sortation]
+            xyz = xyz[sortation]
+            rgb = rgb[sortation]
+            P = P[sortation]
             graph_dict, sp_idxs, part_cp = graph(
                 cloud=P,
                 k_nn_adj=args.k_nn_adj,
@@ -200,9 +206,6 @@ def all_scenes():
         all_data = []
         partition_gt = None
 
-        sortation = np.argsort(p_vec_gt)
-        p_vec_gt = p_vec_gt[sortation]
-        part_cp = part_cp[sortation]
         partition_gt = Partition(partition=p_vec_gt)
         ms_cp, raw_score_cp, ooa_cp, match_stats_cp, dens_stats_cp = match_score(
             gt_partition=partition_gt, partition=Partition(partition=part_cp), return_ooa=True)
@@ -218,7 +221,7 @@ def all_scenes():
                 part_fh04 = partition(graph_dict=graph_dict, unions=unions, P=P, sp_idxs=sp_idxs, half=False, verbose=verbose)
             else:
                 part_fh04 = partition_from_probs(graph_dict=graph_dict, sim_probs=probs, k=k, P=P, sp_idxs=sp_idxs)
-            part_fh04 = part_fh04[sortation]
+
             ms_fh04, raw_score_fh04, ooa_fh04, match_stats_fh04, dens_stats_fh04 = match_score(
                 gt_partition=partition_gt, partition=Partition(partition=part_fh04), return_ooa=True)
             

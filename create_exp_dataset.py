@@ -8,6 +8,9 @@ from ai_utils import graph, predict
 from exp_utils import mkdir, predict_correl, get_unions, get_imperfect_probs, save_exp_data, binary_cross_entropy, classification_metrics
 from partition.partition import Partition
 from partition.density_utils import densities_np
+from visu_utils import render_graph, render_partition_vec_o3d
+from sp_utils import sp_centers, partition
+from io_utils import load_colors
 
 
 def main():
@@ -28,6 +31,9 @@ def main():
     os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
     mkdir(args.h5_dir)
 
+    colors = load_colors()
+    colors = colors/255.
+
     scenes, _, scannet_dir = get_scenes(blacklist=[])
     n_scenes = len(scenes)
     
@@ -37,9 +43,12 @@ def main():
     for i in tqdm(range(n_scenes), desc=desc, disable=verbose):
         scene_name = scenes[i]
         mesh, p_vec_gt, file_gt = get_ground_truth(scannet_dir=scannet_dir, scene=scene_name)
-        xyz = np.asarray(mesh.vertices)
-        rgb = np.asarray(mesh.vertex_colors)
+        sortation = np.argsort(p_vec_gt)
+        sortation = sortation.astype(np.uint32)
+        xyz = np.asarray(mesh.vertices)[sortation]
+        rgb = np.asarray(mesh.vertex_colors)[sortation]
         P = np.hstack((xyz, rgb))
+        p_vec_gt = p_vec_gt[sortation]
         p_gt = Partition(partition=p_vec_gt)
 
         graph_dict, sp_idxs, part_cp = graph(
@@ -52,6 +61,7 @@ def main():
             max_sp_size=args.max_sp_size,
             verbose=verbose,
             return_p_vec=True)
+        #render_partition_vec_o3d(mesh=P, partition=part_cp, colors=colors)
         p_cp = Partition(partition=part_cp)
         if model is None:
             _, probs_gnn, model = predict(graph_dict=graph_dict, dec_b=args.t, return_model=True, verbose=False)
@@ -79,6 +89,7 @@ def main():
         #print(acc_gnn, acc_correl, acc_random, acc_imperfect)
 
         exp_dict = {
+            "sortation": sortation,
             "node_features": graph_dict["nodes"],
             "senders": graph_dict["senders"],
             "receivers": graph_dict["receivers"],
@@ -125,6 +136,16 @@ def main():
             exp_dict[str(j)] = np.array(sp)
         save_exp_data(fdir=args.h5_dir, fname=scene_name, exp_dict=exp_dict)
 
+        """
+        spc = sp_centers(sp_idxs=sp_idxs, xyz=xyz)
+        render_graph(P=P, nodes=np.arange(len(sp_idxs)), sp_idxs=sp_idxs, sp_centers=spc,
+            senders=graph_dict["senders"], receivers=graph_dict["receivers"], colors=colors)
+        render_graph(P=P, nodes=np.arange(len(sp_idxs)), sp_idxs=sp_idxs, sp_centers=spc,
+            senders=graph_dict["senders"][unions_gt], receivers=graph_dict["receivers"][unions_gt], colors=colors)
+        part_cc_gt = partition(graph_dict=graph_dict, unions=unions_gt, P=P, sp_idxs=sp_idxs, half=False, verbose=verbose)
+        render_partition_vec_o3d(mesh=P, partition=p_vec_gt, colors=colors)
+        render_partition_vec_o3d(mesh=P, partition=part_cc_gt, colors=colors)
+        """
 
 if __name__ == "__main__":
     main()

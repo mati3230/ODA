@@ -378,6 +378,14 @@ def connected_components_(i, uni, u_idxs, counts, visited, receivers, components
     return components, visited
 
 
+def sp_centers(sp_idxs, xyz):
+    sp_centers = np.zeros((len(sp_idxs), 3), dtype=np.float32)
+    for j in range(len(sp_idxs)):
+        P_idxs = sp_idxs[j]
+        sp_centers[j] = np.mean(xyz[P_idxs], axis=0)
+    return sp_centers
+
+
 def connected_components(graph_dict, unions, sp_idxs):
     senders = np.array(graph_dict["senders"], copy=True)
     receivers = np.array(graph_dict["receivers"], copy=True)

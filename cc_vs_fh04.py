@@ -6,7 +6,7 @@ import numpy as np
 from scannet_utils import get_scenes, get_ground_truth
 from ai_utils import graph, predict
 from partition.felzenszwalb import partition_from_probs
-from sp_utils import partition
+from sp_utils import partition, sp_centers
 from partition.partition import Partition
 from partition.density_utils import densities_np
 from exp_utils import \
@@ -16,7 +16,7 @@ from exp_utils import \
     mkdir,\
     load_exp_data
 
-from visu_utils import render_partition_vec_o3d
+from visu_utils import render_partition_vec_o3d, render_graph
 from io_utils import load_colors
 
 
@@ -75,7 +75,14 @@ def main():
             for j in range(probs.shape[0]):
                 prob = probs[j]
                 unions[j] = prob >= args.t
+            sortation = exp_dict["sortation"]
         else:
+            sortation = np.argsort(p_vec_gt)
+            sortation = sortation.astype(np.uint32)
+            p_vec_gt = p_vec_gt[sortation]
+            xyz = xyz[sortation]
+            rgb = rgb[sortation]
+            P = P[sortation]
             graph_dict, sp_idxs, part_cp = graph(
                 cloud=P,
                 k_nn_adj=args.k_nn_adj,
@@ -91,20 +98,28 @@ def main():
             else:
                 unions, probs = predict(graph_dict=graph_dict, dec_b=args.t, model=model, verbose=False)
 
-        sortation = np.argsort(p_vec_gt)
-        p_vec_gt = p_vec_gt[sortation]
+        """
+        max_lbl = np.max(p_vec_gt)
+        sp_idxs = []
+        for j in range(max_lbl):
+            idxs = np.where(p_vec_gt == j)[0]
+            if idxs.shape[0] == 0:
+                continue
+            sp_idxs.append(idxs)
+        """
+        """
+        spc = sp_centers(sp_idxs=sp_idxs, xyz=xyz)
+        render_graph(P=P, nodes=np.arange(len(sp_idxs)), sp_idxs=sp_idxs, sp_centers=spc,
+            senders=graph_dict["senders"], receivers=graph_dict["receivers"], colors=colors)
+        """
 
         part_fh04 = partition_from_probs(graph_dict=graph_dict, sim_probs=probs, k=args.k, P=P, sp_idxs=sp_idxs)
         part_cc = partition(graph_dict=graph_dict, unions=unions, P=P, sp_idxs=sp_idxs, half=False, verbose=verbose)
         part_fh04_gt = partition_from_probs(graph_dict=graph_dict, sim_probs=probs_gt, k=args.k, P=P, sp_idxs=sp_idxs)
         part_cc_gt = partition(graph_dict=graph_dict, unions=unions_gt, P=P, sp_idxs=sp_idxs, half=False, verbose=verbose)
+        
         #render_partition_vec_o3d(mesh=mesh, partition=part_cc_gt, colors=colors)
-
-        part_fh04 = part_fh04[sortation]
-        part_cc = part_cc[sortation]
-        part_cp = part_cp[sortation]
-        part_cc_gt = part_cc_gt[sortation]
-        part_fh04_gt = part_fh04_gt[sortation]
+        #render_partition_vec_o3d(mesh=mesh, partition=part_cc, colors=colors)
 
         partition_gt = Partition(partition=p_vec_gt)
         ms_fh04, raw_score_fh04, ooa_fh04, match_stats_fh04, dens_stats_fh04 = match_score(
@@ -117,7 +132,7 @@ def main():
             gt_partition=partition_gt, partition=Partition(partition=part_fh04_gt), return_ooa=True)
         ms_cc_gt, raw_score_cc_gt, ooa_cc_gt, match_stats_cc_gt, dens_stats_cc_gt = match_score(
             gt_partition=partition_gt, partition=Partition(partition=part_cc_gt), return_ooa=True)
-
+        #print(ooa_cc_gt, ooa_cc)
         size_fh04 = np.unique(part_fh04).shape[0]
         size_cc = np.unique(part_cc).shape[0]
         size_fh04_gt = np.unique(part_fh04_gt).shape[0]
