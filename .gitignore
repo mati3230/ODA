@@ -33,3 +33,27 @@ number_gtos.csv
 mesh_cloud_results.csv
 results.csv
 .ipynb_checkpoints
+
+# Data Analyzation
+analyze_cross1.ipynb
+cc_vary_t.csv
+cc_vs_fh04.csv
+commands.txt
+correl_vs_gnn.csv
+csv_data/
+csvs_cc_vary_t.zip
+csvs_cc_vary_t/
+csvs_cc_vs_fh04.zip
+csvs_cc_vs_fh04/
+csvs_correl_vs_gnn.zip
+csvs_correl_vs_gnn/
+csvs_vary_k.zip
+csvs_vary_k/
+exp_data.zip
+features.zip
+features1.zip
+fh04_vary_k.csv
+requirements_notebooks.txt
+scene0451_05_vh_clean_2.ply
+stats/
+tmp.zip

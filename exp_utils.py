@@ -229,6 +229,7 @@ def load_exp_data(fdir, fname):
     hf = h5py.File("{0}{1}".format(fdir, fname), "r")
     #print(np.array(hf["acc_gnn"], copy=True))
     exp_dict = {
+        "sortation": np.array(hf["sortation"], copy=True),
         "node_features": np.array(hf["node_features"], copy=True),
         "senders": np.array(hf["senders"], copy=True),
         "receivers": np.array(hf["receivers"], copy=True),
