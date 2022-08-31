@@ -57,3 +57,16 @@ requirements_notebooks.txt
 scene0451_05_vh_clean_2.ply
 stats/
 tmp.zip
+01_cutpursuit_graph.png
+02_unions.png
+03_ground_truth_partition.png
+04_connected_components.png
+exp_data/
+feature_data/
+model_light.npz
+old_gnn_data/
+old_model.npz
+old_tmp/
+snapshots/
+tf_utils.py
+tmp_data/
