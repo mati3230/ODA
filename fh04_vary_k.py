@@ -143,7 +143,7 @@ def all_scenes():
 
     k_params = [0.001, 0.1, 1, 2, 10, 100]
     if args.cc:
-        k_params = [0.5, 0.6, 0.7, 0.8, 0.9]
+        k_params = [0.55, 0.6, 0.65, 0.7]
 
     scenes, _, scannet_dir = get_scenes(blacklist=[])
     header = ["Name", "K"]
@@ -161,7 +161,7 @@ def all_scenes():
     desc = "Vary K"
     if args.cc:
         desc = "Vary T"
-    for j in tqdm(range(len(scenes)), desc=desc):
+    for j in tqdm(range(len(scenes)), desc=desc, disable=False):
         scene_name = scenes[j]
         mesh, p_vec_gt, file_gt = get_ground_truth(
             scannet_dir=scannet_dir, scene=scene_name)
@@ -177,6 +177,7 @@ def all_scenes():
                 "receivers": exp_dict["receivers"]
             }
             probs = exp_dict["probs_gnn"]
+            #print("mean: {0}, std: {1}".format(np.mean(probs), np.std(probs)))
             p_vec_gt = exp_dict["p_gt"]
             part_cp = exp_dict["p_cp"]
         else:
@@ -213,11 +214,9 @@ def all_scenes():
 
         for i in range(len(k_params)):
             k = k_params[i]
+            #k = 0.99
             if args.cc:
-                unions = np.zeros(probs.shape, dtype=np.bool)
-                for z in range(probs.shape[0]):
-                    prob = probs[z]
-                    unions[z] = prob >= k
+                unions = probs >= k
                 part_fh04 = partition(graph_dict=graph_dict, unions=unions, P=P, sp_idxs=sp_idxs, half=False, verbose=verbose)
             else:
                 part_fh04 = partition_from_probs(graph_dict=graph_dict, sim_probs=probs, k=k, P=P, sp_idxs=sp_idxs)
@@ -226,6 +225,8 @@ def all_scenes():
                 gt_partition=partition_gt, partition=Partition(partition=part_fh04), return_ooa=True)
             
             size_fh04 = np.unique(part_fh04).shape[0]
+            #print("k:", k, "size:", size_fh04, "len sp_idxs:", len(sp_idxs))
+            #return
             ooas.append(ooa_fh04)
             sizes.append(size_fh04)
             all_data.append([

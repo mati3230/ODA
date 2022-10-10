@@ -389,6 +389,19 @@ def sp_centers(sp_idxs, xyz):
 def connected_components(graph_dict, unions, sp_idxs):
     senders = np.array(graph_dict["senders"], copy=True)
     receivers = np.array(graph_dict["receivers"], copy=True)
+    n_unions = np.sum(unions)
+    components_list = []
+    if n_unions == 0:
+        for i in range(len(sp_idxs)):
+            spi = sp_idxs[i]
+            components_list.append(list())
+            components_list[-1].append((i, spi))
+        return components_list
+    elif n_unions == len(senders):
+        components_list.append(list())
+        n_points = graph_dict["nodes"].shape[0]
+        components_list[-1].append((0, np.arange(n_points, dtype=np.int32)))
+        return components_list
     senders = senders[unions == True]
     receivers = receivers[unions == True]
     sortation = np.argsort(senders)
@@ -418,15 +431,20 @@ def connected_components(graph_dict, unions, sp_idxs):
             if len(inter) > 0:
                 raise Exception("inter: {0}, i: {1}, j: {2}".format(inter, comp_i, comp_j))
     """
-
-    components_list = []
+    union_mask = len(sp_idxs) * [False]
     for i in range(len(components)):
         component = list(components[i])
         components_list.append(list())
         for sp_idx in component:
+            union_mask[sp_idx] = True
             P_idxs = sp_idxs[sp_idx]
             components_list[-1].append((sp_idx, P_idxs))
-    
+    for i in range(len(sp_idxs)):
+        if union_mask[i]:
+            continue
+        components_list.append(list())
+        P_idxs = sp_idxs[i]
+        components_list[-1].append((i, P_idxs))
     return components_list
 
 
