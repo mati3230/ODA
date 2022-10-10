@@ -47,7 +47,7 @@ def internal_difference(G, S, C):
     elif len(weights_C) == 1:
         return weights_C[0]
     elif len(weights_C) == 2:
-        return min(weights_C)
+        return max(weights_C) # TODO why not using max? we want he max weight of the minimum spanning tree!
     G_C.add_vertices(len(verts_C))
     G_C.add_edges(edges_C)
     edge_idxs_MST = G_C.spanning_tree(weights=weights_C, return_tree=False)
