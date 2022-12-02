@@ -1,53 +1,44 @@
-# Requirements
+# Graph Neural Network Partition
+
+This repository contains a script [oda.py](./oda.py) to interactively create a partition. Furthermore, it contains scripts to evaluate graph neural network architectures and union algorithms in the context of the partition task. The strongly connected components algorithm and the segmentation algorithm of Felzenzwalb and Huttenlocher can be used as union algorithms. The code works on Windows. 
+
+## Requirements
 
 * Python 3.6.8
 
 # Install
 
-* pip install -r requirements.txt
+```
+conda install -c anaconda boost
+pip install -r requirements.txt
+```
 
-# Quickstart
+## Quickstart Partition Creation
 
-python oda.py --file ../conferenceRoom_1.txt --p 0.05 --reg_strength 0.03 --initial_db 0.9 --load_probs True --g_filename a1cr1
-python oda.py --file D:/Datasets/HSD/data/Hive/hive.npz --reg_strength 0.3 --initial_db 0.88 --g_filename hive --max_sp_size 25000 --p 0.1 --save_init_g True --save_probs True 
+```
+python oda.py --file path/to/txt/point/cloud.txt --p 0.05 --reg_strength 0.03 --initial_db 0.9 --load_probs True --g_filename a1cr1
+```
+```
+python oda.py --file path/to/npz/point/cloud.npz --reg_strength 0.3 --initial_db 0.88 --g_filename hive --max_sp_size 25000 --p 0.1 --save_init_g True --save_probs True 
+```
 
-TODO: Add script to create the colors.npz file
+## Evaluation
 
-## Windows
+The evaluation can be conducted with the ScanNet dataset. After downloading the ScanNet dataset, create an environment variable SCANNET_DIR which points to the root directory of the dataset. For instance, SCANNET_DIR/scans should be a valid path.
 
-Ensure that the following files are in the project: 
-* boost_numpy36-vc142-mt-x64-1_74.dll
-* boost_python36-vc142-mt-x64-1_74.dll
-* ply_c_ext.pyd
-* cp_ext.pyd
+First, create a preprocessed dataset to accelerate the evaluation process: 
+```
+python create_exp_dataset.py
+```
 
-# Code Insights of the oda.py Script
+After that, you can run an evaluation script, such as
+```
+python cc_vs_fh04.py
+```
+which executes that connected components and the segmentation algorithm of Felzenzwalb and Huttenlocher. The evaluation data will be stored in a folder called *csvs_cc_vs_fh04*. The csvs can be concatenated with:
+```
+python concat_csvs.py --csv_dir ./csvs_cc_vs_fh04 --file cc_vs_fh04.csv
+```
+After that, you can start the *cc_vs_fh04.ipynb* jupyter notebook to analyize the data. 
 
-## Loading of a Point Cloud
-
-At the beginning of the code a point cloud is loaded. This is realized with the helper function load_cloud which is defined in the [io_utils](./io_utils.py) script. After that a point cloud can be processed (e.g. aligning to the coordinate axis or translate the point cloud in the origin) so that our assumptions to an input point cloud are fitted. 
-
-## Creation of the Superpoint Graph
-
-The superpoint graph is created by a function which is called graph (see [ai_utils.py](./ai_utils.py)). The superpoint graph which is later passed to the neural network is created by functions of [Landrieu et al.](https://github.com/loicland/superpoint_graph). The end of the function superpoint_graph (see [ai_utils.py](./ai_utils.py)) returns the used graph data structure. 
-
-## DEMO
-
-Show the coloured mesh:
-
-python oda_mesh.py --file ../sn000000.ply --g_filename sn000000 --n_proc 1 --load_proc_cloud True
-
-Show the partitioned mesh:
-
-python oda_mesh.py --file ../sn000000.ply --g_filename sn000000 --n_proc 1 --save_init_g True --save_probs True --load_init_g True --load_probs True --load_unions True
-
-# Compile pcl_c
-
-Set CONDAENV to directory of the python interpreter
-
-cmake .. . -DPYTHON_LIBRARY="$CONDAENV/python36.dll" -DPYTHON_INCLUDE_DIR="$CONDAENV/include" -DBOOST_INCLUDEDIR="$CONDAENV/Library/include" -DEIGEN3_INCLUDE_DIR="$CONDAENV/Library/include"
-
-Check the include and linker directories in .vcxproj-file
-
-msbuild LIBGEOF.sln /p:Configuration=Release
-
+The other evaluation scripts ([correl_vs_gnn.py](./correl_vs_gnn.py) and [fh04_vary_k.py](./fh04_vary_k.py)) can be used in the same way.
